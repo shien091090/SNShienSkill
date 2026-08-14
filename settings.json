@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "defaultMode": "auto"
+  },
+  "model": "claude-fable-5[1m]",
+  "statusLine": {
+    "type": "command",
+    "command": "node ~/.claude/statusline.js",
+    "padding": 2
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
+  },
+  "syntaxHighlightingDisabled": false,
+  "askUserQuestionTimeout": "never",
+  "autoUpdatesChannel": "latest",
+  "tui": "fullscreen",
+  "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
+  "skipAutoPermissionPrompt": true,
+  "allowedTools": [
+    "Bash",
+    "PowerShell"
+  ]
+}

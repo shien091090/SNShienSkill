@@ -1,0 +1,32 @@
+# 白名單制: 預設全部忽略, 只手動放行想同步的路徑
+*
+
+# 頂層設定檔
+!/settings.json
+!/statusline.js
+!/.gitignore
+
+# 個人本機設定(含明文token等機密, 不進版控)
+settings.local.json
+
+# 自訂 output style
+!/output-styles/
+!/output-styles/**
+
+# 自訂 skills
+!/skills/
+!/skills/**
+
+# 只同步 memory 筆記, 不同步整個 projects/ (含逐字稿等機密內容)
+!/projects/
+/projects/*
+!/projects/C--Users-lithoshu/
+/projects/C--Users-lithoshu/*
+!/projects/C--Users-lithoshu/memory/
+!/projects/C--Users-lithoshu/memory/**
+# IDE專案設定, 不是筆記內容
+/projects/C--Users-lithoshu/memory/.idea/
+
+# skill 執行紀錄(可能含群組名稱等私人資訊), 只同步 skill 本體
+/skills/line-group-export/logs/
+/skills/unity-mcp-skill/.unity-mcp-skill-sync

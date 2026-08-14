@@ -1,0 +1,40 @@
+{
+  "categories": [
+    {
+      "id": "discount",
+      "label": "打折優惠",
+      "description": "任何提到折扣、優惠、促銷、特價的訊息",
+      "enabled": true
+    },
+    {
+      "id": "taichung_event",
+      "label": "台中期間限定活動",
+      "description": "台中市舉辦的期間限定活動、快閃活動、展覽等訊息",
+      "enabled": true
+    },
+    {
+      "id": "taichung_sale",
+      "label": "台中特賣會",
+      "description": "台中市的特賣會、清倉拍賣等訊息",
+      "enabled": true
+    },
+    {
+      "id": "tech_news",
+      "label": "科技新聞",
+      "description": "AI、科技、3C相關新聞",
+      "enabled": true
+    },
+    {
+      "id": "game_news",
+      "label": "遊戲新聞",
+      "description": "遊戲開發、遊戲發布、遊戲產業相關新聞",
+      "enabled": true
+    },
+    {
+      "id": "current_affairs",
+      "label": "時事新聞",
+      "description": "國內外時事相關新聞",
+      "enabled": true
+    }
+  ]
+}
