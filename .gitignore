@@ -17,15 +17,7 @@ settings.local.json
 !/skills/
 !/skills/**
 
-# 只同步 memory 筆記, 不同步整個 projects/ (含逐字稿等機密內容)
-!/projects/
-/projects/*
-!/projects/C--Users-lithoshu/
-/projects/C--Users-lithoshu/*
-!/projects/C--Users-lithoshu/memory/
-!/projects/C--Users-lithoshu/memory/**
-# IDE專案設定, 不是筆記內容
-/projects/C--Users-lithoshu/memory/.idea/
+# projects/ 不納入版控(內容非預期同步對象)
 
 # skill 執行紀錄(可能含群組名稱等私人資訊), 只同步 skill 本體
 /skills/line-group-export/logs/
