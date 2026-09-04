@@ -97,17 +97,13 @@ findSubset(pool, target, startIndex, current):
   return findSubset(pool, target, startIndex+1, current)
 ```
 
-### 6. 產生本機 HTML 報表並開啟瀏覽器
+### 6. 產生對帳報告並以 Artifact 連結呈現
 
-使用 Write 工具將 HTML 寫入以下路徑（檔名包含日期範圍）：
+發布前先 load `artifact-design` skill 校準設計投入程度。
 
-```
-C:\Users\lithoshu\Desktop\對帳報告_{startDate}_{endDate}.html
-```
+將 HTML 寫入 scratchpad 目錄下的暫存檔（檔名包含日期範圍，例如 `對帳報告_20260601_20260629.html`），不要存到 Desktop 或任何使用者可見的持久路徑——這份檔案只是發布用的暫存稿。
 
-例如：`對帳報告_20260601_20260629.html`
-
-HTML 必須是完整的獨立網頁（`<!DOCTYPE html>` 開頭、`<html><head><body>` 完整結構、所有 CSS 內嵌於 `<style>`，不依賴任何外部資源）。
+HTML 內容本身不需 `<!DOCTYPE html>`／`<html>`／`<head>`／`<body>` 外層標籤，直接寫頁面內容（Artifact 工具會自動包一層），所有 CSS 內嵌，不依賴任何外部資源。
 
 **HTML 報表內容規格：**
 
@@ -131,10 +127,6 @@ Table 2 — 已比對（`<details><summary>` 預設收合，灰色）：
 
 頁尾說明文字：比對邏輯（兩段式 ± 1 日）：①先找當日∪前一日記帳中單筆精確匹配；②其餘以 exact subset sum 補配。折扣商家（如新知喬95折）會同時嘗試原金額與折扣後金額。金額無法對齊時標記為可能漏記，請人工確認。
 
-寫入完成後，用 PowerShell 開啟檔案：
+寫入完成後，用 Artifact 工具發布（`favicon` 用 🧾，`title` 用「對帳報告」，`description` 為時間範圍摘要）。
 
-```powershell
-Start-Process "C:\Users\lithoshu\Desktop\對帳報告_{startDate}_{endDate}.html"
-```
-
-最後告知使用者報告已開啟，並列出可能漏記的摘要（幾筆、哪幾天）。
+最後在對話框中提供 Artifact 連結給使用者查看，並列出可能漏記的摘要（幾筆、哪幾天）。
