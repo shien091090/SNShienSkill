@@ -66,22 +66,65 @@ Get-ChildItem "$env:SNSHIEN_ROOT\gas_live_integration" -Recurse -File | Select-O
 
 ---
 
-## Step 2 — 檢查 GAS pre-push hook
+## Step 2 — 確認 GAS 部署環境（clasp）
 
-使用 PowerShell 檢查 `gas_live_integration` 的 pre-push hook 是否存在：
+`gas_live_integration` 透過 clasp 部署到 Google Apps Script。全新裝置上需要三件事都到位：clasp 已安裝、已登入授權、`.clasp.json` 已連結到正確的 GAS 專案。`.clasp.json` 被 `.gitignore` 排除、不會隨 git clone 帶過來，每台新裝置都要重建一次。
+
+### 1. 確認 clasp 已安裝
+
+```powershell
+Get-Command clasp -ErrorAction SilentlyContinue
+```
+
+沒找到就安裝：
+
+```powershell
+npm install -g @google/clasp
+```
+
+### 2. 確認 `.clasp.json` 已連結專案
+
+```powershell
+Test-Path "$env:SNSHIEN_ROOT\gas_live_integration\.clasp.json"
+```
+
+若回傳 `False`，建立它（scriptId 是這個 GAS 專案固定的值，不會因裝置而變）：
+
+```powershell
+$claspConfig = @{ scriptId = '1bPOXP0XfEU-OiFgvm4sahG106lxB6Er1D9orG-Jau5Kp4y_LRkTuEgnV'; rootDir = '.' } | ConvertTo-Json
+Set-Content -Path "$env:SNSHIEN_ROOT\gas_live_integration\.clasp.json" -Value $claspConfig
+```
+
+### 3. 確認已登入 clasp
+
+```powershell
+Set-Location "$env:SNSHIEN_ROOT\gas_live_integration"
+clasp status
+```
+
+若出現登入/授權相關錯誤，代表這台裝置還沒登入過——**這是互動式 OAuth，Claude 沒辦法代為操作**，請使用者自己在提示字元前加 `!` 執行，並停在這裡等使用者回報登入完成，不要自行嘗試繞過：
+
+```
+! clasp login
+```
+
+### 4. 檢查 pre-push hook
 
 ```powershell
 Test-Path "$env:SNSHIEN_ROOT\gas_live_integration\.git\hooks\pre-push"
+Get-Content "$env:SNSHIEN_ROOT\gas_live_integration\.git\hooks\pre-push" -Raw -ErrorAction SilentlyContinue
 ```
 
-若回傳 `False`，自動建立：
+若檔案不存在，或內容不是 `clasp push --force`（例如舊版只有 `clasp push`），(重新)建立：
 
 ```powershell
-$hookContent = "#!/bin/sh`nclasp push"
+$hookContent = "#!/bin/sh`nclasp push --force"
 Set-Content -Path "$env:SNSHIEN_ROOT\gas_live_integration\.git\hooks\pre-push" -Value $hookContent -NoNewline
 ```
 
-建立後告知使用者「已建立 pre-push hook」；若已存在則不需提及。
+**一定要用 `--force`**：clasp 只要偵測到 `appsscript.json`（manifest）跟遠端有一點點差異（哪怕只是行尾符號），沒加 `--force` 就會直接印出「Skipping push.」但不報錯——`git push` 表面上成功，GAS 其實完全沒有部署到新版。這個坑已經實測踩過，務必用 `--force` 避免靜默失敗。
+
+建立/修正後告知使用者「已建立（或已修正）pre-push hook」；若已經是 `clasp push --force` 則不需提及。
 
 ---
 
