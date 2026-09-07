@@ -115,16 +115,25 @@ Test-Path "$env:SNSHIEN_ROOT\gas_live_integration\.git\hooks\pre-push"
 Get-Content "$env:SNSHIEN_ROOT\gas_live_integration\.git\hooks\pre-push" -Raw -ErrorAction SilentlyContinue
 ```
 
-若檔案不存在，或內容不是 `clasp push --force`（例如舊版只有 `clasp push`），(重新)建立：
+正確內容應該是（`deploymentId` 是正式環境固定值，不會因裝置而變）：
+
+```
+#!/bin/sh
+clasp push --force && clasp deploy -i AKfycbydY2IAQ2CLCeU2baHfdWO1rCCzZPOUp8qt_fS2967yZYkmcn7b1Q-zOk2kixYV36dNXQ
+```
+
+若檔案不存在，或內容跟上面不一致（例如舊版只有 `clasp push`，或只有 `clasp push --force` 但沒有後面的 `clasp deploy`），(重新)建立：
 
 ```powershell
-$hookContent = "#!/bin/sh`nclasp push --force"
+$hookContent = "#!/bin/sh`nclasp push --force && clasp deploy -i AKfycbydY2IAQ2CLCeU2baHfdWO1rCCzZPOUp8qt_fS2967yZYkmcn7b1Q-zOk2kixYV36dNXQ"
 Set-Content -Path "$env:SNSHIEN_ROOT\gas_live_integration\.git\hooks\pre-push" -Value $hookContent -NoNewline
 ```
 
-**一定要用 `--force`**：clasp 只要偵測到 `appsscript.json`（manifest）跟遠端有一點點差異（哪怕只是行尾符號），沒加 `--force` 就會直接印出「Skipping push.」但不報錯——`git push` 表面上成功，GAS 其實完全沒有部署到新版。這個坑已經實測踩過，務必用 `--force` 避免靜默失敗。
+**為什麼兩步都要**：
+- **`--force`**：clasp 只要偵測到 `appsscript.json`（manifest）跟遠端有一點點差異（哪怕只是行尾符號），沒加 `--force` 就會直接印出「Skipping push.」但不報錯——`git push` 表面上成功，GAS 其實完全沒有部署到新版。這個坑已經實測踩過。
+- **`clasp deploy -i <deploymentId>`**：`clasp push` 只會更新 Apps Script 專案的 HEAD（開發版）內容，**不會**讓正式的 `/exec` 網址自動跟著換版本——那個網址是綁定在特定 deployment 的固定版本號上。這個坑也已經實測踩過：曾經連續好幾次 `clasp push` 都成功，但正式環境（LINE bot、家庭總覽 dashboard 實際呼叫的網址）一直停在舊版本沒更新，導致程式邏輯跟已經改過格式的 Google Sheet 對不上、算出全部歸零。用同一個 `deploymentId` 重新 `clasp deploy` 才會讓 `/exec` 網址真正切到最新程式碼，網址本身不會變。
 
-建立/修正後告知使用者「已建立（或已修正）pre-push hook」；若已經是 `clasp push --force` 則不需提及。
+建立/修正後告知使用者「已建立（或已修正）pre-push hook」；若已經正確則不需提及。
 
 ---
 
