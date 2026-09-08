@@ -127,5 +127,75 @@ while ($true) {
 }
 
 # ---- RESULT ----
-Emit @{ status = 'ok'; request_id = $requestId; message = 'poll done (download not implemented yet)' }
+try { $result = Get-WithRetry $responseUrl } catch { Fail 'result' (Get-HttpError $_) $requestId }
+
+# Walk the result object; collect fal "File"-like objects: has `url` plus one of content_type/file_name/file_size/width
+function Find-FileObjects($node, [ref]$acc) {
+  if ($null -eq $node) { return }
+  if ($node -is [string]) { return }
+  if ($node -is [System.Collections.IEnumerable]) { foreach ($n in $node) { Find-FileObjects $n $acc }; return }
+  if ($node -is [System.Management.Automation.PSCustomObject]) {
+    $props = @($node.PSObject.Properties.Name)
+    $isFile = ($props -contains 'url') -and (($props -contains 'content_type') -or ($props -contains 'file_name') -or ($props -contains 'file_size') -or ($props -contains 'width'))
+    if ($isFile -and "$($node.url)" -like 'http*') { $acc.Value.Add($node) | Out-Null; return }
+    foreach ($p in $props) { Find-FileObjects $node.$p $acc }
+  }
+}
+
+$found = New-Object System.Collections.ArrayList
+Find-FileObjects $result ([ref]$found)
+
+# de-duplicate by url (e.g. hunyuan returns model_glb and model_urls.glb pointing to the same file)
+$seen = @{}
+$files = @()
+foreach ($f in $found) { if (-not $seen.ContainsKey($f.url)) { $seen[$f.url] = $true; $files += $f } }
+
+$elapsed = [int]((Get-Date) - $script:StartTime).TotalSeconds
+if ($files.Count -eq 0) {
+  Emit @{ status = 'ok'; files = @(); remote_urls = @(); request_id = $requestId; elapsed_sec = $elapsed; note = 'no downloadable file objects found'; raw = $result }
+  exit 0
+}
+
+function Get-ExtFor($fileObj) {
+  try { $ext = [IO.Path]::GetExtension(([Uri]$fileObj.url).AbsolutePath) } catch { $ext = '' }
+  if ($ext) { return $ext.ToLower() }
+  switch ("$($fileObj.content_type)") {
+    'image/jpeg'        { return '.jpg' }
+    'image/png'         { return '.png' }
+    'image/webp'        { return '.webp' }
+    'video/mp4'         { return '.mp4' }
+    'audio/mpeg'        { return '.mp3' }
+    'audio/mp3'         { return '.mp3' }
+    'audio/wav'         { return '.wav' }
+    'audio/x-wav'       { return '.wav' }
+    'model/gltf-binary' { return '.glb' }
+    default             { return '.bin' }
+  }
+}
+
+if ([string]::IsNullOrWhiteSpace($OutDir)) { $OutDir = Join-Path (Get-Location) 'fal_out' }
+$dir = Join-Path $OutDir $Category
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+$stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+
+$saved = @()
+$remote = @()
+$i = 0
+foreach ($f in $files) {
+  $i++
+  $remote += "$($f.url)"
+  $ext = Get-ExtFor $f
+  if ($files.Count -gt 1) { $name = ('{0}_{1:d2}{2}' -f $stamp, $i, $ext) } else { $name = "$stamp$ext" }
+  $dest = Join-Path $dir $name
+  try {
+    Invoke-WebRequest -Uri $f.url -OutFile $dest -UseBasicParsing
+    $saved += $dest
+    Write-Output "$(Elapsed) SAVED $dest"
+  } catch {
+    Fail 'download' (Get-HttpError $_) $requestId $remote
+  }
+}
+
+$elapsed = [int]((Get-Date) - $script:StartTime).TotalSeconds
+Emit @{ status = 'ok'; files = $saved; remote_urls = $remote; request_id = $requestId; elapsed_sec = $elapsed }
 exit 0
