@@ -84,7 +84,45 @@ function Get-WithRetry([string]$Uri) {
   }
 }
 
+function Get-MimeFor([string]$Path) {
+  switch ([IO.Path]::GetExtension($Path).ToLower()) {
+    '.png'  { return 'image/png' }
+    '.jpg'  { return 'image/jpeg' }
+    '.jpeg' { return 'image/jpeg' }
+    '.webp' { return 'image/webp' }
+    '.gif'  { return 'image/gif' }
+    '.mp4'  { return 'video/mp4' }
+    '.mp3'  { return 'audio/mpeg' }
+    '.wav'  { return 'audio/wav' }
+    '.glb'  { return 'model/gltf-binary' }
+    default { return 'application/octet-stream' }
+  }
+}
+
+function Upload-File([string]$Path) {
+  if (-not (Test-Path -LiteralPath $Path)) { Fail 'upload' "Input file not found: $Path" }
+  $mime = Get-MimeFor $Path
+  $body = @{ content_type = $mime; file_name = [IO.Path]::GetFileName($Path) } | ConvertTo-Json -Compress
+  try {
+    $init = Invoke-RestMethod -Method Post -Uri 'https://rest.fal.ai/storage/upload/initiate?storage_type=fal-cdn-v3' -Headers $headers -ContentType 'application/json' -Body $body
+  } catch { Fail 'upload' ("initiate failed: " + (Get-HttpError $_)) }
+  if (-not $init.upload_url -or -not $init.file_url) { Fail 'upload' "initiate returned no upload_url/file_url: $($init | ConvertTo-Json -Compress)" }
+  try {
+    # signed URL: do NOT send Authorization header
+    Invoke-RestMethod -Method Put -Uri $init.upload_url -InFile $Path -ContentType $mime | Out-Null
+  } catch { Fail 'upload' ("PUT failed: " + (Get-HttpError $_)) }
+  [Console]::Out.WriteLine("$(Elapsed) UPLOADED $([IO.Path]::GetFileName($Path)) -> $($init.file_url)")
+  return "$($init.file_url)"
+}
+
 # ---- MAIN ----
+if ($UploadOnly) {
+  if ([string]::IsNullOrWhiteSpace($InputFile)) { Fail 'upload' '-UploadOnly requires -InputFile' }
+  $u = Upload-File $InputFile
+  Emit @{ status = 'ok'; file_url = $u }
+  exit 0
+}
+
 $resume = -not [string]::IsNullOrWhiteSpace($StatusUrl)
 if ($resume) {
   if ([string]::IsNullOrWhiteSpace($ResponseUrl)) { Fail 'resume' '-ResponseUrl is required with -StatusUrl' }
@@ -94,7 +132,12 @@ if ($resume) {
   $cancelUrl = $null
   Write-Output "$(Elapsed) RESUMED request_id=$requestId"
 } else {
+  $fileUrl = $null
+  if (-not [string]::IsNullOrWhiteSpace($InputFile)) { $fileUrl = Upload-File $InputFile }
+
   $payload = Read-Payload $PayloadFile
+  if ($fileUrl) { $payload = $payload.Replace('__INPUT_FILE_URL__', $fileUrl) }
+  if ($payload.Contains('__INPUT_FILE_URL__')) { Fail 'payload' 'Payload contains __INPUT_FILE_URL__ but no -InputFile was given.' }
 
   $submit = Submit-Job $Endpoint $payload
   $requestId = $submit.request_id
