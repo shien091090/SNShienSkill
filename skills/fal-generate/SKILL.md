@@ -62,17 +62,25 @@ $r.credits.current_balance
 ```
 
 - 成功且 `balance < low_balance_threshold`：
-  - 若 tier ≠ low → 本次改用 `low`，並將 `config.categories[類別].current = "low"` 寫回
-  - 不論 tier 為何，Gate 1 卡片加一行「⚠️ 額度剩 ${balance}，低於門檻 ${threshold}」（使用者手動切回較貴方案時，每次都會再看到這行）
+  - 類別為 `sfx` → 此降級規則不適用（sfx 只有一個模型，沒有更便宜的等級可切），略過「改用 low／寫回 current」的步驟；但仍在 Gate 1 卡片加上下面的餘額警告行讓使用者知情
+  - 其餘類別，若 tier ≠ low → 本次改用 `low`，並將 `config.categories[類別].current = "low"` 寫回
+  - 不論 tier 為何（含 sfx），Gate 1 卡片加一行「⚠️ 額度剩 ${balance}，低於門檻 ${threshold}」（使用者手動切回較貴方案時，每次都會再看到這行）
 - 失敗（401/403/網路）→ 卡片加一行「（餘額查詢失敗：{原因}，略過自動降級）」，繼續
 
 ### 3.3 決定端點
 
-`endpoint = config.categories[類別].tiers[tier].endpoints[模式]`。
+sfx 沒有 tier/mode 分支，直接 `endpoint = config.categories.sfx.single.endpoints.generate`，不套用以下的一般公式（也沒有其他等級可以往上找）。
 
-為 `null`（該等級不支援此模式）→ 依序往 `medium`、`high` 找第一個非 null 的端點，改用該等級**僅此一次**（不寫回 config），並在 Gate 1 卡片註明「{原等級} 不支援{模式}，本次改用 {替代等級} {label}」。
+其餘類別：`endpoint = config.categories[類別].tiers[tier].endpoints[模式]`。
 
-3d 的 `text_to_3d` 在 medium/low 皆為 null 時 → 兩段式：先以 `image` 類別目前等級的 `generate` 生一張參考圖（payload 加 `"aspect_ratio":"1:1"` 或 `image_size":"square"`），再以該圖走 `image_to_3d`。Gate 1 卡片分兩行列出兩段費用，總計後確認。第一段完成後不再另外確認，直接進第二段。
+為 `null`（該等級不支援此模式）→ 依序往 `medium`、`high` 找第一個非 null 的端點，改用該等級**僅此一次**（不寫回 config），並在 Gate 1 卡片註明「{原等級} 不支援{模式}，本次改用 {替代等級} {label}」。**例外**：category=3d 且 mode=text_to_3d 時不適用此規則，改用下面的專屬規則；其餘所有類別/模式組合（例如 image 的 `edit` 在 low 等級為 null）仍照此規則處理。
+
+**3d 的 text_to_3d 專屬規則**（取代上一段的一般規則，僅適用於這個組合，不做「往上找等級」的搜尋）：當目前 3d 等級的 `text_to_3d` 為 `null`（medium、low 皆是如此）時，改走兩段式流程：
+
+1. 先以 `image` 類別目前等級的 `generate` 生一張參考圖（payload 加 `"aspect_ratio":"1:1"` 或 `"image_size":"square"`）。
+2. 再以該圖，用**同一個** 3d 等級（也就是使用者原本所在的 medium 或 low——這兩個等級的 `image_to_3d` 皆非 null，只有 `text_to_3d` 是 null）走 `image_to_3d`。
+
+Gate 1 卡片分兩行列出兩段費用，總計後確認一次；第一段完成後不再另外確認，直接進第二段。第一段產生的參考圖會更新 `config.last_output.image`（它是真實可用的生成圖檔，路徑已知，不只是內部暫存），第二段的 GLB 依 §7 一般規則更新 `config.last_output.3d`。
 
 ### 3.4 使用者指定任意模型（「切換到 XXX 模型」「用 XXX 生」）
 
@@ -92,15 +100,15 @@ $r.credits.current_balance
 | music（/分） | 「N 秒／N 分」→ `music_length_ms`；費用以分鐘無條件進位 | 60 秒 | `amount × ceil(秒/60)` |
 | music（/首） | — | 1 | `amount` |
 | sfx | 「N 秒」（0.5–22） | 5 | `amount × 秒` |
-| speech | 文本字數（含標點） | — | `amount × ceil(字數/1000)`；Chatterbox 超過 300 字要分段，每段一次呼叫 |
+| speech | 文本字數（含標點） | — | `amount × ceil(字數/1000)`；tier=low（Chatterbox）且字數 > 300 時，本次改用 medium（ElevenLabs Turbo v2.5，無字數上限），**僅此一次**（不寫回 config），並在 Gate 1 卡片註明「low 字數超過 300 上限，本次改用 medium {label}」 |
 | 3d | — | 1 | `amount`（Hunyuan 需 PBR 時 +0.15） |
 
 Gate 1 卡片（AskUserQuestion，單選）：
 
 > 問題：「【{類別} · {模式}】{等級中文}方案 {label}｜{數量說明，如 1 張 / 5 秒 / 1 首 / 128 字}｜預估 ${費用}{approx 時前綴「約」}｜餘額 ${balance}{警告行}{替代方案說明行}{兩段式費用明細}」
-> 選項：`確認執行` / `換等級` / `取消`
+> 選項：`確認執行` / `換等級` / `取消`（類別為 sfx 時不提供「換等級」，選項只有 `確認執行` / `取消`）
 
-「換等級」→ AskUserQuestion 列 `高品質 {label} ${price}` / `適中 …` / `便宜 …`，選後**只影響本次**（不寫回），重算費用再出一次 Gate 1。
+「換等級」→ AskUserQuestion 列 `高品質 {label} ${price}` / `適中 …` / `便宜 …`，選後**只影響本次**（不寫回），重算費用再出一次 Gate 1。sfx 沒有分級（只有一個模型），不提供此選項——沒有其他等級可換。
 
 ## 5. 設定指令
 
@@ -113,6 +121,8 @@ Gate 1 卡片（AskUserQuestion，單選）：
 | 更新價格表 | 對 config 內每個 endpoint 用 WebFetch 抓模型頁 `Your request will cost $X per Y`，更新 `price.amount`、`approx=false`；抓不到的保留並標 `approx=true`；最後列出變動清單 |
 | 存到哪／改存檔位置 | 問新路徑，更新 `save_root` |
 | 額度門檻改成 N | 更新 `low_balance_threshold` |
+
+上面三種切等級指令（切成貴的／便宜的／適中），若類別（明講或依同句生成指令推斷）為 `sfx` → 回覆「音效沒有分級」，不寫入 `current`（sfx 只有一個模型，沒有等級可切）。
 
 每次寫回 config：讀 → 修改 → Write 整份（UTF-8，保持 2 空格縮排）。
 
@@ -131,8 +141,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:/Users/user/.claude/s
    - `persistent: false`
 4. 每個事件行翻成中文簡短回報：`SUBMITTED` → 「已送出，request_id …」；`IN_QUEUE position=N` → 「排隊中，前面還有 N 個」；`IN_PROGRESS` → 「生成中…（已 mm:ss）」；`UPLOADED` → 「輸入檔已上傳」；`SAVED` → 「已存檔 …」
 5. 最後一行 JSON：
-   - `status=ok` → §7
-   - `status=error` → 依 `stage` 說明：`auth` 教設定 FAL_KEY；`submit` 顯示 message（常見：422 參數錯 → 檢查 payload；404 端點不存在 → 建議「更新價格表」或指定其他模型；403/402 餘額不足）；`poll`/`result` 顯示 message 與 request_id；`download` 列出 `remote_urls` 請使用者手動存。**不自動重試**，問「要換等級再試一次嗎？」
+   - `status=ok` 且 `files` 非空 → §7
+   - `status=ok` 但 `files` 為空陣列 → 不進入 §7；回報 `note` 的內容給使用者，並告知若需檢查原始 API 回應可查看 `raw` 欄位
+   - `status=error` → 依 `stage` 說明：`auth` 教設定 FAL_KEY；`submit` 顯示 message（常見：422 參數錯 → 檢查 payload；404 端點不存在 → 建議「更新價格表」或指定其他模型；403/402 餘額不足）；`poll`/`result` 顯示 message 與 request_id；`download` → 若錯誤 JSON 的 `files` 欄位非空，先告知使用者這些檔案已成功存到本機（列出各檔案的本機路徑），再列出其餘 `remote_urls` 請使用者手動存；若 `files` 為空則只列出 `remote_urls`。**不自動重試**，問「要換等級再試一次嗎？」
    - `status=timeout` → AskUserQuestion「已等待 {timeout_sec} 秒仍未完成（fal 端仍在執行、會照常計費）。」選項：`再等一輪` / `取消任務` / `先不管它`
      - 再等一輪 → 再跑一次 Monitor，改用**續接模式**（不會重新送出）：
 
@@ -141,7 +152,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:/Users/user/.claude/s
 ```
 
        結果處理與一般流程相同（最後一行 JSON）
-     - 取消任務 → PowerShell：`Invoke-RestMethod -Method Put -Uri '{cancel_url}' -Headers @{ Authorization = "Key $env:FAL_KEY" }`；回報「已送出取消」；若拋 400 → 回報「任務已完成、無法取消」並改走續接模式把結果抓下來
+     - 取消任務 → 若 `cancel_url` 為 `null` 或缺失（例如「再等一輪」進入續接模式後第二次逾時——續接模式不帶 `-CancelUrl`，一律是 `null`）→ 回報「此輪無法取消（fal 仍在背景執行）」，不嘗試發送 PUT 請求；否則 PowerShell：`Invoke-RestMethod -Method Put -Uri '{cancel_url}' -Headers @{ Authorization = "Key $env:FAL_KEY" }`；回報「已送出取消」；若拋 400 → 回報「任務已完成、無法取消」並改走續接模式把結果抓下來
      - 先不管它 → 回報 request_id 與 status_url，結束
 
 ## 7. 收尾

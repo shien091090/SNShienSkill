@@ -37,7 +37,7 @@
 
 | tier | label | endpoint | price | unit | payload 範本 |
 |---|---|---|---|---|---|
-| high | ElevenLabs Music | fal-ai/elevenlabs/music | 0.60/分（無條件進位） | 分 | `{"prompt":"{prompt}","music_length_ms":{ms}}` |
+| high | ElevenLabs Music | fal-ai/elevenlabs/music | 0.60/分（無條件進位） | 分 | `{"prompt":"{prompt}","music_length_ms":{ms}}`（3000–600000） |
 | medium | MiniMax Music 2.6 | fal-ai/minimax-music/v2.6 | 0.15/首 | 首 | 有歌詞 `{"prompt":"{style}","lyrics":"{lyrics}"}`；純音樂 `{"prompt":"{style}","is_instrumental":true}` |
 | low | MiniMax Music 1.5 | fal-ai/minimax-music/v1.5 | 0.03/首 | 首 | `{"prompt":"{style}","lyrics_prompt":"{lyrics}"}`（**lyrics_prompt 必填**；使用者沒給歌詞時由 Claude 代寫 4–8 行並在確認卡顯示） |
 
@@ -57,7 +57,7 @@
 |---|---|---|---|---|
 | high | MiniMax Speech-2.8 HD | fal-ai/minimax/speech-2.8-hd | 0.10/千字 | `{"prompt":"{text}","voice_id":"Wise_Woman","language_boost":"auto"}` |
 | medium | ElevenLabs Turbo v2.5 | fal-ai/elevenlabs/tts/turbo-v2.5 | 0.05/千字 | `{"text":"{text}","voice":"Rachel","language_code":"zh"}` |
-| low | Chatterbox Multilingual | fal-ai/chatterbox/text-to-speech/multilingual | 0.025/千字 | `{"text":"{text}","voice":"chinese"}`（text ≤ 300 字，超過需分段） |
+| low | Chatterbox Multilingual | fal-ai/chatterbox/text-to-speech/multilingual | 0.025/千字 | `{"text":"{text}","voice":"chinese"}`（text ≤ 300 字；超過時本次自動改用 medium 等級，不寫回 config，非分段） |
 
 輸出：`audio.url`
 
