@@ -137,6 +137,43 @@ Set-Content -Path "$env:SNSHIEN_ROOT\gas_live_integration\.git\hooks\pre-push" -
 
 ---
 
+## Step 3 — 確認 Heroku CLI 環境
+
+`linebot_liveManagerIntegration` 部署在 Heroku。全新裝置上需要 heroku CLI 已安裝、且已用 API Key 認證。
+
+**不要用 `heroku login` 或 `heroku login -i`**：實測在這個工具的殼層環境下兩種都會失敗（`heroku login` 因為需要抓鍵盤原始輸入跳出 `setRawMode is not a function`；`heroku login -i` 的互動式提示也會因為同樣的 TTY 限制被強制中斷），不要嘗試繞過或重試，直接改用下面的 API Key 方式。
+
+### 1. 確認 heroku CLI 已安裝
+
+```powershell
+Get-Command heroku -ErrorAction SilentlyContinue
+```
+
+沒找到就安裝：
+
+```powershell
+npm install -g heroku
+```
+
+### 2. 確認已用 API Key 認證
+
+```powershell
+$env:HEROKU_API_KEY
+if ($env:HEROKU_API_KEY) { heroku auth:whoami }
+```
+
+- 有輸出帳號 email → 已認證，跳到下一步。
+- 沒有輸出、或顯示 `not logged in` → 請使用者到 https://dashboard.heroku.com/account 複製自己的 API Key（頁面上的 API Key 欄位，可能要按 Reveal 才會顯示），貼給你之後寫入 User 環境變數：
+
+```powershell
+[Environment]::SetEnvironmentVariable('HEROKU_API_KEY', '{使用者提供的API Key}', 'User')
+$env:HEROKU_API_KEY = '{使用者提供的API Key}'
+```
+
+寫入 User 層級後，這台裝置之後開的新 session 會自動用這個 key 認證，不需要再跑 `heroku login`（同一個 session 裡如果之後又開新的 PowerShell/Bash 工具呼叫讀不到，比照 Step 0 的作法用 `[Environment]::GetEnvironmentVariable(...)` 重新載入一次即可）。**API Key 是敏感憑證，不要重複印出、不要寫進任何會進版控的檔案。**
+
+---
+
 ## 專案參考資源
 
 - **Google Sheet（資料來源）**：https://docs.google.com/spreadsheets/d/1vDFl5qpQb_oTj0xZt1PRw-39yvfbvsYZx04BN10ZQHQ/edit?usp=sharing
@@ -244,7 +281,7 @@ git -C "$env:SNSHIEN_ROOT\linebot_liveManagerIntegration" push heroku main
 
 ---
 
-## Step 3 — 確認設定完成
+## Step 4 — 確認設定完成
 
 完成後向使用者回覆（將 `{路徑}` 換成 `$env:SNSHIEN_ROOT` 實際的值）：
 
