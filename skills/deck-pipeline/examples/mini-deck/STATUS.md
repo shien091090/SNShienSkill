@@ -1,0 +1,10 @@
+stage: build
+title: mini-deck 範例
+
+| # | 資料夾 | script | slides | 備註 |
+|---|---|---|---|---|
+| 01 | 01_背景 | done | done | |
+| 02 | 02_做法 | done | done | 1 張待補圖 |
+
+log:
+- 2026-09-07 建立範例資料
