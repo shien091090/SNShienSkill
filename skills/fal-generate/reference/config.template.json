@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "save_root": null,
+  "low_balance_threshold": null,
+  "poll_interval_sec": 3,
+  "heartbeat_sec": 15,
+  "timeout_sec": { "image": 180, "music": 180, "sfx": 180, "speech": 180, "video": 600, "3d": 600 },
+  "last_output": { "image": null, "video": null, "music": null, "sfx": null, "speech": null, "3d": null },
+  "schema_cache": {},
+  "categories": {
+    "image": {
+      "current": "medium",
+      "tiers": {
+        "high":   { "label": "Nano Banana Pro", "endpoints": { "generate": "fal-ai/nano-banana-pro", "edit": "fal-ai/nano-banana-pro/edit" }, "price": { "amount": 0.15, "unit": "張", "approx": false } },
+        "medium": { "label": "Nano Banana 2",   "endpoints": { "generate": "fal-ai/nano-banana-2",   "edit": "fal-ai/nano-banana-2/edit" },   "price": { "amount": 0.08, "unit": "張", "approx": false } },
+        "low":    { "label": "FLUX Schnell",    "endpoints": { "generate": "fal-ai/flux/schnell",    "edit": null },                          "price": { "amount": 0.003, "unit": "張", "approx": true } }
+      }
+    },
+    "video": {
+      "current": "medium",
+      "tiers": {
+        "high":   { "label": "Seedance 2.0",        "endpoints": { "text_to_video": "bytedance/seedance-2.0/text-to-video",                 "image_to_video": "bytedance/seedance-2.0/image-to-video" },                 "price": { "amount": 0.30,  "unit": "秒", "approx": true } },
+        "medium": { "label": "Kling 2.5 Turbo Pro", "endpoints": { "text_to_video": "fal-ai/kling-video/v2.5-turbo/pro/text-to-video",     "image_to_video": "fal-ai/kling-video/v2.5-turbo/pro/image-to-video" },     "price": { "amount": 0.07,  "unit": "秒", "approx": false } },
+        "low":    { "label": "Seedance 1.0 Lite",   "endpoints": { "text_to_video": "fal-ai/bytedance/seedance/v1/lite/text-to-video",     "image_to_video": "fal-ai/bytedance/seedance/v1/lite/image-to-video" },     "price": { "amount": 0.036, "unit": "秒", "approx": true } }
+      }
+    },
+    "music": {
+      "current": "medium",
+      "tiers": {
+        "high":   { "label": "ElevenLabs Music",  "endpoints": { "generate": "fal-ai/elevenlabs/music" },   "price": { "amount": 0.60, "unit": "分", "approx": false } },
+        "medium": { "label": "MiniMax Music 2.6", "endpoints": { "generate": "fal-ai/minimax-music/v2.6" }, "price": { "amount": 0.15, "unit": "首", "approx": false } },
+        "low":    { "label": "MiniMax Music 1.5", "endpoints": { "generate": "fal-ai/minimax-music/v1.5" }, "price": { "amount": 0.03, "unit": "首", "approx": false } }
+      }
+    },
+    "sfx": {
+      "single": { "label": "ElevenLabs SFX v2", "endpoints": { "generate": "fal-ai/elevenlabs/sound-effects/v2" }, "price": { "amount": 0.002, "unit": "秒", "approx": false } }
+    },
+    "speech": {
+      "current": "medium",
+      "tiers": {
+        "high":   { "label": "MiniMax Speech-2.8 HD",    "endpoints": { "generate": "fal-ai/minimax/speech-2.8-hd" },                  "price": { "amount": 0.10,  "unit": "千字", "approx": false } },
+        "medium": { "label": "ElevenLabs Turbo v2.5",    "endpoints": { "generate": "fal-ai/elevenlabs/tts/turbo-v2.5" },              "price": { "amount": 0.05,  "unit": "千字", "approx": false } },
+        "low":    { "label": "Chatterbox Multilingual",  "endpoints": { "generate": "fal-ai/chatterbox/text-to-speech/multilingual" }, "price": { "amount": 0.025, "unit": "千字", "approx": false } }
+      }
+    },
+    "3d": {
+      "current": "medium",
+      "tiers": {
+        "high":   { "label": "Hunyuan 3D Pro v3.1", "endpoints": { "image_to_3d": "fal-ai/hunyuan-3d/v3.1/pro/image-to-3d", "text_to_3d": "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d" }, "price": { "amount": 0.375, "unit": "次", "approx": false } },
+        "medium": { "label": "Trellis 2",           "endpoints": { "image_to_3d": "fal-ai/trellis-2",                       "text_to_3d": null },                                     "price": { "amount": 0.30,  "unit": "次", "approx": false } },
+        "low":    { "label": "Trellis",             "endpoints": { "image_to_3d": "fal-ai/trellis",                         "text_to_3d": null },                                     "price": { "amount": 0.02,  "unit": "次", "approx": false } }
+      }
+    }
+  }
+}
