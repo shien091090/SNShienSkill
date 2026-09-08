@@ -1,11 +1,11 @@
 ---
 name: deck-pipeline
-description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把一個堆滿簡報素材 (截圖、txt、md) 的資料夾, 經七個階段 (堆素材 → 分 topic → 講稿 → 頁面內容 → 版型定案 → 生 pptx → 桌面版 Claude Design 美化) 帶到最終 pptx。跨多次會話進行, 進度靠資料夾內 STATUS.md 銜接。使用者提到要做簡報、整理簡報素材、寫講稿、把講稿變投影片、或指向一個已有 STATUS.md 的資料夾時使用。
+description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把一個堆滿簡報素材 (截圖、txt、md) 的資料夾, 經六個階段 (堆素材 → 分 topic → 講稿 → 頁面內容 → 版型定案 → 生 pptx) 帶到可編輯 pptx。跨多次會話進行, 進度靠資料夾內 STATUS.md 銜接。使用者提到要做簡報、整理簡報素材、寫講稿、把講稿變投影片、或指向一個已有 STATUS.md 的資料夾時使用。
 ---
 
 # deck-pipeline
 
-一個資料夾, 七個階段, 前六階段使用者拍板、AI 動手; 第七階段 (美化) 由使用者在桌面版 Claude Design 手動完成, CLI 接不到那個功能。輸入輸出都在同一個資料夾原地演化, 與任何專案無關。
+一個資料夾, 六個階段, 使用者拍板、AI 動手, 到 `output/<title>.pptx` 為止。排版美化不在這個 skill 範圍內, 由使用者自行處理 (例如手動送桌面版 Claude Design)。輸入輸出都在同一個資料夾原地演化, 與任何專案無關。
 
 格式規格在 `references/formats.md`, 階段 5 細節在 `references/stage-style.md`, 需要時才讀。
 
@@ -37,11 +37,10 @@ description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把�
   SLIDES.md            頁面內容, 單一檔
   IMAGES_TODO.md       待補圖清單 (腳本產生)
   STYLE.md             版型規則
-  output/<title>.pptx        階段 6 build 產物 (內容完整、版型樸素)
-  output/<title>_final.pptx  階段 7 美化後的最終成品
+  output/<title>.pptx        階段 6 build 產物, 即最終交付
 ```
 
-## 七階段
+## 六階段
 
 ### 1. collect 堆素材
 
@@ -95,19 +94,7 @@ py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck>
 - 相依: `py -3.12-64 -m pip install python-pptx pyyaml` (SVG 轉換器已 vendor 在 scripts/vendor, 不用另裝)
 - pptx 正在 PowerPoint 裡開著會 build 失敗 (PermissionError), 先請使用者關掉再重跑
 - STYLE.md 用到的字型播放機器要裝, 沒裝 PowerPoint 會退系統字; 定案時提醒使用者
-- 完成: 使用者確認內容無誤 (字、圖、頁序) → stage 改 polish。內容還會改就留在 build, 美化是內容凍結後才做
-
-### 7. polish 美化 (手動, 桌面版 Claude Design)
-
-這一步 CLI 做不到: Claude Code 的 `/design` 只是預覽版 canvas, 沒有 pptx 匯入匯出; 能吃 pptx 重新排版再匯出 pptx 的是 claude.ai/design (桌面版)。所以由使用者手動完成, skill 只負責交接與收尾。
-
-- 交接: 告訴使用者把 `output/<title>.pptx` 丟進桌面版 Claude Design, 並附預設提示 (使用者定案的版本, 逐字用):
-  > 請根據這份ppt, 以不增減文字、不調整示意圖結構、不縮小使用者插入的圖片(只可放大)為前提, 美化排版
-  使用者要加條件 (例如保留 speaker notes、表格維持可編輯) 再追加在後面
-- 收尾: 使用者把 Design 匯出的 pptx 放回 `output/<title>_final.pptx`, 說一聲 → STATUS.md stage 改 done, log 記美化日期
-- 匯出後常見漂移 (字型替換、漸層變平、文字框位移), 提醒使用者用 PowerPoint 開 `_final` 翻一次, 有問題在 PowerPoint 裡直接修, 不回 Design
-- 美化後內容再改: 小改 (幾個字) 直接在 `_final.pptx` 改, SLIDES.md 同步補上讓來源一致; 大改 (加減頁、換圖) 回 build 重產 `output/<title>.pptx`, 再送一次 Design。哪種算大改由使用者判斷, AI 提醒代價即可
-- `_final.pptx` 是 build 不會碰的檔, 重 build 只覆蓋 `<title>.pptx`
+- 完成: 使用者確認內容無誤 (字、圖、頁序) → stage 改 done。skill 到此結束, 排版美化由使用者自行處理
 
 ## 素材規則 (所有階段適用)
 
@@ -134,5 +121,4 @@ py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck>
 - STATUS.md 損壞: 問使用者, 不自行重建
 - stage 與資料夾實況打架: 回報, 使用者裁決
 - design skill 不可用: 階段 5 退化為文字描述方案 (見 stage-style.md 第 6 節)
-- 使用者沒有桌面版 Claude Design: 階段 7 跳過, build 產物即成品, stage 直接改 done
 - build 失敗: 一次列全部錯誤, 不逐個中斷

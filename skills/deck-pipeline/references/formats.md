@@ -5,7 +5,7 @@
 ## STATUS.md
 
 ```
-stage: slides            // collect | organize | script | slides | style | build | polish | done
+stage: slides            // collect | organize | script | slides | style | build | done
 title: <簡報名稱>
 
 | # | 資料夾 | script | slides | 備註 |
@@ -17,7 +17,7 @@ log:
 - 2026-09-07 organize 定案, 6 份素材, 1 份拆分
 ```
 
-- `stage`: 目前所在階段; `polish` = build 產物已確認, 等使用者在桌面版 Claude Design 美化; `done` = `output/<title>_final.pptx` 已放回
+- `stage`: 目前所在階段; `done` = `output/<title>.pptx` 已確認無誤, skill 結束
 - topic 表: 一行一個 topic, `#` 兩位數與資料夾前綴一致
 - `script` / `slides` 欄位值: `-` 未開始 / `doing` / `done` / `stale` (前面階段被回頭改過, 這欄要重看)
 - 備註: 新增素材記 `+素材 <日期> <檔名>`; 其他事件自由寫
