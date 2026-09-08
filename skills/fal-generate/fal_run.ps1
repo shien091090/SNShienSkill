@@ -48,8 +48,8 @@ function Get-HttpError($err) {
   return $msg
 }
 
-function Fail([string]$stage, [string]$message, $requestId = $null, $remoteUrls = @(), [int]$code = 1) {
-  Emit @{ status = 'error'; stage = $stage; message = $message; request_id = $requestId; remote_urls = $remoteUrls }
+function Fail([string]$stage, [string]$message, $requestId = $null, $remoteUrls = @(), $files = @(), [int]$code = 1) {
+  Emit @{ status = 'error'; stage = $stage; message = $message; request_id = $requestId; remote_urls = $remoteUrls; files = $files }
   exit $code
 }
 
@@ -192,7 +192,7 @@ foreach ($f in $files) {
     $saved += $dest
     Write-Output "$(Elapsed) SAVED $dest"
   } catch {
-    Fail 'download' (Get-HttpError $_) $requestId $remote
+    Fail 'download' (Get-HttpError $_) $requestId $remote $saved
   }
 }
 
