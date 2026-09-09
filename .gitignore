@@ -1,0 +1,14 @@
+# This repo only tracks curated content (skills/, gdd-spec-writing/).
+# Everything else here is Claude Code's own runtime state, local machine
+# state, or credentials — never meant to be version-controlled.
+/*
+!/skills/
+!/gdd-spec-writing/
+!/.gitignore
+
+# Runtime/local state generated inside tracked skill folders
+__pycache__/
+*.pyc
+skills/fal-generate/config.json
+skills/line-group-export/logs/
+skills/unity-mcp-skill/.unity-mcp-skill-sync
