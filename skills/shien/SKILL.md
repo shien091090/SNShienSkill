@@ -135,6 +135,34 @@ Set-Content -Path "$env:SNSHIEN_ROOT\gas_live_integration\.git\hooks\pre-push" -
 
 建立/修正後告知使用者「已建立（或已修正）pre-push hook」；若已經正確則不需提及。
 
+### 5. 確認 GAS 網址與 hook 的 deployment 一致
+
+**不變量：`settings.py` 的 `URL_GAS_API` 必須包含 hook 裡那個 deploymentId。**
+
+`-i` 的意思是「重用這個既有 deployment」，而 **deploymentId 本身就是 `/exec` 網址中間那段字串**：
+
+```
+hook:  clasp deploy -i AKfycbydY2IAQ2CL...kixYV36dNXQ
+網址:  https://script.google.com/macros/s/AKfycbydY2IAQ2CL...kixYV36dNXQ/exec
+                                          └────────── 同一串 ──────────┘
+```
+
+所以只要 hook 正確，**GAS `git push` 之後正式環境就會自動更新，網址永遠不會變、也不需要更新 `settings.py`**。
+
+檢查兩邊是否一致：
+
+```powershell
+$hookId = (Get-Content "$env:SNSHIEN_ROOT\gas_live_integration\.git\hooks\pre-push" -Raw) -replace '(?s).*clasp deploy -i\s+(\S+).*', '$1'
+$settingsUrl = (Get-Content "$env:SNSHIEN_ROOT\linebot_liveManagerIntegration\settings.py" -Raw) -replace "(?s).*URL_GAS_API\s*=\s*'([^']+)'.*", '$1'
+if ($settingsUrl -like "*$($hookId.Trim())*") { "URL 一致" } else { "不一致! hook=$($hookId.Trim())" }
+```
+
+**若不一致**：把 `settings.py` 的 `URL_GAS_API` 改成 `https://script.google.com/macros/s/{hookId}/exec`（見下方「更新GAS網址」觸發詞的流程），**不要**反過來去改 hook、也不要建立新的 deployment。
+
+**為什麼要查**：這個落差是**靜默**的——GAS 部署成功、git push 成功、Heroku 部署成功，每一步都顯示正常，但 Python 呼叫的是另一個永遠不會被更新的 deployment，拿到的一直是舊程式碼。2026-09-11 實測踩過：新加的 `action_get_stomach_records` 在 `settings.py` 當時的網址回傳 `{}`，在 hook 的網址才回傳完整資料。當時兩邊分別是 `AKfycbzIU1WbkAd6...`（@165）和 `AKfycbydY2IAQ2CL...`（@166）。
+
+**歷史成因**：早期部署用的是不帶 `-i` 的 `clasp deploy`，那會每次建立一個**新的** deployment、拿到新網址，所以每次都得手動同步 `settings.py`（git log 裡那些 `更新GAS API URL(...)` commit 就是在追這個，`clasp deployments` 列出的 163 個 deployment 也是這段歷史的殘留）。改用 `-i` 之後這件事就結束了，不要再繞回建新 deployment 的老路。
+
 ---
 
 ## Step 3 — 確認 Heroku CLI 環境
@@ -182,6 +210,13 @@ $env:HEROKU_API_KEY = '{使用者提供的API Key}'
 
 ## 觸發詞：更新GAS網址
 
+> **正常情況下用不到這個流程。** hook 用 `-i` 重用固定 deployment，網址永遠不變（見 Step 2.5）。GAS 改完只要 `git push`，正式環境就會自動更新。
+>
+> 動手之前先判斷是哪一種狀況：
+> - **Step 2.5 的檢查顯示不一致** → 只要把 `settings.py` 對齊 hook 的 deploymentId 即可，網址是 `https://script.google.com/macros/s/{hookId}/exec`。照下面流程做，但別去動 hook。
+> - **使用者貼了一個全新的 deployment 網址** → 先問清楚為什麼要換。若確定要換，做完下面的流程後**必須同步把 hook 裡的 `-i` 參數改成新的 deploymentId**，否則兩邊又會分岔，回到那個靜默失效的狀態。
+> - **只是想讓 GAS 的改動生效** → 不需要這個流程，去 GAS repo `git push` 就好。
+
 當使用者說「更新GAS網址: {url}」或貼上新的 GAS 部署網址時，執行以下步驟（**全程自動執行，不需使用者確認**）：
 
 ### 1. 更新 settings.py
@@ -210,14 +245,22 @@ heroku git:remote -a linebot-livemanagerintegration
 
 ### 3. 驗證新網址
 
-用 PowerShell 確認新 URL 可正常回傳 JSON（非 HTML 錯誤頁）：
-
 ```powershell
 $r = Invoke-WebRequest -Uri "{新網址}?action=action_memo_get" -UseBasicParsing -MaximumRedirection 5 -TimeoutSec 15
 $r.Content.Substring(0, [Math]::Min(200, $r.Content.Length))
 ```
 
-若開頭是 `{` 代表成功；若是 `<!DOCTYPE` 代表 GAS 仍有授權問題。
+- 開頭是 `{"statusCode"...` → 成功
+- 開頭是 `<!DOCTYPE` → GAS 仍有授權問題
+
+**這一步只證明網址活著，不證明它跑的是最新程式碼。** 要驗證版本新舊，改用一個「只有最新版才有」的 action 來測——`ServerFunction.js` 的 `switch` 對不認得的 action 不會進任何 case，`res` 會維持空物件、回傳 `{}`：
+
+```powershell
+$r = Invoke-WebRequest -Uri "{新網址}?action={最近新增的action名稱}" -UseBasicParsing -MaximumRedirection 5 -TimeoutSec 30
+if ($r.Content.Trim() -eq '{}') { "舊版! 這個 deployment 沒有最新程式碼" } else { "版本正確" }
+```
+
+回傳 `{}` 就代表這個 deployment 停在舊版——這正是 Step 2.5 那個靜默失效的樣子。
 
 完成後告知使用者結果。
 
