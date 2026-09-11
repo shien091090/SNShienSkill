@@ -6,6 +6,9 @@
 !/statusline.js
 !/.gitignore
 
+# 全域使用者指示(每個 session 載入, 跨裝置同步)
+!/CLAUDE.md
+
 # 個人本機設定(含明文token等機密, 不進版控)
 settings.local.json
 
