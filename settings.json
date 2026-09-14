@@ -21,5 +21,20 @@
   "allowedTools": [
     "Bash",
     "PowerShell"
-  ]
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/memory-guard.js",
+            "timeout": 10,
+            "statusMessage": "memory-guard"
+          }
+        ]
+      }
+    ]
+  }
 }

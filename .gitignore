@@ -29,3 +29,7 @@ settings.local.json
 # commit 規範(每次 commit 前重讀)
 !/rules/
 !/rules/**
+
+# hooks(memory-guard 等)
+!/hooks/
+!/hooks/**
