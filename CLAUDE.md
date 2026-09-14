@@ -28,3 +28,7 @@
 **Why:** 中途的討論會不斷產生 memory，而「skill 是否完備」無法靠「我跑起來很順」判斷——我很可能正在靠 memory 補洞而不自知。清查是唯一能確認 skill 自給自足的方法。
 
 **How to apply:** 這一步不可省略，也不要等使用者提醒。要再確認一層，就在一個沒用過的工作目錄下加 `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` 冷跑一次 skill，那等同模擬一台新機器。
+
+## Commit 規範
+
+任何 repo 要下 commit 之前, 先讀 `~/.claude/rules/commit-format.md` 全文再動手, 格式、submodule 處理、專案別例外都在那份。
