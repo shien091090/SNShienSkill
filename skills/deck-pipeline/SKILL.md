@@ -1,11 +1,11 @@
 ---
 name: deck-pipeline
-description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把一個堆滿簡報素材 (截圖、txt、md) 的資料夾, 經六個階段 (堆素材 → 分 topic → 講稿 → 頁面內容 → 版型定案 → 生 pptx) 帶到可編輯 pptx, 加一個上傳步驟把使用者手動美化完的版本傳上 Google Drive。跨多次會話進行, 進度靠資料夾內 STATUS.md 銜接。使用者提到要做簡報、整理簡報素材、寫講稿、把講稿變投影片、說美化完了要上傳、或指向一個已有 STATUS.md 的資料夾時使用。
+description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把一個堆滿簡報素材 (截圖、txt、md) 的資料夾, 經六個階段 (堆素材 → 分 topic → 講稿 → 頁面內容 → 版型定案 → 生 pptx) 帶到可編輯 pptx。跨多次會話進行, 進度靠資料夾內 STATUS.md 銜接。使用者提到要做簡報、整理簡報素材、寫講稿、把講稿變投影片、或指向一個已有 STATUS.md 的資料夾時使用。
 ---
 
 # deck-pipeline
 
-一個資料夾, 六個階段做出 `output/<title>.pptx`, 使用者拍板、AI 動手。排版美化不在這六階段範圍內, 由使用者自行處理 (例如手動送桌面版 Claude Design), 完成後放回 `output/`; 使用者說一聲, skill 才接手最後的上傳步驟。輸入輸出都在同一個資料夾原地演化, 與任何專案無關。
+一個資料夾, 六個階段做出 `output/<title>.pptx`, 使用者拍板、AI 動手。排版美化不在這六階段範圍內, 由使用者自行處理 (例如手動送桌面版 Claude Design), 完成後放回 `output/`。輸入輸出都在同一個資料夾原地演化, 與任何專案無關。
 
 格式規格在 `references/formats.md`, 階段 5 細節在 `references/stage-style.md`, 需要時才讀。
 
@@ -37,10 +37,10 @@ description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把�
   SLIDES.md            頁面內容, 單一檔
   IMAGES_TODO.md       待補圖清單 (腳本產生)
   STYLE.md             版型規則
-  output/<title>.pptx        階段 6 build 產物; 使用者美化後可能放回其他檔名的版本, 上傳步驟挑最新的那份
+  output/<title>.pptx        階段 6 build 產物; 使用者美化後可能放回其他檔名的版本
 ```
 
-## 六階段 + 上傳
+## 六階段
 
 ### 1. collect 堆素材
 
@@ -95,19 +95,6 @@ py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck>
 - pptx 正在 PowerPoint 裡開著會 build 失敗 (PermissionError), 先請使用者關掉再重跑
 - STYLE.md 用到的字型播放機器要裝, 沒裝 PowerPoint 會退系統字; 定案時提醒使用者
 - 完成: 使用者確認內容無誤 (字、圖、頁序) → stage 改 done。build 到此結束, 排版美化由使用者自行處理 (例如手動送桌面版 Claude Design), 完成的檔案放回 `output/`
-
-### 7. upload 上傳 Google Drive
-
-美化完全在 skill 外進行, 這步只在使用者主動開口後才動作, 不屬於任何 STATUS.md `stage` 值, build 完成 (`done`) 後隨時可能觸發、可重複觸發。
-
-- 觸發: 使用者說類似「美化完了」「放好了」的話
-- 動作:
-  1. 掃 `output/` 資料夾 (不含子資料夾), 挑最後修改時間最新的一個檔案, 不論檔名
-  2. 用 Google Drive 的 `create_file` 上傳: `parentId` 固定為 `1T0kgXrebR0HOhTw3h1M9Pd75JDUjkvpe` (「【重要】」資料夾); `title` 設為 `<STATUS.md title>_<YYYYMMDD>` (日期 = 上傳當下, 副檔名照原檔, 例如 `.pptx`); 內容用 `base64Content` 附上, `contentMimeType` 設對應的 pptx MIME type (`application/vnd.openxmlformats-officedocument.presentationml.presentation`), 並帶 `disableConversionToGoogleType: true` (避免被轉成 Google 簡報, 原生可編輯圖案/表格才不會跑掉)
-  3. 上傳前回報挑到哪個檔案 (檔名、修改時間), 讓使用者能立刻發現挑錯檔; 不用先問過才傳
-  4. 本地 `output/` 裡的原檔名不動, 只有上傳到 Drive 的那份用新命名; 每次都是新建檔案, 不覆蓋 Drive 上的舊檔, 同一天重複觸發會有同名檔案並存, 這是預期行為
-  5. 完成後把 Drive 連結告訴使用者, STATUS.md log 記一筆 `上傳 Google Drive: <連結>`
-- 共用權限不動: 上傳時不更動分享設定 (2026-09-08 使用者確認暫不需要, 若日後要開放公司檢視要另外處理)
 
 ## 素材規則 (所有階段適用)
 
