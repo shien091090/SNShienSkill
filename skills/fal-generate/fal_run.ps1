@@ -37,14 +37,23 @@ function Emit($obj) {
 
 function Get-HttpError($err) {
   $msg = $err.Exception.Message
-  try {
-    $resp = $err.Exception.Response
-    if ($resp) {
-      $sr = New-Object IO.StreamReader($resp.GetResponseStream())
-      $bodyText = $sr.ReadToEnd()
-      if ($bodyText) { $msg = "$msg :: $bodyText" }
-    }
-  } catch { }
+  $bodyText = $null
+  # PowerShell 7 的 Response 是 HttpResponseMessage, 沒有 GetResponseStream(), 錯誤 body
+  # 在 ErrorDetails.Message; 只有 Windows PowerShell 5.1 才需要讀 ResponseStream。
+  # 不分開處理的話所有 API 錯誤都只會剩下 "422 (Unprocessable Entity)" 這種無用訊息。
+  if ($err.ErrorDetails -and $err.ErrorDetails.Message) {
+    $bodyText = $err.ErrorDetails.Message
+  }
+  else {
+    try {
+      $resp = $err.Exception.Response
+      if ($resp -and ($resp | Get-Member -Name GetResponseStream -MemberType Method)) {
+        $sr = New-Object IO.StreamReader($resp.GetResponseStream())
+        $bodyText = $sr.ReadToEnd()
+      }
+    } catch { }
+  }
+  if ($bodyText) { $msg = "$msg :: $bodyText" }
   return $msg
 }
 

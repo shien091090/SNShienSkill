@@ -168,3 +168,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:/Users/user/.claude/s
 - 任何會扣費的呼叫都必須先經過 Gate 1 確認；兩段式 3D 只在第一段前確認一次（卡片已列兩段費用）
 - 腳本 stdout 是英文，回報時翻中文；最後一行 JSON 才是結果，不要把中間事件行當結果
 - 使用者只說「取消」而沒有進行中的任務 → 回覆目前沒有任務
+
+## 9. 腳本本身的已知事項
+
+- **`fal_run.ps1` 是通用的 fal queue runner**，不綁這支 skill 的類別表。任何 fal 端點都能直接呼叫（`-Endpoint` + `-PayloadFile` + `-InputFile`），`__INPUT_FILE_URL__` 會被上傳後的 URL 取代。例如 `deck-pipeline` 的語音轉逐字稿就是直接借用它打 `fal-ai/elevenlabs/speech-to-text/scribe-v2`
+- **回傳不是檔案時結果放在 `raw`**：`Find-FileObjects` 找不到可下載的 file object 時，最後一行 JSON 會是 `{status:'ok', files:[], raw:<整包 response>}`。純文字類端點（STT、分類、抽取）都走這條，不要以為 `files` 空就是失敗
+- **不要用 pipe 直接 capture stdout 拿中文結果**：從 Python `subprocess` 之類捕捉 stdout 時，中文會被當 Latin-1 讀成亂碼（`[笑]` 變 `[ç¬]`）。改成在 PowerShell 端 `| Out-File -FilePath <檔> -Encoding utf8` 再讀檔。亂碼本身可逆（`text.encode('latin-1').decode('utf-8')`），但不要留著讓下游修
+- **`Get-HttpError` 的 PowerShell 版本差異**（2026-09-14 修正）：PowerShell 7 的 `$err.Exception.Response` 是 `HttpResponseMessage`，**沒有** `GetResponseStream()`，錯誤 body 在 `$err.ErrorDetails.Message`；只有 Windows PowerShell 5.1 才需要讀 ResponseStream。修正前所有 API 錯誤都只剩 `"422 (Unprocessable Entity)"` 這種沒有內容的訊息，完全查不出原因
