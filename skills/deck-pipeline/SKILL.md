@@ -1,6 +1,6 @@
 ---
 name: deck-pipeline
-description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把一個堆滿簡報素材 (截圖、txt、md) 的資料夾, 經六個階段 (堆素材 → 分 topic → 講稿 → 頁面內容 → 版型定案 → 生 pptx) 帶到可編輯 pptx。跨多次會話進行, 進度靠資料夾內 STATUS.md 銜接。使用者提到要做簡報、整理簡報素材、寫講稿、把講稿變投影片、或指向一個已有 STATUS.md 的資料夾時使用。
+description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把一個堆滿簡報素材 (截圖、txt、md、語音檔) 的資料夾, 經六個階段 (堆素材 → 分 topic → 講稿 → 頁面內容 → 版型定案 → 生 pptx) 帶到可編輯 pptx。跨多次會話進行, 進度靠資料夾內 STATUS.md 銜接。使用者提到要做簡報、整理簡報素材、寫講稿、把講稿變投影片、或指向一個已有 STATUS.md 的資料夾時使用。
 ---
 
 # deck-pipeline
@@ -31,8 +31,10 @@ description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把�
   STATUS.md            進度與 topic 表
   (散檔)               階段 1 堆放區
   01_<topic>/          階段 2 後: 素材搬進來, 前綴即順序
+    週會.m4a           語音素材與它的逐字稿永遠同層同名 (見「語音素材」)
+    週會.md
   _unsorted/           決定不用的素材, 不刪
-  _archive/            被拆分過的原始檔, 不刪
+  _archive/            被拆分過的原始檔 (逐字稿被拆時音檔跟著進來), 不刪
   SCRIPT.md            講稿, 單一檔
   SLIDES.md            頁面內容, 單一檔
   IMAGES_TODO.md       待補圖清單 (腳本產生)
@@ -45,18 +47,36 @@ description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把�
 ### 1. collect 堆素材
 
 - 做: 建立 STATUS.md (`stage: collect`)。素材由使用者自行堆放, AI 不動
-- 完成: 使用者說堆好了 → stage 改 organize
+- 使用者說堆好了 → 先掃語音檔, 不要直接轉 organize:
+
+```
+py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan --prompt 詞1,詞2
+```
+
+  - 沒有語音檔 → 直接往下
+  - 有 → 先問這場簡報的專有名詞 (人名、公司名、作品名、系統名、術語), 重跑 `--scan` 帶 `--prompt` 拿到正確估價。專有名詞使用者講不出來時, AI 可以自己查 (講座名稱、講者、產品), 查到的先給使用者確認
+  - **把 `--scan` 的表格和花費估算貼給使用者, 問要走 Scribe 還是本地**。這是必問的一題, 因為 Scribe 花的是使用者的錢:
+
+```
+找到 N 個語音檔, 總長 59:54, 走 Scribe V2 估計花費 US$0.62 (含 keyterms 加價 30%)
+要走 Scribe (品質好、有標點) 還是本地 Breeze (免費, 但沒標點、專有名詞常錯)?
+```
+
+  - 使用者說走線上 → `--scribe`; 說不要花錢 → `--local`。**不指定引擎腳本會直接 exit 2 拒絕執行**, 這是刻意的, 防止跳過詢問
+  - 轉完把逐字稿貼幾段給使用者確認辨識品質, 明顯錯的詞請他直接改 `.md` (腳本不會覆蓋已存在的逐字稿)
+- 完成: 語音檔都有逐字稿了 → stage 改 organize
 
 ### 2. organize 分 topic
 
 - 讀全部散檔: 截圖用 Read 看圖, 文字檔讀內容。檔案多就用 subagent 平行讀回摘要
+- 語音檔不直接讀 (讀不了), 讀它同層同名的 `.md` 逐字稿。還有語音檔沒逐字稿 → 回頭補跑 collect 的轉錄步驟
 - 提出 topic 切分與順序, 附每份素材的歸屬建議, 標出需要拆分的檔
 - topic = 講述段落, 不等於素材資料夾。使用者的素材常已按主題預分好資料夾, 提案以 3~5 個敘事層 topic 為底 (例如: 以往怎麼做 / 這次怎麼做 / 流程展開 / 痛點與下一步), 既有資料夾當 topic 底下的步驟保留, 加 `N_` 前綴排序; 不要一個資料夾一個 topic
 - 提拆分方案時逐段貼出每一份拆分後的原文, 不寫「第 N~N 行」, 使用者看不出內容
 - 不要為了 parser 改資料夾名 (路徑帶括號、空白都能 parse); 改名只在使用者要求或要加排序前綴時做
 - 使用者反覆調整到滿意才動檔
 - 定案後: 建 `01_<topic>/` 子資料夾、搬檔 (不複製)、拆分 (見素材規則)、不用的進 `_unsorted/`、寫 STATUS.md topic 表
-- 完成: 根目錄除 STATUS.md 與流程檔 (SCRIPT.md / SLIDES.md / IMAGES_TODO.md / STYLE.md) 外沒有散檔; `_archive/` 每個檔都對得到至少一個拆分檔 → stage 改 script
+- 完成: 根目錄除 STATUS.md 與流程檔 (SCRIPT.md / SLIDES.md / IMAGES_TODO.md / STYLE.md) 外沒有散檔; `_archive/` 每個**文字檔**都對得到至少一個拆分檔 (音檔不算, 它是陪逐字稿一起進去的) → stage 改 script
 
 ### 3. script 講稿
 
@@ -102,7 +122,91 @@ py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck>
 
 - **使用者請 AI 收集**: WebSearch / WebFetch 找, 每份內容一個 md 檔, 檔頭記來源 URL 與抓取日期。網路圖片用 PowerShell 下載成檔案, 來源 URL 記進 STATUS.md log
 - **對話補述**: 使用者在對話裡講的補充, 當場寫成 `note_<主題關鍵字>.md`
-- **拆分**: 一份文字檔內文跨多個 topic 時, 拆成 `<原檔名>__<topic關鍵字>.md`, 每個拆分檔檔頭記「拆自: <原檔名>, 第 X~Y 段」; 原檔搬進 `_archive/` 不刪
+- **拆分**: 一份文字檔內文跨多個 topic 時, 拆成 `<原檔名>__<topic關鍵字>.md`, 每個拆分檔檔頭記「拆自: <原檔名>, 第 X~Y 段」; 原檔搬進 `_archive/` 不刪。原檔是逐字稿時, 同名音檔跟著一起進 `_archive/`
+- **語音檔**: 見下面「語音素材」一節
+
+## 語音素材
+
+語音檔 (`.mp3 .wav .m4a .flac .ogg .aac`) 由 `scripts/transcribe.py` 轉成**同層同名的 `.md` 逐字稿**, 之後所有階段只讀逐字稿, 完全當一般文字素材處理, 不知道它從語音來。
+
+```
+py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan [--prompt 詞1,詞2]
+py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scribe [--prompt 詞1,詞2]
+py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --local  [--prompt 詞1,詞2] [--cpu]
+```
+
+- `--scan` 只列表不轉錄, 並印出走 Scribe 的花費估算
+- **`--scribe` / `--local` 二選一, 不給會 exit 2**。哪一條要由使用者決定, 見下面「引擎怎麼選」
+- **已存在同名 `.md` 就跳過**, 所以可以隨時重跑, 也不會蓋掉使用者手改過的逐字稿
+- 全部都有逐字稿時完全不載入模型也不呼叫 API, 秒退
+- 逐字稿是純文字段落不帶時間戳, 檔頭三行記 `轉自 / 模型 / 轉錄日期`
+- **音檔永遠跟它的完整逐字稿同一層** — 沒被拆就一起進 topic 資料夾, 被拆了就跟原逐字稿一起進 `_archive/`。只有這一條規則, 沒有例外
+- 路徑一律給 Windows 格式 (`C:\...`), 給 Git Bash 的 `/c/...` 會被 Python 解成別的目錄, 而且不會報錯, 只會安靜地掃不到檔
+
+### 引擎怎麼選 (每次都要問使用者)
+
+判準**不是**機密性, 是**要不要花使用者的錢**。所以流程固定是: `--scan` 出估價 → 問使用者 → 照回答執行。不准自己選。
+
+| | `--scribe` (ElevenLabs Scribe V2 via fal) | `--local` (Breeze-ASR-25) |
+|---|---|---|
+| 費用 | $0.008/分鐘, 加 keyterms 再 +30% (一小時約 US$0.62) | 免費 |
+| 速度 | 一小時約 3 分鐘 (含四段上傳) | 一小時 18~28 分鐘 |
+| 標點 | 有 (一小時 316 句號 / 1171 逗號) | **完全沒有** |
+| 輸出 | 簡繁混雜, 腳本用 OpenCC `s2tw` 轉繁 | 原生繁體 |
+| 非語音段 | 標成 `[笑]` `[遊戲音效]` `[背景雜音]` | **爆重複迴圈幻覺** |
+| 專有名詞 | `keyterms` 參數 (最多 100 個) | `initial_prompt` 偏方 |
+| 需要 | `FAL_KEY` 環境變數 (User scope) | 4GB 模型 + CUDA |
+
+實測同一場一小時講座 (TGDF, 台灣中文夾大量英文術語), 品質差一個檔次:
+
+| Breeze | Scribe V2 |
+|---|---|
+| Lexington **IndieFlight** | **Indie Prize** |
+| **旅行式**遊戲相關**體力** | **敘事遊戲**相關**領域** |
+| 它是一群**網** | 它是一幅**畫** |
+| 小小的 **iPad** / 這個 **iPhone** | 小小的 **icon** |
+| **虎中帶雷** | **苦中帶淚** |
+| **營救**葬禮 | **宇宙**葬禮 |
+
+結論: Breeze 那份「要重寫」, Scribe 那份「要校對」。但兩份的人名/機構名都還是會錯, **專有名詞一律要人工校對**, 不要當成正確的直接用進講稿。
+
+`--local` 的已知缺陷**不修, 這是刻意的** (2026-09-14 使用者裁決): 非語音段 (播影片、長靜音) 會爆重複迴圈幻覺, `collapse_repeats` 也擋不住夾雜標點的變體 (例如 `：SIGONO：：SIGONO：`)。它的定位就是「不想花錢時的堪用備案」, 要品質就走 `--scribe`。想修的話方向是接 Silero VAD 先切掉非語音段, 但不要自己動手, 先問使用者。
+
+### Scribe 的硬限制與坑
+
+- **單段音檔上限 1200 秒**, 超過回 422 `audio_duration_too_long`。腳本內建切成 900 秒一段再把時間戳偏移合回去 (`split_plan` / `words_to_segments`), 使用者不用自己切
+- 回傳的是純文字 JSON 不是檔案, 所以結果在 `fal_run.ps1` 最後一行的 `raw` 欄位, `files` 會是空的, 那不是失敗
+- **不要用 pipe 直接 capture fal_run.ps1 的 stdout**, 中文會變 Latin-1 亂碼 (`[笑]` → `[ç¬]`)。腳本改成 `| Out-File -Encoding utf8` 再讀檔; `repair_mojibake()` 是最後一道保險, 不要依賴它
+- `keyterms` 不是萬靈丹: 實測餵了 SIGONO 還是被聽成 Game Award, 因為講者把英文名混在中文句子中間念
+
+### 分段怎麼決定
+
+三條規則疊在一起 (`merge_segments`), 兩種引擎共用:
+
+1. 停頓 ≥ 1.0 秒且段落已滿 100 字 → 換段。**只有 Scribe 的 word 級時間戳有真實停頓** (一小時 108 次); whisper 系的長檔時間戳是連續的 (前段結束即後段開始), 這條幾乎不觸發
+2. 超過 200 字且停在句末標點 → 換段。Breeze 沒標點所以等於沒有
+3. 超過 400 字 → 在 segment 邊界硬換。保底用, Breeze 幾乎全靠這條
+
+實測一小時講座: Scribe 切出 97 段中位 205 字; Breeze 切出 57 段全靠第 3 條。
+
+### 相依與環境
+
+```
+py -3.12-64 -m pip install av opencc-python-reimplemented          # 兩條路都要
+py -3.12-64 -m pip install transformers torch                      # 只有 --local 要
+```
+
+- 解碼走 PyAV, **不需要系統裝 ffmpeg** (PyAV 自帶), 所以 m4a/aac 也直接吃
+- `--scribe` 需要 `FAL_KEY` 設在 **User scope** 環境變數 (`[Environment]::SetEnvironmentVariable("FAL_KEY","<key>","User")`), 腳本每次呼叫都從 User scope 讀, 所以設完不用重開 Claude Code
+- `--local` 首次跑會下載約 4GB 模型到 HuggingFace cache; 有 CUDA 自動用 GPU (bfloat16, 約 4.4GB VRAM), 沒有就退 CPU 並明講會很慢
+- **Windows 長路徑**: 裝 torch 會因為 260 字元上限失敗 (Microsoft Store 版 Python 的 site-packages 前綴就 137 字元)。要用系統管理員權限開:
+  `Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -Value 1`
+- RTX 50 系 (Blackwell, sm_120) 要 CUDA 12.8 的 torch 輪子: `pip install torch --index-url https://download.pytorch.org/whl/cu128`。實測 sm_120 的 bfloat16 推論沒問題
+- CTranslate2 (faster-whisper 底層) 在 sm_120 也跑得動, 但要先 `os.add_dll_directory(<site-packages>/torch/lib)` 掛上 torch 自帶的 `cublas64_12.dll`, 否則 `Library cublas64_12.dll is not found`
+
+### OpenCC 用 s2tw 不用 s2twp
+
+`s2twp` 的慣用詞轉換會把**「文本」改成「文字」**, 在遊戲業是錯的。用 `s2tw` 只轉字不轉詞。另外 OpenCC 一律產出「臺」, 台灣慣用「台」, 所以 `to_traditional_tw()` 最後再換一次。
 
 ## 回頭修改
 
@@ -125,7 +229,10 @@ py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck>
 
 ## 維護這支 skill
 
-- 改 `scripts/` 前後都跑 `py -3.12-64 -m pytest scripts/tests` (現為 39 筆)
+- 改 `scripts/` 前後都跑 `py -3.12-64 -m pytest scripts/tests` (現為 101 筆)
+- `transcribe.py` 有兩處沒被 pytest 蓋到, 因為一個要載 4GB 模型、一個會真的花錢: `make_breeze_transcriber()` 與 `make_scribe_transcriber()` / `_call_fal_scribe()`。動到它們要另外跑一次真實音檔 smoke test。其餘純邏輯 (掃檔/併段/估價/切檔計畫/word 轉 segment/簡轉繁/冪等跳過) 都有測試
+- 改轉錄相關邏輯時**不要每次都重跑模型或 API**: 先把一次的原始回傳存成 json, 之後拿那份 json 餵純邏輯函式驗證。一小時的檔跑一次 Scribe 要 $0.62、跑一次 Breeze 要 20 分鐘, 反覆重跑很浪費
+- 實驗新參數時用 **5 分鐘切片**而不是整場, 迭代速度差 10 倍
 - **格式的權威是 `scripts/build_pptx.py` 本身**, 不是文件。改了 parser 或版型規則, 要同步改 `references/formats.md`
 - 跑過 build 之後 `examples/mini-deck/output/` 的 pptx 二進位每次都不同 (即使內容沒變), 收尾前 `git checkout -- examples/mini-deck/output/` 還原, 不要把它當成有意義的異動 commit 進去
 
@@ -138,4 +245,7 @@ py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck>
 
 - **第七階段 polish (送 Claude Design 美化)**: 2026-09-08 試過用 claude-design MCP 半自動化, 技術上跑得通, 但 MCP 沒有任何工具能替 app 裡的 agent 送出訊息或觸發匯出 (`put_conversation` 只是把對話複製顯示在面板, 不會執行), 手動 key prompt 這步拔不掉, 所以整個階段取消。美化由使用者自行處理
 - **第八步驟 upload 到 Google Drive**: 2026-09-08 加過, 2026-09-09 使用者要求移除。要重加先重新確認需求, 不要照舊參數復原
+- **逐字稿帶時間戳**: 2026-09-14 討論過, 使用者明確要純文字段落。不要「順便」加回去。(時間戳仍然要拿來**決定分段**, 只是不寫進輸出)
+- **再去比別的 STT 模型**: 2026-09-14 已經實測比過四個, 不要重跑一輪。faster-whisper `large-v3` (21.8x realtime, 但簡繁混雜、台灣口音差); `asadfgglie/faster-whisper-large-v3-zh-TW` (59x realtime 最快, 但辨識品質最差且會卡重複迴圈); Breeze-ASR-25 (本地最佳但無標點); Scribe V2 (整體最佳)。換模型換不出品質, 瓶頸是音訊本身 (語速快、中英混雜密集、會議室收音)
+- **其他線上 STT 服務**: 2026-09-14 評估過, 都不如 Scribe。雅婷逐字稿 (台灣口音最準但只送 20 分鐘, 之後 100元/小時, 且是網頁無法自動化); HuggingFace Space / Colab (要手動上傳下載); fal 上的 wizper (就是 large-v3, 換到雲端不會變好, 只是多花錢)
 - ⚠️ `docs/2026-09-07-deck-pipeline-design.md` 第 295 行仍寫著「新增第七階段 polish」, 那是設計當下的版本, **已作廢**, 以本文件為準
