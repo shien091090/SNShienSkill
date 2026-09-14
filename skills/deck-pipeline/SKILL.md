@@ -122,3 +122,20 @@ py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck>
 - stage 與資料夾實況打架: 回報, 使用者裁決
 - design skill 不可用: 階段 5 退化為文字描述方案 (見 stage-style.md 第 6 節)
 - build 失敗: 一次列全部錯誤, 不逐個中斷
+
+## 維護這支 skill
+
+- 改 `scripts/` 前後都跑 `py -3.12-64 -m pytest scripts/tests` (現為 39 筆)
+- **格式的權威是 `scripts/build_pptx.py` 本身**, 不是文件。改了 parser 或版型規則, 要同步改 `references/formats.md`
+- 跑過 build 之後 `examples/mini-deck/output/` 的 pptx 二進位每次都不同 (即使內容沒變), 收尾前 `git checkout -- examples/mini-deck/output/` 還原, 不要把它當成有意義的異動 commit 進去
+
+### 已知 minor (未修, 遇到不用重查)
+
+- `### [section]` 這一行若沒帶標題文字, `RE_PAGE` 不 match, 但拋出的錯誤訊息會指向別的原因, 誤導
+- 圖片行 `![描述](路徑)` 前面有縮排就不 match (`RE_IMAGE` 綁 `^`)
+
+### 已終結的方向 (不要重新提議)
+
+- **第七階段 polish (送 Claude Design 美化)**: 2026-09-08 試過用 claude-design MCP 半自動化, 技術上跑得通, 但 MCP 沒有任何工具能替 app 裡的 agent 送出訊息或觸發匯出 (`put_conversation` 只是把對話複製顯示在面板, 不會執行), 手動 key prompt 這步拔不掉, 所以整個階段取消。美化由使用者自行處理
+- **第八步驟 upload 到 Google Drive**: 2026-09-08 加過, 2026-09-09 使用者要求移除。要重加先重新確認需求, 不要照舊參數復原
+- ⚠️ `docs/2026-09-07-deck-pipeline-design.md` 第 295 行仍寫著「新增第七階段 polish」, 那是設計當下的版本, **已作廢**, 以本文件為準
