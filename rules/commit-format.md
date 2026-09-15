@@ -2,6 +2,14 @@
 
 任何 commit 前重讀本檔全文再下手。不憑記憶, 也不抄 `git log` 裡舊 commit 的寫法——舊 history 不保證合規, 本檔才是權威。
 
+## 專案規範優先
+
+專案內若有明確定義的 commit 規範(repo 根目錄的 CLAUDE.md、`.claude/rules/`、CONTRIBUTING 等), **一律以專案的為主**, 本檔退為 fallback。衝突時不自己折衷、不混用兩邊格式, 照專案那份走; 專案沒講到的部分才回來套本檔。
+
+判斷不出哪份是現行規範就停下來問使用者, 不要憑 `git log` 舊 commit 猜。
+
+例: `D:\Git\MYS-808` 的 `aiToolLib/.claude/rules/22-commit-and-safety-guardrails.md` 自稱最高優先, 要求「嚴禁自動 commit, 必須等使用者明確指示」且 message 走 Conventional Commits 前綴——這兩條分別蓋過本檔的「預設行為」與「格式」。
+
 ## 預設行為
 
 改動完成後直接 `git commit`, 不用問。push 一律等使用者明確指示。
