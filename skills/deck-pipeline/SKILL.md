@@ -217,11 +217,17 @@ keyterms 沒有存檔機制 (2026-09-14 使用者裁決: 用流程規則取代�
 
 ### 相依與環境
 
+**這些東西都不在 git 裡, 換一台機器要重裝一次。** git 只有 skill 本體 (29 個檔)。
+
 ```
-py -3.12-64 -m pip install av opencc-python-reimplemented          # 兩條路都要
-py -3.12-64 -m pip install transformers torch                      # 只有 --local 要
+py -3.12-64 -m pip install av opencc-python-reimplemented    # 必裝: 解碼 + 簡轉繁
+py -3.12-64 -m pip install faster-whisper                    # 轉錄前的「探測音檔」那步要
+py -3.12-64 -m pip install transformers torch                # 只有 --local 要
 ```
 
+- **探測那步也要 torch**: faster-whisper 走 CUDA 時要借 torch 自帶的 `cublas64_12.dll` (見下面那條), 只裝 faster-whisper 會退 CPU。只用 `--scribe` 的人若不想裝 torch (2.7GB), 探測就在 CPU 跑, 60 秒的片段還是幾秒內出來, 可以接受
+- 模型是第一次跑才下載, 不隨 git 走。本機目前快取 7.27 GB:
+  `Breeze-ASR-25` 2.88 GB (`--local` 用) / `faster-whisper-large-v3` 2.88 GB (探測用) / `faster-whisper-large-v3-zh-TW` 1.51 GB (**選型時比較用的, 已淘汰, 可以刪**)
 - 解碼走 PyAV, **不需要系統裝 ffmpeg** (PyAV 自帶), 所以 m4a/aac 也直接吃
 - `--scribe` 需要 `FAL_KEY` 設在 **User scope** 環境變數 (`[Environment]::SetEnvironmentVariable("FAL_KEY","<key>","User")`), 腳本每次呼叫都從 User scope 讀, 所以設完不用重開 Claude Code
 - `--local` 首次跑會下載約 4GB 模型到 HuggingFace cache; 有 CUDA 自動用 GPU (bfloat16, 約 4.4GB VRAM), 沒有就退 CPU 並明講會很慢
