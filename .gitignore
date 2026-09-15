@@ -24,7 +24,6 @@ settings.local.json
 
 # skill 執行紀錄(可能含群組名稱等私人資訊), 只同步 skill 本體
 /skills/line-group-export/logs/
-/skills/unity-mcp-skill/.unity-mcp-skill-sync
 
 # commit 規範(每次 commit 前重讀)
 !/rules/
