@@ -29,7 +29,8 @@ SCRIBE_API_MAX_SEC = 1200        # API 硬限制, 超過回 422 audio_duration_t
 SCRIBE_CHUNK_SEC = 900           # 實際切檔長度, 留餘裕
 
 AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac"}
-SKIP_DIRS = {"output"}
+# _unsorted 是決定不用的素材, 不掃; _archive 要掃, 因為音檔是陪著逐字稿一起進去的
+SKIP_DIRS = {"output", "_unsorted"}
 SENTENCE_END = "。？！?!"
 PUNCTUATION = "。，、！？；：,.!?;:「」『』()（）"
 PROMPT_BASE = "以下是台灣中文的會議錄音逐字稿，請用繁體中文轉寫。"

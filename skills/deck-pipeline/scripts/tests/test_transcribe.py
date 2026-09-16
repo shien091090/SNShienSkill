@@ -530,3 +530,18 @@ def test_merge_segments_preserves_spaces_between_english_words():
 
 def test_merge_segments_still_trims_paragraph_edges():
     assert tr.merge_segments(_segs("  前面 ", "後面  "), min_chars=1) == ["前面 後面"]
+
+
+def test_find_audio_files_skips_unsorted(tmp_path):
+    """_unsorted/ 是決定不用的素材, 不該被列入待轉錄。"""
+    _touch(tmp_path / "要用的.mp3")
+    _touch(tmp_path / "_unsorted" / "不用的.mp3")
+
+    assert [p.name for p in tr.find_audio_files(tmp_path)] == ["要用的.mp3"]
+
+
+def test_find_audio_files_keeps_archive(tmp_path):
+    """_archive/ 是拆分過的原檔, 音檔陪著逐字稿在裡面, 要留在清單裡。"""
+    _touch(tmp_path / "_archive" / "週會.m4a")
+
+    assert [p.name for p in tr.find_audio_files(tmp_path)] == ["週會.m4a"]
