@@ -244,8 +244,14 @@ def chrome_available() -> bool:
 
 
 def render(svg_path: Path, out_path: Path | None = None) -> Path:
-    """用 Chrome headless 把 SVG 截成 PNG, 視窗尺寸直接用 SVG 的像素尺寸"""
-    out = out_path or svg_path.with_suffix(".render.png")
+    """用 Chrome headless 把 SVG 截成 PNG, 視窗尺寸直接用 SVG 的像素尺寸。
+
+    Chrome 的 --screenshot 若給相對路徑, 解析基準不是呼叫端的工作目錄,
+    所以輸出路徑一律轉絕對路徑, 且上層資料夾不存在就先建好。
+    """
+    svg_abs = svg_path.resolve()
+    out = (out_path or svg_path.with_suffix(".render.png")).resolve()
+    out.parent.mkdir(parents=True, exist_ok=True)
     vw, vh = svg_size_px(svg_path)
     proc = subprocess.run(
         [
@@ -256,14 +262,16 @@ def render(svg_path: Path, out_path: Path | None = None) -> Path:
             f"--screenshot={out}",
             f"--window-size={int(round(vw))},{int(round(vh))}",
             "--default-background-color=FFFFFFFF",
-            str(svg_path.resolve()),
+            str(svg_abs),
         ],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=60,
     )
     if not out.exists():
-        raise SvgTraceError(f"瀏覽器沒有產出截圖。訊息: {proc.stderr.strip()[:200]}")
+        stderr = (proc.stderr or "").strip()
+        raise SvgTraceError(f"瀏覽器沒有產出截圖。訊息: {stderr[:200]}")
     return out
 
 
@@ -285,8 +293,10 @@ def compare(original: Path, trace_png: Path, out_path: Path) -> Path:
     draw.text((left.width + GUTTER_PX + 4, 6), "TRACE", fill="#000000")
     canvas.paste(left, (0, LABEL_PX))
     canvas.paste(right, (left.width + GUTTER_PX, LABEL_PX))
-    canvas.save(out_path)
-    return out_path
+    out = out_path.resolve()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(out)
+    return out
 
 
 def _dispatch(args: argparse.Namespace) -> int:

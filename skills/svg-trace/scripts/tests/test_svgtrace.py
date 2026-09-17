@@ -297,6 +297,35 @@ def test_render_produces_a_png(tmp_path):
     assert Image.open(out).size == (400, 200)
 
 
+@pytest.mark.skipif(not st.chrome_available(), reason="這台機器沒有 Chrome 或 Edge")
+def test_render_accepts_relative_output_path(tmp_path, monkeypatch):
+    svg = _write(tmp_path, "r.svg", SVG_OK)
+    monkeypatch.chdir(tmp_path)
+    out = st.render(Path("r.svg"), Path("shot.png"))
+    assert out.exists() and out.stat().st_size > 0
+
+
+@pytest.mark.skipif(not st.chrome_available(), reason="這台機器沒有 Chrome 或 Edge")
+def test_render_creates_missing_output_directory(tmp_path):
+    svg = _write(tmp_path, "r.svg", SVG_OK)
+    out_path = tmp_path / "sub" / "dir" / "shot.png"
+    out = st.render(svg, out_path)
+    assert out.exists() and out.stat().st_size > 0
+
+
+def test_render_reports_svgtrace_error_not_attribute_error(tmp_path, monkeypatch):
+    svg = _write(tmp_path, "r.svg", SVG_OK)
+    monkeypatch.setattr(st, "find_chrome", lambda: Path("fake-chrome.exe"))
+
+    class FakeProc:
+        returncode = 1
+        stderr = None
+
+    monkeypatch.setattr(st.subprocess, "run", lambda *a, **k: FakeProc())
+    with pytest.raises(st.SvgTraceError):
+        st.render(svg)
+
+
 def test_svg_problems_reports_count_when_exceeds_limit(tmp_path):
     # 造 9 個 foreignObject, 超過 8 個上限
     svg_with_many = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
