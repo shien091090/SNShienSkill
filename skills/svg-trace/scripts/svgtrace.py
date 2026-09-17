@@ -39,6 +39,7 @@ CHROME_CANDIDATES = (
 )
 GUTTER_PX = 16
 LABEL_PX = 24
+RENDER_TIMEOUT_SEC = 60
 
 P_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
 A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -251,24 +252,28 @@ def render(svg_path: Path, out_path: Path | None = None) -> Path:
     """
     svg_abs = svg_path.resolve()
     out = (out_path or svg_path.with_suffix(".render.png")).resolve()
+    chrome = find_chrome()
     out.parent.mkdir(parents=True, exist_ok=True)
     vw, vh = svg_size_px(svg_path)
-    proc = subprocess.run(
-        [
-            str(find_chrome()),
-            "--headless=new",
-            "--disable-gpu",
-            "--hide-scrollbars",
-            f"--screenshot={out}",
-            f"--window-size={int(round(vw))},{int(round(vh))}",
-            "--default-background-color=FFFFFFFF",
-            str(svg_abs),
-        ],
-        capture_output=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=60,
-    )
+    try:
+        proc = subprocess.run(
+            [
+                str(chrome),
+                "--headless=new",
+                "--disable-gpu",
+                "--hide-scrollbars",
+                f"--screenshot={out}",
+                f"--window-size={int(round(vw))},{int(round(vh))}",
+                "--default-background-color=FFFFFFFF",
+                str(svg_abs),
+            ],
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=RENDER_TIMEOUT_SEC,
+        )
+    except subprocess.TimeoutExpired as e:
+        raise SvgTraceError(f"瀏覽器截圖逾時,超過 {RENDER_TIMEOUT_SEC} 秒沒有回應") from e
     if not out.exists():
         stderr = (proc.stderr or "").strip()
         raise SvgTraceError(f"瀏覽器沒有產出截圖。訊息: {stderr[:200]}")

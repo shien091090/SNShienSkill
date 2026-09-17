@@ -326,6 +326,18 @@ def test_render_reports_svgtrace_error_not_attribute_error(tmp_path, monkeypatch
         st.render(svg)
 
 
+def test_render_reports_timeout_as_svgtrace_error(tmp_path, monkeypatch):
+    svg = _write(tmp_path, "r.svg", SVG_OK)
+    monkeypatch.setattr(st, "find_chrome", lambda: Path("fake-chrome.exe"))
+
+    def boom(*a, **k):
+        raise st.subprocess.TimeoutExpired(cmd="fake-chrome.exe", timeout=st.RENDER_TIMEOUT_SEC)
+
+    monkeypatch.setattr(st.subprocess, "run", boom)
+    with pytest.raises(st.SvgTraceError, match="逾時"):
+        st.render(svg)
+
+
 def test_svg_problems_reports_count_when_exceeds_limit(tmp_path):
     # 造 9 個 foreignObject, 超過 8 個上限
     svg_with_many = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
