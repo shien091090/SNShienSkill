@@ -102,3 +102,28 @@ def test_svg_size_invalid_height_value(tmp_path):
     p = _write(tmp_path, "i.svg", '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="xyz"/>')
     with pytest.raises(st.SvgTraceError, match="height.*無效"):
         st.svg_size_px(p)
+
+
+SVG_OK = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200">
+  <rect x="10" y="10" width="100" height="50" fill="#2B579A"/>
+  <text x="20" y="40" font-size="16" fill="#FFFFFF">框</text>
+</svg>'''
+
+
+def test_svg_problems_empty_for_supported_svg(tmp_path):
+    p = _write(tmp_path, "ok.svg", SVG_OK)
+    assert st.svg_problems(p) == []
+
+
+def test_svg_problems_reports_unsupported_element(tmp_path):
+    p = _write(tmp_path, "bad.svg",
+               '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+               '<foreignObject width="1" height="1"/></svg>')
+    problems = st.svg_problems(p)
+    assert len(problems) == 1
+    assert "foreignObject" in problems[0]
+
+
+def test_svg_problems_reports_parse_error(tmp_path):
+    p = _write(tmp_path, "broken.svg", "<svg><unclosed>")
+    assert any("解析失敗" in m for m in st.svg_problems(p))

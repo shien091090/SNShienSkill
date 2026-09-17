@@ -17,6 +17,8 @@ from xml.etree import ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "vendor"))
 
+from svg_to_pptx.drawingml_converter import _collect_unsupported_visuals
+
 MARGIN_IN = 0.5
 DEFAULT_W_IN, DEFAULT_H_IN = 13.333, 7.5
 
@@ -61,6 +63,20 @@ def fit_box(vw_px: float, vh_px: float, box: tuple[float, float, float, float]) 
     scale = min(bw / (vw_px / 96), bh / (vh_px / 96))
     gw, gh = (vw_px / 96) * scale, (vh_px / 96) * scale
     return bx + (bw - gw) / 2, by + (bh - gh) / 2, gw, gh
+
+
+def svg_problems(svg_path: Path) -> list[str]:
+    """驗證 SVG 能不能轉。回空 list 代表沒問題"""
+    if not svg_path.exists():
+        return [f"檔案不存在: {svg_path}"]
+    try:
+        root = ET.parse(str(svg_path)).getroot()
+    except ET.ParseError as e:
+        return [f"SVG 解析失敗 {svg_path.name}: {e}"]
+    unsupported = _collect_unsupported_visuals(root)
+    if unsupported:
+        return [f"SVG 含不支援元素 {svg_path.name}: {'; '.join(unsupported[:8])}"]
+    return []
 
 
 def _dispatch(args: argparse.Namespace) -> int:
