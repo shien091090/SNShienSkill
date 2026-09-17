@@ -78,3 +78,21 @@ def test_fit_box_width_limited():
     assert h == pytest.approx(4.1667, abs=0.001)
     assert x == pytest.approx(0.5)
     assert y == pytest.approx(1.6667, abs=0.001)
+
+
+def test_svg_size_viewbox_token_count_wrong(tmp_path):
+    p = _write(tmp_path, "f.svg", '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100"/>')
+    with pytest.raises(st.SvgTraceError, match="viewBox"):
+        st.svg_size_px(p)
+
+
+def test_svg_size_viewbox_contains_non_numeric(tmp_path):
+    p = _write(tmp_path, "g.svg", '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 abc 666"/>')
+    with pytest.raises(st.SvgTraceError, match="viewBox"):
+        st.svg_size_px(p)
+
+
+def test_svg_size_invalid_width_value(tmp_path):
+    p = _write(tmp_path, "h.svg", '<svg xmlns="http://www.w3.org/2000/svg" width="abc" height="10"/>')
+    with pytest.raises(st.SvgTraceError, match="無效"):
+        st.svg_size_px(p)

@@ -27,7 +27,11 @@ class SvgTraceError(Exception):
 
 def _px(value: str) -> float:
     """去掉 px / pt / % 之類的單位尾巴, 只留數字"""
-    return float(re.sub(r"[a-z%]+$", "", value.strip()))
+    stripped = re.sub(r"[a-z%]+$", "", value.strip())
+    try:
+        return float(stripped)
+    except ValueError as e:
+        raise SvgTraceError(f"無效的尺寸值: {value}") from e
 
 
 def svg_size_px(svg_path: Path) -> tuple[float, float]:
@@ -40,7 +44,10 @@ def svg_size_px(svg_path: Path) -> tuple[float, float]:
         raise SvgTraceError(f"SVG 解析失敗 {svg_path.name}: {e}") from e
     vb = root.get("viewBox")
     if vb:
-        _, _, vw, vh = (float(v) for v in vb.replace(",", " ").split())
+        try:
+            _, _, vw, vh = (float(v) for v in vb.replace(",", " ").split())
+        except ValueError as e:
+            raise SvgTraceError(f"{svg_path.name} 的 viewBox 格式不正確: {vb}") from e
         return vw, vh
     w, h = root.get("width"), root.get("height")
     if not w or not h:
@@ -48,7 +55,7 @@ def svg_size_px(svg_path: Path) -> tuple[float, float]:
     return _px(w), _px(h)
 
 
-def fit_box(vw_px: float, vh_px: float, box: tuple[float, float, float, float]):
+def fit_box(vw_px: float, vh_px: float, box: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
     """把 vw_px x vh_px 的圖等比縮放置中塞進 box。box 與回傳值都是 (x, y, w, h) 英吋"""
     bx, by, bw, bh = box
     scale = min(bw / (vw_px / 96), bh / (vh_px / 96))
