@@ -10,7 +10,9 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -28,6 +30,15 @@ from svg_to_pptx.drawingml_utils import SVG_NS
 
 MARGIN_IN = 0.5
 DEFAULT_W_IN, DEFAULT_H_IN = 13.333, 7.5
+
+CHROME_CANDIDATES = (
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+    r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+)
+GUTTER_PX = 16
+LABEL_PX = 24
 
 P_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
 A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -212,6 +223,72 @@ def palette(img_path: Path, n: int = 12, at: list[str] = ()) -> dict:
     return {"size": im.size, "colors": colors, "samples": samples}
 
 
+def find_chrome() -> Path:
+    """依序找 CHROME 環境變數、Chrome、Edge。Edge 同為 Chromium, 截圖參數完全一樣"""
+    env = os.environ.get("CHROME")
+    if env and Path(env).exists():
+        return Path(env)
+    for candidate in CHROME_CANDIDATES:
+        if Path(candidate).exists():
+            return Path(candidate)
+    tried = [env or "(環境變數 CHROME 未設)", *CHROME_CANDIDATES]
+    raise SvgTraceError("找不到 Chrome 或 Edge。找過這些位置:\n  " + "\n  ".join(tried))
+
+
+def chrome_available() -> bool:
+    try:
+        find_chrome()
+        return True
+    except SvgTraceError:
+        return False
+
+
+def render(svg_path: Path, out_path: Path | None = None) -> Path:
+    """用 Chrome headless 把 SVG 截成 PNG, 視窗尺寸直接用 SVG 的像素尺寸"""
+    out = out_path or svg_path.with_suffix(".render.png")
+    vw, vh = svg_size_px(svg_path)
+    proc = subprocess.run(
+        [
+            str(find_chrome()),
+            "--headless=new",
+            "--disable-gpu",
+            "--hide-scrollbars",
+            f"--screenshot={out}",
+            f"--window-size={int(round(vw))},{int(round(vh))}",
+            "--default-background-color=FFFFFFFF",
+            str(svg_path.resolve()),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if not out.exists():
+        raise SvgTraceError(f"瀏覽器沒有產出截圖。訊息: {proc.stderr.strip()[:200]}")
+    return out
+
+
+def compare(original: Path, trace_png: Path, out_path: Path) -> Path:
+    """原圖與臨摹圖等高並排, 中間留灰色分隔線。
+
+    標籤刻意用英文, 避免踩到 Pillow 預設字型沒有中文字的問題。
+    """
+    left = Image.open(original).convert("RGB")
+    right = Image.open(trace_png).convert("RGB")
+    height = max(left.height, right.height)
+    left = left.resize((round(left.width * height / left.height), height))
+    right = right.resize((round(right.width * height / right.height), height))
+
+    canvas = Image.new("RGB", (left.width + GUTTER_PX + right.width, height + LABEL_PX), "#FFFFFF")
+    draw = ImageDraw.Draw(canvas)
+    draw.rectangle([left.width, 0, left.width + GUTTER_PX, height + LABEL_PX], fill="#CCCCCC")
+    draw.text((4, 6), "ORIGINAL", fill="#000000")
+    draw.text((left.width + GUTTER_PX + 4, 6), "TRACE", fill="#000000")
+    canvas.paste(left, (0, LABEL_PX))
+    canvas.paste(right, (left.width + GUTTER_PX, LABEL_PX))
+    canvas.save(out_path)
+    return out_path
+
+
 def _dispatch(args: argparse.Namespace) -> int:
     if args.cmd == "palette":
         result = palette(Path(args.image), args.n, args.at)
@@ -224,6 +301,14 @@ def _dispatch(args: argparse.Namespace) -> int:
     if args.cmd == "build":
         out = build(Path(args.svg), Path(args.out), args.name)
         print(f"已寫入 {out}")
+        return 0
+    if args.cmd == "render":
+        svg = Path(args.svg)
+        png = render(svg, Path(args.out) if args.out else None)
+        print(f"已截圖 {png}")
+        if args.against:
+            cmp_path = compare(Path(args.against), png, svg.with_suffix(".compare.png"))
+            print(f"已產出並排比對圖 {cmp_path}")
         return 0
     raise SvgTraceError(f"子命令尚未實作: {args.cmd}")
 

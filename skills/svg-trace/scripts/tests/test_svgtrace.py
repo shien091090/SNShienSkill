@@ -256,6 +256,47 @@ def test_build_reports_locked_file_in_chinese(tmp_path, monkeypatch):
         st.build(svg, tmp_path / "locked.pptx")
 
 
+def test_find_chrome_prefers_env_var(tmp_path, monkeypatch):
+    fake = tmp_path / "chrome.exe"
+    fake.write_bytes(b"")
+    monkeypatch.setenv("CHROME", str(fake))
+    assert st.find_chrome() == fake
+
+
+def test_find_chrome_lists_tried_paths_when_missing(tmp_path, monkeypatch):
+    monkeypatch.delenv("CHROME", raising=False)
+    monkeypatch.setattr(st, "CHROME_CANDIDATES", (str(tmp_path / "nope.exe"),))
+    with pytest.raises(st.SvgTraceError, match="找不到 Chrome"):
+        st.find_chrome()
+
+
+def test_compare_puts_two_images_side_by_side(tmp_path):
+    a, b = tmp_path / "a.png", tmp_path / "b.png"
+    Image.new("RGB", (100, 50), "#FF0000").save(a)
+    Image.new("RGB", (100, 50), "#00FF00").save(b)
+    im = Image.open(st.compare(a, b, tmp_path / "cmp.png"))
+    assert im.width == 100 + st.GUTTER_PX + 100
+    assert im.height == 50 + st.LABEL_PX
+
+
+def test_compare_scales_to_equal_height(tmp_path):
+    a, b = tmp_path / "a.png", tmp_path / "b.png"
+    Image.new("RGB", (100, 50), "#FF0000").save(a)
+    Image.new("RGB", (200, 200), "#00FF00").save(b)
+    im = Image.open(st.compare(a, b, tmp_path / "cmp2.png"))
+    # 兩張都拉到 200 高: 原圖變 400 寬, 臨摹圖維持 200 寬
+    assert im.width == 400 + st.GUTTER_PX + 200
+    assert im.height == 200 + st.LABEL_PX
+
+
+@pytest.mark.skipif(not st.chrome_available(), reason="這台機器沒有 Chrome 或 Edge")
+def test_render_produces_a_png(tmp_path):
+    svg = _write(tmp_path, "r.svg", SVG_OK)
+    out = st.render(svg)
+    assert out.exists() and out.stat().st_size > 0
+    assert Image.open(out).size == (400, 200)
+
+
 def test_svg_problems_reports_count_when_exceeds_limit(tmp_path):
     # 造 9 個 foreignObject, 超過 8 個上限
     svg_with_many = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
