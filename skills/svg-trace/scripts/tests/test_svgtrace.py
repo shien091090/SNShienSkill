@@ -127,3 +127,30 @@ def test_svg_problems_reports_unsupported_element(tmp_path):
 def test_svg_problems_reports_parse_error(tmp_path):
     p = _write(tmp_path, "broken.svg", "<svg><unclosed>")
     assert any("解析失敗" in m for m in st.svg_problems(p))
+
+
+def test_svg_problems_missing_file(tmp_path):
+    p = tmp_path / "nonexistent.svg"
+    problems = st.svg_problems(p)
+    assert len(problems) == 1
+    assert "檔案不存在" in problems[0]
+
+
+def test_svg_problems_reports_count_when_exceeds_limit(tmp_path):
+    # 造 9 個 foreignObject, 超過 8 個上限
+    svg_with_many = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <foreignObject x="0" y="0" width="10" height="10"/>
+      <foreignObject x="10" y="0" width="10" height="10"/>
+      <foreignObject x="20" y="0" width="10" height="10"/>
+      <foreignObject x="30" y="0" width="10" height="10"/>
+      <foreignObject x="40" y="0" width="10" height="10"/>
+      <foreignObject x="50" y="0" width="10" height="10"/>
+      <foreignObject x="60" y="0" width="10" height="10"/>
+      <foreignObject x="70" y="0" width="10" height="10"/>
+      <foreignObject x="80" y="0" width="10" height="10"/>
+    </svg>'''
+    p = _write(tmp_path, "many.svg", svg_with_many)
+    problems = st.svg_problems(p)
+    assert len(problems) == 1
+    assert "foreignObject" in problems[0]
+    assert "還有 1 個" in problems[0]

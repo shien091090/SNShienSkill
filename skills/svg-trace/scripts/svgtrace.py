@@ -75,7 +75,10 @@ def svg_problems(svg_path: Path) -> list[str]:
         return [f"SVG 解析失敗 {svg_path.name}: {e}"]
     unsupported = _collect_unsupported_visuals(root)
     if unsupported:
-        return [f"SVG 含不支援元素 {svg_path.name}: {'; '.join(unsupported[:8])}"]
+        msg = f"SVG 含不支援元素 {svg_path.name}: {'; '.join(unsupported[:8])}"
+        if len(unsupported) > 8:
+            msg += f"，還有 {len(unsupported) - 8} 個"
+        return [msg]
     return []
 
 
