@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from PIL import Image, ImageDraw
 from pptx import Presentation
 from pptx.util import Inches
 
@@ -30,6 +31,38 @@ def _write(tmp_path, name, text):
     p = tmp_path / name
     p.write_text(text, encoding="utf-8")
     return p
+
+
+def _two_tone_png(tmp_path):
+    im = Image.new("RGB", (100, 50), "#EAF1FB")
+    ImageDraw.Draw(im).rectangle([0, 0, 49, 49], fill="#2B579A")
+    p = tmp_path / "src.png"
+    im.save(p)
+    return p
+
+
+def test_palette_reports_size_and_dominant_colors(tmp_path):
+    result = st.palette(_two_tone_png(tmp_path), n=8)
+    assert result["size"] == (100, 50)
+    hexes = [c["hex"] for c in result["colors"]]
+    assert "#2B579A" in hexes
+    assert "#EAF1FB" in hexes
+    assert sum(c["ratio"] for c in result["colors"]) == pytest.approx(1.0, abs=0.001)
+
+
+def test_palette_samples_exact_pixels(tmp_path):
+    result = st.palette(_two_tone_png(tmp_path), at=["10,10", "80,10"])
+    assert [s["hex"] for s in result["samples"]] == ["#2B579A", "#EAF1FB"]
+
+
+def test_palette_rejects_out_of_range_point(tmp_path):
+    with pytest.raises(st.SvgTraceError, match="超出圖片範圍"):
+        st.palette(_two_tone_png(tmp_path), at=["999,999"])
+
+
+def test_palette_missing_file_raises(tmp_path):
+    with pytest.raises(st.SvgTraceError, match="圖片不存在"):
+        st.palette(tmp_path / "nope.png")
 
 
 def test_svg_size_from_viewbox(tmp_path):

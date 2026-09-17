@@ -16,6 +16,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from lxml import etree
+from PIL import Image, ImageDraw
 from pptx import Presentation
 from pptx.util import Inches
 
@@ -177,7 +178,49 @@ def build(svg_path: Path, out_path: Path, name: str | None = None) -> Path:
     return out_path
 
 
+def _hex(rgb) -> str:
+    return "#%02X%02X%02X" % tuple(rgb)
+
+
+def palette(img_path: Path, n: int = 12, at: list[str] = ()) -> dict:
+    """取原圖的主色與指定座標的精確顏色。
+
+    量化只回答「這張圖大致有哪些色」, 但「那條線是什麼藍」要靠 at 點名問。
+    """
+    if not img_path.exists():
+        raise SvgTraceError(f"圖片不存在: {img_path}")
+    im = Image.open(img_path).convert("RGB")
+
+    quantized = im.quantize(colors=max(2, n))
+    pal = quantized.getpalette()
+    total = im.width * im.height
+    colors = [
+        {"hex": _hex(pal[idx * 3: idx * 3 + 3]), "ratio": count / total}
+        for count, idx in sorted(quantized.getcolors(), reverse=True)
+    ]
+
+    samples = []
+    for point in at:
+        try:
+            x, y = (int(v) for v in point.split(","))
+        except ValueError as e:
+            raise SvgTraceError(f"座標格式要寫成 X,Y: {point}") from e
+        if not (0 <= x < im.width and 0 <= y < im.height):
+            raise SvgTraceError(f"座標 {point} 超出圖片範圍 {im.width}x{im.height}")
+        samples.append({"at": (x, y), "hex": _hex(im.getpixel((x, y)))})
+
+    return {"size": im.size, "colors": colors, "samples": samples}
+
+
 def _dispatch(args: argparse.Namespace) -> int:
+    if args.cmd == "palette":
+        result = palette(Path(args.image), args.n, args.at)
+        print(f"尺寸 {result['size'][0]}x{result['size'][1]}")
+        for c in result["colors"]:
+            print(f"  {c['hex']}  {c['ratio'] * 100:5.1f}%")
+        for s in result["samples"]:
+            print(f"  取樣 {s['at'][0]},{s['at'][1]} → {s['hex']}")
+        return 0
     if args.cmd == "build":
         out = build(Path(args.svg), Path(args.out), args.name)
         print(f"已寫入 {out}")
