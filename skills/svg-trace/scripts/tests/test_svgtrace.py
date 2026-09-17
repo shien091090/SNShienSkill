@@ -65,6 +65,21 @@ def test_palette_missing_file_raises(tmp_path):
         st.palette(tmp_path / "nope.png")
 
 
+def test_palette_clamps_n_to_max_256(tmp_path):
+    result = st.palette(_two_tone_png(tmp_path), n=300)
+    assert len(result["colors"]) <= 256
+    assert "size" in result
+    assert "colors" in result
+    assert "samples" in result
+
+
+def test_palette_rejects_malformed_coordinate(tmp_path):
+    with pytest.raises(st.SvgTraceError, match="座標格式要寫成 X,Y"):
+        st.palette(_two_tone_png(tmp_path), at=["abc"])
+    with pytest.raises(st.SvgTraceError, match="座標格式要寫成 X,Y"):
+        st.palette(_two_tone_png(tmp_path), at=["1,2,3"])
+
+
 def test_svg_size_from_viewbox(tmp_path):
     p = _write(tmp_path, "a.svg", '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1184 666"/>')
     assert st.svg_size_px(p) == (1184.0, 666.0)

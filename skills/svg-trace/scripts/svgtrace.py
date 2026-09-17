@@ -191,7 +191,7 @@ def palette(img_path: Path, n: int = 12, at: list[str] = ()) -> dict:
         raise SvgTraceError(f"圖片不存在: {img_path}")
     im = Image.open(img_path).convert("RGB")
 
-    quantized = im.quantize(colors=max(2, n))
+    quantized = im.quantize(colors=min(256, max(2, n)))
     pal = quantized.getpalette()
     total = im.width * im.height
     colors = [
