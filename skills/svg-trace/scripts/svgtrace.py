@@ -10,8 +10,10 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "vendor"))
 
@@ -21,6 +23,37 @@ DEFAULT_W_IN, DEFAULT_H_IN = 13.333, 7.5
 
 class SvgTraceError(Exception):
     """使用者看得懂的錯誤。main() 捕捉後印一行訊息並回傳 1, 不吐 traceback。"""
+
+
+def _px(value: str) -> float:
+    """去掉 px / pt / % 之類的單位尾巴, 只留數字"""
+    return float(re.sub(r"[a-z%]+$", "", value.strip()))
+
+
+def svg_size_px(svg_path: Path) -> tuple[float, float]:
+    """SVG 的像素寬高。優先讀 viewBox, 沒有才退回 width/height"""
+    if not svg_path.exists():
+        raise SvgTraceError(f"檔案不存在: {svg_path}")
+    try:
+        root = ET.parse(str(svg_path)).getroot()
+    except ET.ParseError as e:
+        raise SvgTraceError(f"SVG 解析失敗 {svg_path.name}: {e}") from e
+    vb = root.get("viewBox")
+    if vb:
+        _, _, vw, vh = (float(v) for v in vb.replace(",", " ").split())
+        return vw, vh
+    w, h = root.get("width"), root.get("height")
+    if not w or not h:
+        raise SvgTraceError(f"{svg_path.name} 沒有 viewBox 也沒有 width/height, 無法決定尺寸")
+    return _px(w), _px(h)
+
+
+def fit_box(vw_px: float, vh_px: float, box: tuple[float, float, float, float]):
+    """把 vw_px x vh_px 的圖等比縮放置中塞進 box。box 與回傳值都是 (x, y, w, h) 英吋"""
+    bx, by, bw, bh = box
+    scale = min(bw / (vw_px / 96), bh / (vh_px / 96))
+    gw, gh = (vw_px / 96) * scale, (vh_px / 96) * scale
+    return bx + (bw - gw) / 2, by + (bh - gh) / 2, gw, gh
 
 
 def _dispatch(args: argparse.Namespace) -> int:
