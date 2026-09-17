@@ -25,13 +25,13 @@ class SvgTraceError(Exception):
     """使用者看得懂的錯誤。main() 捕捉後印一行訊息並回傳 1, 不吐 traceback。"""
 
 
-def _px(value: str) -> float:
+def _px(value: str, attr: str, filename: str) -> float:
     """去掉 px / pt / % 之類的單位尾巴, 只留數字"""
     stripped = re.sub(r"[a-z%]+$", "", value.strip())
     try:
         return float(stripped)
     except ValueError as e:
-        raise SvgTraceError(f"無效的尺寸值: {value}") from e
+        raise SvgTraceError(f"{filename} 的 {attr} 值無效: {value}") from e
 
 
 def svg_size_px(svg_path: Path) -> tuple[float, float]:
@@ -52,7 +52,7 @@ def svg_size_px(svg_path: Path) -> tuple[float, float]:
     w, h = root.get("width"), root.get("height")
     if not w or not h:
         raise SvgTraceError(f"{svg_path.name} 沒有 viewBox 也沒有 width/height, 無法決定尺寸")
-    return _px(w), _px(h)
+    return _px(w, "width", svg_path.name), _px(h, "height", svg_path.name)
 
 
 def fit_box(vw_px: float, vh_px: float, box: tuple[float, float, float, float]) -> tuple[float, float, float, float]:

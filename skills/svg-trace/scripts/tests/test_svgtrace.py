@@ -94,5 +94,11 @@ def test_svg_size_viewbox_contains_non_numeric(tmp_path):
 
 def test_svg_size_invalid_width_value(tmp_path):
     p = _write(tmp_path, "h.svg", '<svg xmlns="http://www.w3.org/2000/svg" width="abc" height="10"/>')
-    with pytest.raises(st.SvgTraceError, match="無效"):
+    with pytest.raises(st.SvgTraceError, match="width.*無效"):
+        st.svg_size_px(p)
+
+
+def test_svg_size_invalid_height_value(tmp_path):
+    p = _write(tmp_path, "i.svg", '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="xyz"/>')
+    with pytest.raises(st.SvgTraceError, match="height.*無效"):
         st.svg_size_px(p)
