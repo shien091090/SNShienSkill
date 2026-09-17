@@ -3,6 +3,8 @@ import sys
 from pathlib import Path
 
 import pytest
+from pptx import Presentation
+from pptx.util import Inches
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import svgtrace as st  # noqa: E402
@@ -134,6 +136,76 @@ def test_svg_problems_missing_file(tmp_path):
     problems = st.svg_problems(p)
     assert len(problems) == 1
     assert "檔案不存在" in problems[0]
+
+
+def test_build_creates_16_9_deck_when_missing(tmp_path):
+    svg = _write(tmp_path, "d.svg", SVG_OK)
+    out = tmp_path / "out.pptx"
+    st.build(svg, out)
+    prs = Presentation(str(out))
+    assert prs.slide_width == Inches(13.333)
+    assert prs.slide_height == Inches(7.5)
+    assert len(prs.slides._sldIdLst) == 1
+
+
+def test_build_appends_a_slide_to_existing_deck(tmp_path):
+    svg = _write(tmp_path, "d.svg", SVG_OK)
+    out = tmp_path / "out.pptx"
+    st.build(svg, out, name="第一張")
+    st.build(svg, out, name="第二張")
+    slides = list(Presentation(str(out)).slides)
+    assert len(slides) == 2
+    # 原有那頁不可被動到
+    assert [s.shapes[0].name for s in slides] == ["第一張", "第二張"]
+
+
+def test_build_keeps_existing_slide_size(tmp_path):
+    out = tmp_path / "four-three.pptx"
+    Presentation().save(str(out))  # python-pptx 預設 10 x 7.5 吋
+    svg = _write(tmp_path, "d.svg", SVG_OK)
+    st.build(svg, out)
+    after = Presentation(str(out))
+    assert after.slide_width == Inches(10)
+    assert after.slide_height == Inches(7.5)
+
+
+def test_build_slide_has_only_the_diagram_group(tmp_path):
+    svg = _write(tmp_path, "d.svg", SVG_OK)
+    out = tmp_path / "out.pptx"
+    st.build(svg, out, name="流程")
+    slide = list(Presentation(str(out)).slides)[0]
+    assert len(slide.shapes) == 1
+    assert slide.shapes[0].name == "流程"
+
+
+def test_build_shape_ids_do_not_collide(tmp_path):
+    svg = _write(tmp_path, "d.svg", SVG_OK)
+    out = tmp_path / "out.pptx"
+    st.build(svg, out)
+    st.build(svg, out)
+    for slide in Presentation(str(out)).slides:
+        ids = re.findall(r'<p:cNvPr id="(\d+)"', slide.shapes._spTree.xml)
+        assert len(ids) == len(set(ids)), "同一頁裡的圖案編號重複了"
+
+
+def test_build_refuses_unsupported_svg(tmp_path):
+    svg = _write(tmp_path, "bad2.svg",
+                 '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+                 '<foreignObject width="1" height="1"/></svg>')
+    with pytest.raises(st.SvgTraceError, match="foreignObject"):
+        st.build(svg, tmp_path / "x.pptx")
+    assert not (tmp_path / "x.pptx").exists(), "驗證沒過就不該產出半成品"
+
+
+def test_build_reports_locked_file_in_chinese(tmp_path, monkeypatch):
+    svg = _write(tmp_path, "d.svg", SVG_OK)
+
+    def deny(self, path):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr("pptx.presentation.Presentation.save", deny)
+    with pytest.raises(st.SvgTraceError, match="PowerPoint"):
+        st.build(svg, tmp_path / "locked.pptx")
 
 
 def test_svg_problems_reports_count_when_exceeds_limit(tmp_path):

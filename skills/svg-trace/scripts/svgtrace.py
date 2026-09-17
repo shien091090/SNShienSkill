@@ -15,12 +15,22 @@ import sys
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+from lxml import etree
+from pptx import Presentation
+from pptx.util import Inches
+
 sys.path.insert(0, str(Path(__file__).resolve().parent / "vendor"))
 
+from svg_to_pptx import ConvertContext, EMU_PER_PX, collect_defs, convert_element
 from svg_to_pptx.drawingml_converter import _collect_unsupported_visuals
+from svg_to_pptx.drawingml_utils import SVG_NS
 
 MARGIN_IN = 0.5
 DEFAULT_W_IN, DEFAULT_H_IN = 13.333, 7.5
+
+P_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
+A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
+R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 
 
 class SvgTraceError(Exception):
@@ -82,7 +92,96 @@ def svg_problems(svg_path: Path) -> list[str]:
     return []
 
 
+def _blank_layout(prs):
+    """挑一個沒有版面配置區的版型; 都沒有就用最後一個, 之後再把配置區拔掉"""
+    for layout in prs.slide_layouts:
+        if len(layout.placeholders) == 0:
+            return layout
+    return prs.slide_layouts[-1]
+
+
+def _add_blank_slide(prs):
+    """加一頁純空白的投影片。
+
+    追加進使用者自己的簡報時, 版型不一定有空白可選, 所以配置區一律拔掉,
+    確保產出的那頁除了圖案以外什麼都沒有。
+    """
+    slide = prs.slides.add_slide(_blank_layout(prs))
+    for shape in list(slide.placeholders):
+        shape._element.getparent().remove(shape._element)
+    return slide
+
+
+def svg_group(slide, box, svg_path: Path, name: str) -> None:
+    """SVG 變成一個原生圖案群組, 等比縮放置中塞進 box。
+
+    群組內每個框/線/文字在 PowerPoint 裡都可個別編輯。
+    """
+    root = ET.parse(str(svg_path)).getroot()
+    vw, vh = svg_size_px(svg_path)
+    gx, gy, gw, gh = fit_box(vw, vh, box)
+
+    sp_tree = slide.shapes._spTree
+    used = [int(m) for m in re.findall(r'<p:cNvPr id="(\d+)"', etree.tostring(sp_tree).decode())]
+    ctx = ConvertContext(defs=collect_defs(root), id_counter=max(used, default=1) + 1)
+
+    frags = []
+    for child in root:
+        if child.tag.replace(f"{{{SVG_NS}}}", "") == "defs":
+            continue
+        result = convert_element(child, ctx)
+        if result:
+            frags.append(result.xml)
+
+    gid = ctx.next_id()
+    grp = (
+        f'<p:grpSp xmlns:a="{A_NS}" xmlns:r="{R_NS}" xmlns:p="{P_NS}">'
+        f'<p:nvGrpSpPr><p:cNvPr id="{gid}" name="{name}"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>'
+        f'<p:grpSpPr><a:xfrm>'
+        f'<a:off x="{int(Inches(gx))}" y="{int(Inches(gy))}"/>'
+        f'<a:ext cx="{int(Inches(gw))}" cy="{int(Inches(gh))}"/>'
+        f'<a:chOff x="0" y="0"/>'
+        f'<a:chExt cx="{int(vw * EMU_PER_PX)}" cy="{int(vh * EMU_PER_PX)}"/>'
+        f'</a:xfrm></p:grpSpPr>'
+        f'{"".join(frags)}</p:grpSp>'
+    )
+    sp_tree.append(etree.fromstring(grp))
+
+
+def build(svg_path: Path, out_path: Path, name: str | None = None) -> Path:
+    """驗證 SVG 後寫進 pptx。檔案不存在就建 16:9 新檔, 存在就追加一頁並沿用原尺寸"""
+    problems = svg_problems(svg_path)
+    if problems:
+        raise SvgTraceError("\n".join(problems))
+
+    if out_path.exists():
+        prs = Presentation(str(out_path))
+    else:
+        prs = Presentation()
+        prs.slide_width = Inches(DEFAULT_W_IN)
+        prs.slide_height = Inches(DEFAULT_H_IN)
+
+    box = (
+        MARGIN_IN,
+        MARGIN_IN,
+        prs.slide_width.inches - 2 * MARGIN_IN,
+        prs.slide_height.inches - 2 * MARGIN_IN,
+    )
+    slide = _add_blank_slide(prs)
+    svg_group(slide, box, svg_path, name or svg_path.stem)
+
+    try:
+        prs.save(str(out_path))
+    except PermissionError as e:
+        raise SvgTraceError(f"{out_path.name} 正在被 PowerPoint 開著, 請先關掉再重跑") from e
+    return out_path
+
+
 def _dispatch(args: argparse.Namespace) -> int:
+    if args.cmd == "build":
+        out = build(Path(args.svg), Path(args.out), args.name)
+        print(f"已寫入 {out}")
+        return 0
     raise SvgTraceError(f"子命令尚未實作: {args.cmd}")
 
 
