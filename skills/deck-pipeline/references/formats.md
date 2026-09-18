@@ -52,8 +52,18 @@ log:
 結構規則:
 - `# ` 簡報名稱, 只有一個, 缺少會報錯; 同時決定輸出檔名 `output/<簡報名稱>.pptx`
 - `## <兩位數> <topic名>` 一個 topic, 必須跟資料夾 `<兩位數>_<topic名>` 對得起來; `## ` 必須是兩位數編號, 否則報錯
-- `### [<版型>] <頁標題>` 一頁; 缺方括號會報錯
+- `### [<版型>]` 一頁, **這行只放版型**; 缺方括號會報錯
+- 頁標題寫在 `###` 的下一行, 獨立一行。開頭可加 `[章節標籤]` 前綴 (對應 role `label`, 通常放投影片左上角小字, 例如 `案例2` / `小結`)
+- 標題之後的純文字行才是副標 (role `subtitle`)
+- `### [<版型>] <頁標題>` 的舊寫法仍可 parse, 但沒有地方放 `label`, 新的頁一律用拆行寫法
 - 不用 `---` 分頁
+
+```
+### [image]
+[小結] 團隊擴大最明顯的變化就是出現了管理職
+管理職不只是用來管人, 更是為了養那些取代了默契的東西
+![意象: ... 呈現: ...](TODO)
+```
 
 頁內元素 (寫在 `###` 之後, 到下一個 `###` 或 `##` 為止):
 - `- ` 開頭 → 條列, 對應 role `body`
@@ -70,7 +80,7 @@ log:
 ### [text] 輪廓一: 小型團隊
 ```
 
-頁碼是手寫的, 插頁刪頁後要自己重編。SLIDES.md 是「一眼看懂每頁實際呈現什麼」的文件, 配時、對應講稿第幾段、為什麼這樣切這類 meta **不要寫進來**, 寫 STATUS.md 的 log。
+頁碼是**整份簡報連續編號**, 不是 topic 內編號 — 下一個 topic 的第一頁接著上一個 topic 的最後一頁往下數。手寫的, 插頁刪頁後要自己重編。SLIDES.md 是「一眼看懂每頁實際呈現什麼」的文件, 配時、對應講稿第幾段、為什麼這樣切這類 meta **不要寫進來**, 寫 STATUS.md 的 log。
 
 版型初始字彙與慣用元素:
 
@@ -79,11 +89,14 @@ log:
 | `title` | 全簡報開頭 | title, subtitle |
 | `section` | 章節分隔 | title |
 | `text` | 純文字重點 | title, body |
-| `image` | 一張圖為主 | title, image, body (底部一行) |
-| `image-text` | 左圖右文 | title, image, body |
-| `compare` | 兩欄對比 | title, left, right |
-| `image2` | 兩圖並排 | title, image, image, body (底部一行) |
-| `table` | 三欄以上表格 | title, table, body (下方一行小結) |
+| `image` | 一張圖為主 | label, title, image, body (底部一行) |
+| `image-text` | 左圖右文 | label, title, image, body |
+| `compare` | 兩欄對比 | label, title, left, right |
+| `image2` | 兩圖並排, 每欄可有小標 | label, title, left, right, image, image |
+| `image4` | 左一大圖 + 右上一圖 + 右下兩小圖並排 | label, title, image ×4, subtitle |
+| `table` | 三欄以上表格 | label, title, table, body (下方一行小結) |
+
+`image2` 的欄小標用一列 markdown 表格給, 例如 `| 單頁大綱 | 短敘述 |` → 左欄 `單頁大綱`、右欄 `短敘述` (第一列自動加粗)。圖片則依序吃頁內的第 1、2、… 張。
 
 版型可以新增, 只要 STYLE.md 有定義; 階段 4 依內容需要取名即可 (例如某份簡報的 `image-icons4` = 主圖 + 4 個圖示方塊)。
 
@@ -128,7 +141,8 @@ layouts:
 - `slide` / `theme` / `layouts` 三個 key 缺一報錯
 - 每個版型 = 元素清單, 依序放置
 - 元素欄位: `role` (必填) / `box` [x, y, w, h] 英吋 (必填) / `size` pt (文字類, 預設 18) / `bold` (預設 false) / `color` hex (預設 theme.fg)
-- role 字彙: `title` `subtitle` `body` `image` `left` `right` `table`; 其他值報錯
+- role 字彙: `title` `label` `subtitle` `body` `image` `left` `right` `table`; 其他值報錯
+- `label` role: 頁標題行 `[xxx]` 前綴的章節標籤, 慣例放左上角、字級小於 title
 - `table` role: 把該頁的 markdown 表格畫成真正的 pptx 表格 (可編輯), 欄數不限; 第一列是表頭, 加粗、底色 `header_bg` (預設 theme.accent)、字色 `header_fg` (預設 theme.bg); 其餘列底色 theme.bg; `left`/`right` 仍可用於兩欄對照
 - 同一版型可放多個 `image` 元素, 依序吃該頁的第 1、2、... 張圖; 頁的圖比元素多的忽略, 比元素少的元素留空
 - 圖片等比縮放置中放進 box; TODO 圖畫灰底 (#D1D5DB) 矩形加描述

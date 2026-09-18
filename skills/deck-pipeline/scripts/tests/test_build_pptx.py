@@ -487,3 +487,33 @@ def test_parse_slides_ignores_html_comments():
     assert page.subtitle == ""
     assert page.bullets == ["條列"]
     assert len(deck.topics[0].pages) == 1
+
+
+# F10: ### 只放版型時, 下一行純文字是標題; 標題可帶 [章節標籤] 前綴
+
+
+def test_parse_slides_title_on_own_line_with_label():
+    deck = bp.parse_slides(
+        "# t\n\n## 01 a\n\n### [image]\n[小結] 團隊擴大最明顯的變化\n管理職不只是用來管人\n![描述](TODO)\n"
+    )
+    page = deck.topics[0].pages[0]
+    assert page.label == "小結"
+    assert page.title == "團隊擴大最明顯的變化"
+    assert page.subtitle == "管理職不只是用來管人"
+    assert page.images == [("描述", bp.TODO)]
+
+
+def test_parse_slides_title_on_own_line_without_label():
+    deck = bp.parse_slides("# t\n\n## 01 a\n\n### [text]\n純標題\n副標\n")
+    page = deck.topics[0].pages[0]
+    assert (page.label, page.title, page.subtitle) == ("", "純標題", "副標")
+
+
+def test_parse_slides_old_inline_title_still_works():
+    deck = bp.parse_slides("# t\n\n## 01 a\n\n### [text] 舊寫法標題\n副標\n")
+    page = deck.topics[0].pages[0]
+    assert (page.label, page.title, page.subtitle) == ("", "舊寫法標題", "副標")
+
+
+def test_validate_accepts_label_role():
+    assert "label" in bp.VALID_ROLES

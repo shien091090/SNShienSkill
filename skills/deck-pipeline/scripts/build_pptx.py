@@ -39,6 +39,7 @@ class SlidesParseError(ValueError):
 class Page:
     layout: str
     title: str
+    label: str = ""          # 左上角章節標籤 (案例2 / 小結), 標題行 [xxx] 前綴
     subtitle: str = ""
     bullets: list[str] = field(default_factory=list)
     images: list[tuple[str, str]] = field(default_factory=list)  # (描述, 路徑)
@@ -69,7 +70,8 @@ class Deck:
 
 
 RE_TOPIC = re.compile(r"^## (\d{2})\s+(.+?)\s*$")
-RE_PAGE = re.compile(r"^### \[([\w-]+)\]\s*(.+?)\s*$")
+RE_PAGE = re.compile(r"^### \[([\w-]+)\]\s*(.*?)\s*$")
+RE_LABEL = re.compile(r"^\[([^\]]+)\]\s*(.+?)\s*$")
 RE_IMAGE = re.compile(r"^!\[(.*?)\]\((.+?)\)\s*$")
 RE_TABLE_SEP = re.compile(r"^\|?\s*:?-{2,}")
 
@@ -121,6 +123,13 @@ def parse_slides(text: str) -> Deck:
                 continue
             page.table.append([c.strip() for c in line.strip().strip("|").split("|")])
             continue
+        if not page.title:
+            m = RE_LABEL.match(line.strip())
+            if m:
+                page.label, page.title = m.group(1).strip(), m.group(2).strip()
+            else:
+                page.title = line.strip()
+            continue
         page.subtitle = (page.subtitle + "\n" + line.strip()).strip()
     if not deck.title:
         raise SlidesParseError("缺少 # 簡報名稱")
@@ -152,7 +161,7 @@ def parse_style(text: str) -> Style:
     return Style(data["slide"], data["theme"], data["layouts"])
 
 
-VALID_ROLES = {"title", "subtitle", "body", "image", "left", "right", "table"}
+VALID_ROLES = {"title", "label", "subtitle", "body", "image", "left", "right", "table"}
 
 
 def validate(deck: Deck, style: Style, deck_dir: Path) -> list[str]:
@@ -338,6 +347,8 @@ def render(deck: Deck, style: Style, deck_dir: Path) -> Presentation:
             color = _rgb(el.get("color", theme["fg"]))
             if role == "title":
                 _textbox(slide, box, [page.title], font=theme["font_title"], size=size, color=color, bold=bold)
+            elif role == "label":
+                _textbox(slide, box, [page.label], font=theme["font_title"], size=size, color=color, bold=bold)
             elif role == "subtitle":
                 _textbox(slide, box, page.subtitle.splitlines(), font=theme["font_body"], size=size, color=color, bold=bold)
             elif role == "body":
