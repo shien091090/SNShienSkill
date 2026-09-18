@@ -189,7 +189,24 @@ def validate(deck: Deck, style: Style, deck_dir: Path) -> list[str]:
                 errors.append(f"{where}: 圖片不存在 {path}")
             elif full.suffix.lower() == SVG_SUFFIX:
                 errors.extend(f"{where}: {e}" for e in _svg_problems(full))
+            else:
+                problem = _exif_problem(full)
+                if problem:
+                    errors.append(f"{where}: {problem}")
     return errors
+
+
+def _exif_problem(img_path: Path) -> str | None:
+    """PowerPoint 不套 EXIF orientation, 帶旋轉標記的照片會貼成歪的 — 要求先轉正落檔"""
+    try:
+        with Image.open(img_path) as im:
+            orientation = im.getexif().get(274)
+    except Exception:
+        return None
+    if orientation in (None, 1):
+        return None
+    return (f"{img_path.name} 帶 EXIF orientation={orientation}, PowerPoint 不會套用, 圖會貼成轉向的。"
+            f"請先轉正再存檔 (PIL: ImageOps.exif_transpose 後移除 274 tag)")
 
 
 def _svg_problems(svg_path: Path) -> list[str]:

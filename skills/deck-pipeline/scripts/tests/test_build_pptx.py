@@ -553,3 +553,46 @@ def test_render_cards_layout(tmp_path):
     assert "01" in texts and "03" in texts
     assert "現成可用" in texts and "沒有" in texts
     assert "下注輪與底池" in texts
+
+
+# F12: 帶 EXIF orientation 的照片 PowerPoint 不會轉正, validate 要擋下來
+
+
+def _write_jpeg(path, size, orientation=None):
+    from PIL import Image
+    im = Image.new("RGB", size, (120, 140, 160))
+    kwargs = {}
+    if orientation is not None:
+        ex = im.getexif()
+        ex[274] = orientation
+        kwargs["exif"] = ex.tobytes()
+    im.save(path, "JPEG", **kwargs)
+
+
+def test_exif_problem_flags_rotated_photo(tmp_path):
+    f = tmp_path / "rotated.jpg"
+    _write_jpeg(f, (400, 300), orientation=6)
+    msg = bp._exif_problem(f)
+    assert msg is not None and "orientation=6" in msg
+
+
+def test_exif_problem_silent_on_upright_photo(tmp_path):
+    upright = tmp_path / "upright.jpg"
+    _write_jpeg(upright, (400, 300))
+    tagged = tmp_path / "tagged.jpg"
+    _write_jpeg(tagged, (400, 300), orientation=1)
+    assert bp._exif_problem(upright) is None
+    assert bp._exif_problem(tagged) is None
+
+
+def test_validate_reports_rotated_photo(tmp_path):
+    (tmp_path / "01_a").mkdir()
+    _write_jpeg(tmp_path / "01_a" / "p.jpg", (400, 300), orientation=6)
+    deck = bp.parse_slides("# t\n\n## 01 a\n\n### [image]\nx\n![d](01_a/p.jpg)\n")
+    st = bp.parse_style(
+        "```yaml\nslide: {w: 13.333, h: 7.5}\n"
+        "theme: {bg: '#FFF', fg: '#000', font_title: A, font_body: B}\n"
+        "layouts:\n  image:\n    - {role: image, box: [1, 1, 5, 4]}\n```\n"
+    )
+    errors = bp.validate(deck, st, tmp_path)
+    assert any("EXIF orientation" in e for e in errors)
