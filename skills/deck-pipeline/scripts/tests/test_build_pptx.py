@@ -474,3 +474,125 @@ def test_validate_reports_svg_with_unsupported_element(tmp_path):
         '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><foreignObject width="1" height="1"/></svg>', encoding="utf-8")
     errors = bp.validate(deck, st, tmp_path)
     assert any("SVG" in e and "foreignObject" in e for e in errors)
+
+
+# F9: <!-- --> 註解行不進投影片, 給人看的頁碼標記用
+
+
+def test_parse_slides_ignores_html_comments():
+    deck = bp.parse_slides(
+        "# t\n\n## 01 a\n\n<!-- P01 -->\n### [text] x\n<!-- 分隔 -->\n- 條列\n"
+    )
+    page = deck.topics[0].pages[0]
+    assert page.subtitle == ""
+    assert page.bullets == ["條列"]
+    assert len(deck.topics[0].pages) == 1
+
+
+# F10: ### 只放版型時, 下一行純文字是標題; 標題可帶 [章節標籤] 前綴
+
+
+def test_parse_slides_title_on_own_line_with_label():
+    deck = bp.parse_slides(
+        "# t\n\n## 01 a\n\n### [image]\n[小結] 團隊擴大最明顯的變化\n管理職不只是用來管人\n![描述](TODO)\n"
+    )
+    page = deck.topics[0].pages[0]
+    assert page.label == "小結"
+    assert page.title == "團隊擴大最明顯的變化"
+    assert page.subtitle == "管理職不只是用來管人"
+    assert page.images == [("描述", bp.TODO)]
+
+
+def test_parse_slides_title_on_own_line_without_label():
+    deck = bp.parse_slides("# t\n\n## 01 a\n\n### [text]\n純標題\n副標\n")
+    page = deck.topics[0].pages[0]
+    assert (page.label, page.title, page.subtitle) == ("", "純標題", "副標")
+
+
+def test_parse_slides_old_inline_title_still_works():
+    deck = bp.parse_slides("# t\n\n## 01 a\n\n### [text] 舊寫法標題\n副標\n")
+    page = deck.topics[0].pages[0]
+    assert (page.label, page.title, page.subtitle) == ("", "舊寫法標題", "副標")
+
+
+def test_validate_accepts_label_role():
+    assert "label" in bp.VALID_ROLES
+
+
+# F11: cards role — page.table 每列一張卡 (| 徽章 | 標題 | 說明 |)
+
+
+def test_cards_role_is_valid():
+    assert "cards" in bp.VALID_ROLES
+
+
+def test_render_cards_layout(tmp_path):
+    slides = (
+        "# t\n\n## 01 a\n\n### [cards]\n能做到什麼\n"
+        "| 現成可用 | 回合流程 | 發牌抽牌比大小 |\n"
+        "| 要自己寫 | 下注輪與底池 | 盲注邊池最小加注都沒有 |\n"
+        "| 沒有 | 節點編輯器 | 文件與截圖都找不到畫布 |\n"
+    )
+    style = (
+        "```yaml\n"
+        "slide: {w: 13.333, h: 7.5}\n"
+        "theme: {bg: '#FFFFFF', fg: '#1F2937', accent: '#2563EB', font_title: A, font_body: B}\n"
+        "layouts:\n"
+        "  cards:\n"
+        "    - {role: title, box: [0.8, 0.5, 11.7, 1.0], size: 28, bold: true}\n"
+        "    - {role: cards, box: [0.8, 1.8, 11.7, 4.6], size: 16, cols: 3,\n"
+        "       badges: {現成可用: '#1F2937', 要自己寫: '#9CA3AF', 沒有: '#DC2626'}}\n"
+        "```\n"
+    )
+    deck = bp.parse_slides(slides)
+    st = bp.parse_style(style)
+    assert bp.validate(deck, st, tmp_path) == []
+    prs = bp.render(deck, st, tmp_path)
+    shapes = list(prs.slides[0].shapes)
+    texts = [s.text_frame.text for s in shapes if s.has_text_frame]
+    assert "01" in texts and "03" in texts
+    assert "現成可用" in texts and "沒有" in texts
+    assert "下注輪與底池" in texts
+
+
+# F12: 帶 EXIF orientation 的照片 PowerPoint 不會轉正, validate 要擋下來
+
+
+def _write_jpeg(path, size, orientation=None):
+    from PIL import Image
+    im = Image.new("RGB", size, (120, 140, 160))
+    kwargs = {}
+    if orientation is not None:
+        ex = im.getexif()
+        ex[274] = orientation
+        kwargs["exif"] = ex.tobytes()
+    im.save(path, "JPEG", **kwargs)
+
+
+def test_exif_problem_flags_rotated_photo(tmp_path):
+    f = tmp_path / "rotated.jpg"
+    _write_jpeg(f, (400, 300), orientation=6)
+    msg = bp._exif_problem(f)
+    assert msg is not None and "orientation=6" in msg
+
+
+def test_exif_problem_silent_on_upright_photo(tmp_path):
+    upright = tmp_path / "upright.jpg"
+    _write_jpeg(upright, (400, 300))
+    tagged = tmp_path / "tagged.jpg"
+    _write_jpeg(tagged, (400, 300), orientation=1)
+    assert bp._exif_problem(upright) is None
+    assert bp._exif_problem(tagged) is None
+
+
+def test_validate_reports_rotated_photo(tmp_path):
+    (tmp_path / "01_a").mkdir()
+    _write_jpeg(tmp_path / "01_a" / "p.jpg", (400, 300), orientation=6)
+    deck = bp.parse_slides("# t\n\n## 01 a\n\n### [image]\nx\n![d](01_a/p.jpg)\n")
+    st = bp.parse_style(
+        "```yaml\nslide: {w: 13.333, h: 7.5}\n"
+        "theme: {bg: '#FFF', fg: '#000', font_title: A, font_body: B}\n"
+        "layouts:\n  image:\n    - {role: image, box: [1, 1, 5, 4]}\n```\n"
+    )
+    errors = bp.validate(deck, st, tmp_path)
+    assert any("EXIF orientation" in e for e in errors)

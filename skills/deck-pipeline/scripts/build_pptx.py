@@ -39,6 +39,7 @@ class SlidesParseError(ValueError):
 class Page:
     layout: str
     title: str
+    label: str = ""          # 左上角章節標籤 (案例2 / 小結), 標題行 [xxx] 前綴
     subtitle: str = ""
     bullets: list[str] = field(default_factory=list)
     images: list[tuple[str, str]] = field(default_factory=list)  # (描述, 路徑)
@@ -69,7 +70,8 @@ class Deck:
 
 
 RE_TOPIC = re.compile(r"^## (\d{2})\s+(.+?)\s*$")
-RE_PAGE = re.compile(r"^### \[([\w-]+)\]\s*(.+?)\s*$")
+RE_PAGE = re.compile(r"^### \[([\w-]+)\]\s*(.*?)\s*$")
+RE_LABEL = re.compile(r"^\[([^\]]+)\]\s*(.+?)\s*$")
 RE_IMAGE = re.compile(r"^!\[(.*?)\]\((.+?)\)\s*$")
 RE_TABLE_SEP = re.compile(r"^\|?\s*:?-{2,}")
 
@@ -82,6 +84,8 @@ def parse_slides(text: str) -> Deck:
         line = raw.rstrip()
         if not line.strip():
             continue
+        if line.startswith("<!--"):
+            continue  # 註解行 (頁碼、分隔線等給人看的標記), 不進投影片
         if line.startswith("# "):
             deck.title = line[2:].strip()
             continue
@@ -119,6 +123,13 @@ def parse_slides(text: str) -> Deck:
                 continue
             page.table.append([c.strip() for c in line.strip().strip("|").split("|")])
             continue
+        if not page.title:
+            m = RE_LABEL.match(line.strip())
+            if m:
+                page.label, page.title = m.group(1).strip(), m.group(2).strip()
+            else:
+                page.title = line.strip()
+            continue
         page.subtitle = (page.subtitle + "\n" + line.strip()).strip()
     if not deck.title:
         raise SlidesParseError("缺少 # 簡報名稱")
@@ -150,7 +161,7 @@ def parse_style(text: str) -> Style:
     return Style(data["slide"], data["theme"], data["layouts"])
 
 
-VALID_ROLES = {"title", "subtitle", "body", "image", "left", "right", "table"}
+VALID_ROLES = {"title", "label", "subtitle", "body", "image", "left", "right", "table", "cards"}
 
 
 def validate(deck: Deck, style: Style, deck_dir: Path) -> list[str]:
@@ -178,7 +189,24 @@ def validate(deck: Deck, style: Style, deck_dir: Path) -> list[str]:
                 errors.append(f"{where}: 圖片不存在 {path}")
             elif full.suffix.lower() == SVG_SUFFIX:
                 errors.extend(f"{where}: {e}" for e in _svg_problems(full))
+            else:
+                problem = _exif_problem(full)
+                if problem:
+                    errors.append(f"{where}: {problem}")
     return errors
+
+
+def _exif_problem(img_path: Path) -> str | None:
+    """PowerPoint 不套 EXIF orientation, 帶旋轉標記的照片會貼成歪的 — 要求先轉正落檔"""
+    try:
+        with Image.open(img_path) as im:
+            orientation = im.getexif().get(274)
+    except Exception:
+        return None
+    if orientation in (None, 1):
+        return None
+    return (f"{img_path.name} 帶 EXIF orientation={orientation}, PowerPoint 不會套用, 圖會貼成轉向的。"
+            f"請先轉正再存檔 (PIL: ImageOps.exif_transpose 後移除 274 tag)")
 
 
 def _svg_problems(svg_path: Path) -> list[str]:
@@ -316,6 +344,47 @@ def _table(slide, box, rows: list[list[str]], *, font, size, fg, bg, header_bg, 
     return frame
 
 
+def _cards(slide, box, rows: list[list[str]], *, font, size, fg, cols, gap, badges, badge_fg,
+           size_badge, size_body, body_color, index_color):
+    """把 page.table 畫成一格一張的卡片網格; 每列 = | 徽章 | 標題 | 說明 |, 編號自動產生"""
+    if not rows:
+        return
+    x, y, w, h = box
+    nrows = -(-len(rows) // cols)
+    cw = (w - gap * (cols - 1)) / cols
+    ch = (h - gap * (nrows - 1)) / nrows
+    for i, row in enumerate(rows):
+        cx = x + (i % cols) * (cw + gap)
+        cy = y + (i // cols) * (ch + gap)
+        badge = row[0] if len(row) > 0 else ""
+        head = row[1] if len(row) > 1 else ""
+        desc = row[2] if len(row) > 2 else ""
+        bh = size_badge / 72 * 2.2
+        _textbox(slide, [cx, cy, cw * 0.25, bh], [f"{i + 1:02d}"],
+                 font=font, size=size_badge, color=_rgb(index_color))
+        if badge:
+            shp = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
+                                         Inches(cx + cw * 0.22), Inches(cy),
+                                         Inches(min(cw * 0.55, len(badge) * size_badge / 72 * 1.5)), Inches(bh))
+            shp.fill.solid()
+            shp.fill.fore_color.rgb = _rgb(badges.get(badge, "#6B7280"))
+            shp.line.fill.background()
+            shp.shadow.inherit = False
+            tf = shp.text_frame
+            tf.word_wrap = False
+            run = tf.paragraphs[0].add_run()
+            run.text = badge
+            run.font.name = font
+            run.font.size = Pt(size_badge)
+            run.font.bold = True
+            run.font.color.rgb = _rgb(badge_fg)
+            tf.paragraphs[0].alignment = PP_ALIGN.CENTER
+        _textbox(slide, [cx, cy + bh + 0.08, cw, size / 72 * 1.8], [head],
+                 font=font, size=size, color=_rgb(fg), bold=True)
+        _textbox(slide, [cx, cy + bh + size / 72 * 1.8 + 0.14, cw, ch - bh - size / 72 * 1.8 - 0.14],
+                 [desc], font=font, size=size_body, color=_rgb(body_color))
+
+
 def render(deck: Deck, style: Style, deck_dir: Path) -> Presentation:
     prs = Presentation()
     prs.slide_width = Inches(style.slide["w"])
@@ -336,6 +405,8 @@ def render(deck: Deck, style: Style, deck_dir: Path) -> Presentation:
             color = _rgb(el.get("color", theme["fg"]))
             if role == "title":
                 _textbox(slide, box, [page.title], font=theme["font_title"], size=size, color=color, bold=bold)
+            elif role == "label":
+                _textbox(slide, box, [page.label], font=theme["font_title"], size=size, color=color, bold=bold)
             elif role == "subtitle":
                 _textbox(slide, box, page.subtitle.splitlines(), font=theme["font_body"], size=size, color=color, bold=bold)
             elif role == "body":
@@ -354,6 +425,14 @@ def render(deck: Deck, style: Style, deck_dir: Path) -> Presentation:
             elif role in ("left", "right"):
                 col = 0 if role == "left" else 1
                 _textbox(slide, box, _column(page, col), font=theme["font_body"], size=size, color=color, bold=bold, first_bold=True)
+            elif role == "cards":
+                _cards(slide, box, page.table,
+                       font=theme["font_body"], size=size, fg=el.get("color", theme["fg"]),
+                       cols=el.get("cols", 3), gap=el.get("gap", 0.3),
+                       badges=el.get("badges", {}), badge_fg=el.get("badge_fg", theme["bg"]),
+                       size_badge=el.get("size_badge", 11), size_body=el.get("size_body", 12),
+                       body_color=el.get("body_color", theme["fg"]),
+                       index_color=el.get("index_color", theme.get("accent", theme["fg"])))
             elif role == "table":
                 _table(slide, box, page.table, font=theme["font_body"], size=size, fg=color, bg=_rgb(theme["bg"]),
                        header_bg=_rgb(el.get("header_bg", theme.get("accent", theme["fg"]))),
