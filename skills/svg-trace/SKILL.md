@@ -115,7 +115,7 @@ description: 觸發詞「描圖」或 /svg-trace [圖片路徑]。給一張圖 (
 ```
 source.png
 trace.svg
-compare.png
+trace.compare.png
 trace.pptx
 ```
 

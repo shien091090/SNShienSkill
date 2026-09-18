@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from PIL import Image, ImageDraw
 from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.util import Inches
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -254,6 +255,69 @@ def test_build_reports_locked_file_in_chinese(tmp_path, monkeypatch):
     monkeypatch.setattr("pptx.presentation.Presentation.save", deny)
     with pytest.raises(st.SvgTraceError, match="PowerPoint"):
         st.build(svg, tmp_path / "locked.pptx")
+
+
+def test_build_group_geometry_matches_fit_box(tmp_path):
+    # 4:3 簡報 (10 x 7.5 吋), 用來確認群組真的是用 fit_box 的結果擺放,
+    # 不是誤用 gx/gy 對調或乾脆寫死 16:9 的 box
+    out = tmp_path / "four-three.pptx"
+    Presentation().save(str(out))
+    svg = _write(tmp_path, "d.svg", SVG_OK)
+    st.build(svg, out, name="流程")
+    prs = Presentation(str(out))
+    shape = list(prs.slides)[0].shapes[0]
+
+    box = (
+        st.MARGIN_IN,
+        st.MARGIN_IN,
+        prs.slide_width.inches - 2 * st.MARGIN_IN,
+        prs.slide_height.inches - 2 * st.MARGIN_IN,
+    )
+    ex, ey, ew, eh = st.fit_box(*st.svg_size_px(svg), box)
+    assert shape.left == pytest.approx(int(Inches(ex)), abs=2)
+    assert shape.top == pytest.approx(int(Inches(ey)), abs=2)
+    assert shape.width == pytest.approx(int(Inches(ew)), abs=2)
+    assert shape.height == pytest.approx(int(Inches(eh)), abs=2)
+
+
+NESTED_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200">
+  <g id="alpha">
+    <rect x="10" y="10" width="80" height="40" fill="#2B579A"/>
+    <text x="20" y="35" font-size="14" fill="#FFFFFF">Alpha</text>
+  </g>
+  <g id="beta">
+    <rect x="200" y="10" width="80" height="40" fill="#A52B2B"/>
+    <text x="210" y="35" font-size="14" fill="#FFFFFF">Beta</text>
+  </g>
+</svg>'''
+
+
+def test_build_preserves_nested_groups_and_text(tmp_path):
+    svg = _write(tmp_path, "nested.svg", NESTED_SVG)
+    out = tmp_path / "out.pptx"
+    st.build(svg, out, name="流程圖")
+    top = list(Presentation(str(out)).slides)[0].shapes[0]
+    assert top.shape_type == MSO_SHAPE_TYPE.GROUP
+
+    subgroups = list(top.shapes)
+    assert len(subgroups) == 2
+    assert all(sg.shape_type == MSO_SHAPE_TYPE.GROUP for sg in subgroups)
+
+    texts = []
+    for sg in subgroups:
+        found = [sh.text_frame.text for sh in sg.shapes if sh.has_text_frame and sh.text_frame.text]
+        assert len(found) == 1
+        texts.append(found[0])
+    assert texts == ["Alpha", "Beta"]
+
+
+def test_build_uses_svg_group_id_as_shape_name(tmp_path):
+    svg = _write(tmp_path, "named.svg", NESTED_SVG)
+    out = tmp_path / "out.pptx"
+    st.build(svg, out, name="流程圖")
+    top = list(Presentation(str(out)).slides)[0].shapes[0]
+    subgroups = list(top.shapes)
+    assert [sg.name for sg in subgroups] == ["alpha", "beta"]
 
 
 def test_find_chrome_prefers_env_var(tmp_path, monkeypatch):

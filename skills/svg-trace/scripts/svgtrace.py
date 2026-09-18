@@ -19,8 +19,9 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from lxml import etree
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, UnidentifiedImageError
 from pptx import Presentation
+from pptx.exc import PackageNotFoundError
 from pptx.util import Inches
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "vendor"))
@@ -47,7 +48,7 @@ PS_GRAB = '''
 Add-Type -AssemblyName System.Windows.Forms,System.Drawing
 $img = [System.Windows.Forms.Clipboard]::GetImage()
 if ($null -eq $img) {{ exit 3 }}
-$img.Save("{out}", [System.Drawing.Imaging.ImageFormat]::Png)
+$img.Save('{out}', [System.Drawing.Imaging.ImageFormat]::Png)
 Write-Output "$($img.Width)x$($img.Height)"
 '''
 
@@ -58,6 +59,16 @@ R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 
 class SvgTraceError(Exception):
     """使用者看得懂的錯誤。main() 捕捉後印一行訊息並回傳 1, 不吐 traceback。"""
+
+
+def _open_image(path: Path, label: str) -> Image.Image:
+    """開使用者給的圖片檔, 檔案不存在或不是圖片都轉成 SvgTraceError"""
+    if not path.exists():
+        raise SvgTraceError(f"{label}不存在: {path}")
+    try:
+        return Image.open(path).convert("RGB")
+    except (UnidentifiedImageError, OSError) as e:
+        raise SvgTraceError(f"{label}不是能讀取的圖片檔 {path.name}: {e}") from e
 
 
 def _px(value: str, attr: str, filename: str) -> float:
@@ -83,11 +94,16 @@ def svg_size_px(svg_path: Path) -> tuple[float, float]:
             _, _, vw, vh = (float(v) for v in vb.replace(",", " ").split())
         except ValueError as e:
             raise SvgTraceError(f"{svg_path.name} 的 viewBox 格式不正確: {vb}") from e
+        if vw <= 0 or vh <= 0:
+            raise SvgTraceError(f"{svg_path.name} 的 viewBox 尺寸不是正數: {vw}x{vh}")
         return vw, vh
     w, h = root.get("width"), root.get("height")
     if not w or not h:
         raise SvgTraceError(f"{svg_path.name} 沒有 viewBox 也沒有 width/height, 無法決定尺寸")
-    return _px(w, "width", svg_path.name), _px(h, "height", svg_path.name)
+    pw, ph = _px(w, "width", svg_path.name), _px(h, "height", svg_path.name)
+    if pw <= 0 or ph <= 0:
+        raise SvgTraceError(f"{svg_path.name} 的 width/height 尺寸不是正數: {pw}x{ph}")
+    return pw, ph
 
 
 def fit_box(vw_px: float, vh_px: float, box: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
@@ -110,7 +126,7 @@ def svg_problems(svg_path: Path) -> list[str]:
     if unsupported:
         msg = f"SVG 含不支援元素 {svg_path.name}: {'; '.join(unsupported[:8])}"
         if len(unsupported) > 8:
-            msg += f"，還有 {len(unsupported) - 8} 個"
+            msg += f", 還有 {len(unsupported) - 8} 個"
         return [msg]
     return []
 
@@ -135,7 +151,12 @@ def _add_blank_slide(prs):
     return slide
 
 
-def svg_group(slide, box, svg_path: Path, name: str) -> None:
+def _xml_attr_escape(s: str) -> str:
+    """XML 屬性值裡的特殊字元跳脫, 給群組名稱沿用 SVG id 時用"""
+    return s.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def svg_group(slide, box: tuple[float, float, float, float], svg_path: Path, name: str) -> None:
     """SVG 變成一個原生圖案群組, 等比縮放置中塞進 box。
 
     群組內每個框/線/文字在 PowerPoint 裡都可個別編輯。
@@ -149,12 +170,23 @@ def svg_group(slide, box, svg_path: Path, name: str) -> None:
     ctx = ConvertContext(defs=collect_defs(root), id_counter=max(used, default=1) + 1)
 
     frags = []
+    frag_sources = []
     for child in root:
         if child.tag.replace(f"{{{SVG_NS}}}", "") == "defs":
             continue
         result = convert_element(child, ctx)
         if result:
             frags.append(result.xml)
+            frag_sources.append(child)
+
+    # 頂層 <g id="..."> 轉出來的子群組沿用該 id 當名稱, 而不是 vendor 內部的
+    # "Group {id}" 流水號, 讓使用者在 PowerPoint 選取窗格裡看得懂每一群是什麼
+    for i, child in enumerate(frag_sources):
+        tag = child.tag.replace(f"{{{SVG_NS}}}", "")
+        gid_attr = child.get("id")
+        if tag == "g" and gid_attr:
+            safe_name = _xml_attr_escape(gid_attr)
+            frags[i] = re.sub(r'name="Group \d+"', f'name="{safe_name}"', frags[i], count=1)
 
     gid = ctx.next_id()
     grp = (
@@ -177,8 +209,14 @@ def build(svg_path: Path, out_path: Path, name: str | None = None) -> Path:
     if problems:
         raise SvgTraceError("\n".join(problems))
 
+    out_path = out_path.resolve()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
     if out_path.exists():
-        prs = Presentation(str(out_path))
+        try:
+            prs = Presentation(str(out_path))
+        except PackageNotFoundError as e:
+            raise SvgTraceError(f"{out_path.name} 不是有效的簡報檔, 無法追加") from e
     else:
         prs = Presentation()
         prs.slide_width = Inches(DEFAULT_W_IN)
@@ -209,9 +247,7 @@ def palette(img_path: Path, n: int = 12, at: list[str] = ()) -> dict:
 
     量化只回答「這張圖大致有哪些色」, 但「那條線是什麼藍」要靠 at 點名問。
     """
-    if not img_path.exists():
-        raise SvgTraceError(f"圖片不存在: {img_path}")
-    im = Image.open(img_path).convert("RGB")
+    im = _open_image(img_path, "圖片")
 
     quantized = im.quantize(colors=min(256, max(2, n)))
     pal = quantized.getpalette()
@@ -295,8 +331,8 @@ def compare(original: Path, trace_png: Path, out_path: Path) -> Path:
 
     標籤刻意用英文, 避免踩到 Pillow 預設字型沒有中文字的問題。
     """
-    left = Image.open(original).convert("RGB")
-    right = Image.open(trace_png).convert("RGB")
+    left = _open_image(original, "原圖")
+    right = _open_image(trace_png, "臨摹圖")
     height = max(left.height, right.height)
     left = left.resize((round(left.width * height / left.height), height))
     right = right.resize((round(right.width * height / right.height), height))
@@ -324,7 +360,8 @@ def work_dir() -> Path:
 def grab(out_path: Path) -> Path:
     """從 Windows 剪貼簿取影像存成 PNG。使用者截圖後完全不必碰路徑"""
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    script = PS_GRAB.format(out=str(out_path).replace("\\", "\\\\"))
+    escaped = str(out_path).replace("\\", "\\\\").replace("'", "''")
+    script = PS_GRAB.format(out=escaped)
     try:
         proc = subprocess.run(
             ["powershell.exe", "-NoProfile", "-STA", "-Command", script],
