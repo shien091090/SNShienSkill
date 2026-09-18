@@ -517,3 +517,39 @@ def test_parse_slides_old_inline_title_still_works():
 
 def test_validate_accepts_label_role():
     assert "label" in bp.VALID_ROLES
+
+
+# F11: cards role — page.table 每列一張卡 (| 徽章 | 標題 | 說明 |)
+
+
+def test_cards_role_is_valid():
+    assert "cards" in bp.VALID_ROLES
+
+
+def test_render_cards_layout(tmp_path):
+    slides = (
+        "# t\n\n## 01 a\n\n### [cards]\n能做到什麼\n"
+        "| 現成可用 | 回合流程 | 發牌抽牌比大小 |\n"
+        "| 要自己寫 | 下注輪與底池 | 盲注邊池最小加注都沒有 |\n"
+        "| 沒有 | 節點編輯器 | 文件與截圖都找不到畫布 |\n"
+    )
+    style = (
+        "```yaml\n"
+        "slide: {w: 13.333, h: 7.5}\n"
+        "theme: {bg: '#FFFFFF', fg: '#1F2937', accent: '#2563EB', font_title: A, font_body: B}\n"
+        "layouts:\n"
+        "  cards:\n"
+        "    - {role: title, box: [0.8, 0.5, 11.7, 1.0], size: 28, bold: true}\n"
+        "    - {role: cards, box: [0.8, 1.8, 11.7, 4.6], size: 16, cols: 3,\n"
+        "       badges: {現成可用: '#1F2937', 要自己寫: '#9CA3AF', 沒有: '#DC2626'}}\n"
+        "```\n"
+    )
+    deck = bp.parse_slides(slides)
+    st = bp.parse_style(style)
+    assert bp.validate(deck, st, tmp_path) == []
+    prs = bp.render(deck, st, tmp_path)
+    shapes = list(prs.slides[0].shapes)
+    texts = [s.text_frame.text for s in shapes if s.has_text_frame]
+    assert "01" in texts and "03" in texts
+    assert "現成可用" in texts and "沒有" in texts
+    assert "下注輪與底池" in texts
