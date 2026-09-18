@@ -478,3 +478,121 @@ def test_svg_problems_reports_count_when_exceeds_limit(tmp_path):
     assert len(problems) == 1
     assert "foreignObject" in problems[0]
     assert "還有 1 個" in problems[0]
+
+
+# --- trace 子命令: 點陣圖描邊 ---
+
+def _paths(svg_text):
+    return re.findall(r'\sd="([^"]+)"', svg_text)
+
+
+def _points(d):
+    """把只含 M/L/Z 的路徑拆成點序列"""
+    return [tuple(float(v) for v in tok.split(","))
+            for tok in d.replace("M", " ").replace("L", " ").replace("Z", " ").split()]
+
+
+def _flat_png(tmp_path, name="src.png", size=(20, 20)):
+    """左半深色右半淺色的單純圖"""
+    im = Image.new("RGB", size, "#101820")
+    ImageDraw.Draw(im).rectangle([size[0] // 2, 0, size[0], size[1]], fill="#E0E0E0")
+    p = tmp_path / name
+    im.save(p)
+    return p
+
+
+def test_viewbox_is_width_limited_for_wide_image():
+    assert st.viewbox_for(600, 300) == pytest.approx((1184.0, 592.0))
+
+
+def test_viewbox_is_height_limited_for_tall_image():
+    # 158x198 直向: 寬吃滿會超過 624 高, 所以改以高度為準
+    vw, vh = st.viewbox_for(158, 198)
+    assert vh == pytest.approx(624.0)
+    assert vw == pytest.approx(498.0, abs=1.0)
+
+
+def test_trace_writes_one_group_per_colour(tmp_path):
+    out = tmp_path / "t.svg"
+    st.trace_image(_flat_png(tmp_path), out, palette=[("底", "#101820"), ("亮", "#E0E0E0")])
+    svg = out.read_text(encoding="utf-8")
+    assert '<g id="底">' in svg
+    assert '<g id="亮">' in svg
+    # 第一個顏色鋪滿整張當底, 不去挖洞
+    assert '<rect x="0" y="0"' in svg
+
+
+def test_trace_at_full_fidelity_has_no_diagonal_segments(tmp_path):
+    """輪廓依建構只有水平與垂直線段; 出現斜線代表迴圈沒閉合, 被 Z 拉了一條回起點"""
+    out = tmp_path / "t.svg"
+    st.trace_image(_flat_png(tmp_path), out, fidelity=100,
+                   palette=[("底", "#101820"), ("亮", "#E0E0E0")])
+    for d in _paths(out.read_text(encoding="utf-8")):
+        if not d.startswith("M"):
+            continue
+        pts = _points(d)
+        ring = pts + [pts[0]]
+        for a, b in zip(ring, ring[1:]):
+            assert a[0] == b[0] or a[1] == b[1], f"斜線段 {a}->{b} 於 {d[:60]}"
+
+
+def _anchors(d):
+    """路徑的錨點數。平滑後每段 C 有兩個控制點, 數逗號會把控制點也算進去"""
+    return d.count("C") if "C" in d else d.count(",")
+
+
+def _circle_png(tmp_path, name="circle.png", size=60):
+    """圓形的邊界在點陣圖上是長長的階梯, 才測得出簡化有沒有作用"""
+    im = Image.new("RGB", (size, size), "#101820")
+    ImageDraw.Draw(im).ellipse([6, 6, size - 6, size - 6], fill="#E0E0E0")
+    p = tmp_path / name
+    im.save(p)
+    return p
+
+
+def test_lower_fidelity_yields_fewer_anchor_points(tmp_path):
+    src = _circle_png(tmp_path)
+    hi, lo = tmp_path / "hi.svg", tmp_path / "lo.svg"
+    pal = [("底", "#101820"), ("亮", "#E0E0E0")]
+    st.trace_image(src, hi, fidelity=100, palette=pal)
+    st.trace_image(src, lo, fidelity=30, palette=pal)
+    count = lambda p: sum(_anchors(d) for d in _paths(p.read_text(encoding="utf-8")))
+    assert count(lo) < count(hi)
+
+
+def test_min_area_drops_specks(tmp_path):
+    im = Image.new("RGB", (30, 30), "#101820")
+    ImageDraw.Draw(im).rectangle([1, 1, 2, 2], fill="#E0E0E0")   # 4 像素的雜點
+    src = tmp_path / "speck.png"
+    im.save(src)
+    pal = [("底", "#101820"), ("亮", "#E0E0E0")]
+    keep, drop = tmp_path / "k.svg", tmp_path / "d.svg"
+    st.trace_image(src, keep, fidelity=100, min_area=1, palette=pal)
+    st.trace_image(src, drop, fidelity=100, min_area=20, palette=pal)
+    assert len(_paths(keep.read_text(encoding="utf-8"))) > len(_paths(drop.read_text(encoding="utf-8")))
+
+
+def test_smooth_emits_curves(tmp_path):
+    out = tmp_path / "t.svg"
+    st.trace_image(_flat_png(tmp_path), out, fidelity=50, smooth=True,
+                   palette=[("底", "#101820"), ("亮", "#E0E0E0")])
+    assert any("C" in d for d in _paths(out.read_text(encoding="utf-8")))
+
+
+def test_trace_rejects_unreadable_image(tmp_path):
+    bad = tmp_path / "notimage.txt"
+    bad.write_text("不是圖", encoding="utf-8")
+    with pytest.raises(st.SvgTraceError, match="圖片"):
+        st.trace_image(bad, tmp_path / "t.svg")
+
+
+def test_trace_rejects_out_of_range_fidelity(tmp_path):
+    with pytest.raises(st.SvgTraceError, match="0 到 100"):
+        st.trace_image(_flat_png(tmp_path), tmp_path / "t.svg", fidelity=150)
+
+
+def test_trace_subcommand_writes_svg(tmp_path):
+    src = _flat_png(tmp_path)
+    out = tmp_path / "cli.svg"
+    assert st.main(["trace", str(src), "--out", str(out)]) == 0
+    assert out.exists() and out.stat().st_size > 0
