@@ -25,6 +25,10 @@ settings.local.json
 # skill 執行紀錄(可能含群組名稱等私人資訊), 只同步 skill 本體
 /skills/line-group-export/logs/
 
+# 從 claude.ai 帳號同步下來的 skill 快取。每台機器自己同步, 目錄名帶 UUID,
+# 進版控只會製造跨裝置衝突
+/skills/synced/
+
 # commit 規範(每次 commit 前重讀)
 !/rules/
 !/rules/**
