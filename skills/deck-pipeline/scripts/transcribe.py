@@ -4,9 +4,9 @@
 走哪條由使用者決定, 不指定引擎會直接報錯 (見 main)。
 
 用法:
-    py -3.12-64 transcribe.py <deck> --scan
-    py -3.12-64 transcribe.py <deck> --scribe [--prompt 通行證,排行賽]
-    py -3.12-64 transcribe.py <deck> --local  [--prompt 通行證,排行賽] [--cpu]
+    py -3 transcribe.py <deck> --scan
+    py -3 transcribe.py <deck> --scribe [--prompt 通行證,排行賽]
+    py -3 transcribe.py <deck> --local  [--prompt 通行證,排行賽] [--cpu]
 """
 from __future__ import annotations
 

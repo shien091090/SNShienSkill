@@ -1,8 +1,8 @@
 """deck-pipeline: SLIDES.md + STYLE.md -> 可編輯 pptx
 
 用法:
-  py -3.12-64 build_pptx.py <deck資料夾>               # 產 output/<title>.pptx
-  py -3.12-64 build_pptx.py <deck資料夾> --images-todo # 只產 IMAGES_TODO.md
+  py -3 build_pptx.py <deck資料夾>               # 產 output/<title>.pptx
+  py -3 build_pptx.py <deck資料夾> --images-todo # 只產 IMAGES_TODO.md
 """
 from __future__ import annotations
 

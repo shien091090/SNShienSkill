@@ -50,7 +50,7 @@ description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把�
 - 使用者說堆好了 → 先掃語音檔, 不要直接轉 organize:
 
 ```
-py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan --prompt 詞1,詞2
+py -3 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan --prompt 詞1,詞2
 ```
 
   - 沒有語音檔 → 直接往下
@@ -95,7 +95,7 @@ py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan -
 - 用 `> ` 註記對應講稿段落, 會進 speaker notes
 - 版型可以在這階段新增: 內容需要現有六種以外的排法 (兩圖並排、主圖加多個圖示、三欄以上表格) 就直接取名用 (`image2` / `image-icons4` / `table` 這類), 記進 STATUS.md log, 階段 5 照清單出方案
 - 逐 topic 確認; STATUS.md 該 topic `slides` 欄 doing → done
-- 全部完成後跑 `py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck> --images-todo` 產 IMAGES_TODO.md, 告知使用者哪些圖要補。補圖不在 skill 範圍, 沒補的圖 build 時會是灰框
+- 全部完成後跑 `py -3 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck> --images-todo` 產 IMAGES_TODO.md, 告知使用者哪些圖要補。補圖不在 skill 範圍, 沒補的圖 build 時會是灰框
 - 完成: 全部 topic `slides: done` → stage 改 style
 
 ### 5. style 版型定案
@@ -105,13 +105,13 @@ py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan -
 ### 6. build 生 pptx
 
 ```
-py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck>
+py -3 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck>
 ```
 
 - 成功: `output/<title>.pptx`, 文字皆可編輯, TODO 圖為灰框加描述, `>` 進 notes
 - 失敗: 腳本列出全部錯誤 (版型未定義 / 圖片不存在), 修 SLIDES.md 或 STYLE.md 後重跑
 - 改了 SLIDES.md 或 STYLE.md 就重 build, 每次整份重建
-- 相依: `py -3.12-64 -m pip install python-pptx pyyaml` (SVG 轉換器已 vendor 在 scripts/vendor, 不用另裝)
+- 相依: `py -3 -m pip install python-pptx pyyaml` (SVG 轉換器已 vendor 在 scripts/vendor, 不用另裝)
 - pptx 正在 PowerPoint 裡開著會 build 失敗 (PermissionError), 先請使用者關掉再重跑
 - STYLE.md 用到的字型播放機器要裝, 沒裝 PowerPoint 會退系統字; 定案時提醒使用者
 - 完成: 使用者確認內容無誤 (字、圖、頁序) → stage 改 done。build 到此結束, 排版美化由使用者自行處理 (例如手動送桌面版 Claude Design), 完成的檔案放回 `output/`
@@ -130,9 +130,9 @@ py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck>
 語音檔 (`.mp3 .wav .m4a .flac .ogg .aac`) 由 `scripts/transcribe.py` 轉成**同層同名的 `.md` 逐字稿**, 之後所有階段只讀逐字稿, 完全當一般文字素材處理, 不知道它從語音來。
 
 ```
-py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan [--prompt 詞1,詞2]
-py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scribe [--prompt 詞1,詞2]
-py -3.12-64 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --local  [--prompt 詞1,詞2] [--cpu]
+py -3 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan [--prompt 詞1,詞2]
+py -3 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scribe [--prompt 詞1,詞2]
+py -3 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --local  [--prompt 詞1,詞2] [--cpu]
 ```
 
 - `--scan` 只列表不轉錄, 並印出走 Scribe 的花費估算
@@ -220,9 +220,9 @@ keyterms 沒有存檔機制 (2026-09-14 使用者裁決: 用流程規則取代�
 **這些東西都不在 git 裡, 換一台機器要重裝一次。** git 只有 skill 本體 (29 個檔)。
 
 ```
-py -3.12-64 -m pip install av opencc-python-reimplemented    # 必裝: 解碼 + 簡轉繁
-py -3.12-64 -m pip install faster-whisper                    # 轉錄前的「探測音檔」那步要
-py -3.12-64 -m pip install transformers torch                # 只有 --local 要
+py -3 -m pip install av opencc-python-reimplemented    # 必裝: 解碼 + 簡轉繁
+py -3 -m pip install faster-whisper                    # 轉錄前的「探測音檔」那步要
+py -3 -m pip install transformers torch                # 只有 --local 要
 ```
 
 - **探測那步也要 torch**: faster-whisper 走 CUDA 時要借 torch 自帶的 `cublas64_12.dll` (見下面那條), 只裝 faster-whisper 會退 CPU。只用 `--scribe` 的人若不想裝 torch (2.7GB), 探測就在 CPU 跑, 60 秒的片段還是幾秒內出來, 可以接受
@@ -262,7 +262,7 @@ py -3.12-64 -m pip install transformers torch                # 只有 --local �
 
 ## 維護這支 skill
 
-- 改 `scripts/` 前後都跑 `py -3.12-64 -m pytest scripts/tests` (現為 101 筆)
+- 改 `scripts/` 前後都跑 `py -3 -m pytest scripts/tests` (現為 101 筆)
 - `transcribe.py` 有兩處沒被 pytest 蓋到, 因為一個要載 4GB 模型、一個會真的花錢: `make_breeze_transcriber()` 與 `make_scribe_transcriber()` / `_call_fal_scribe()`。動到它們要另外跑一次真實音檔 smoke test。其餘純邏輯 (掃檔/併段/估價/切檔計畫/word 轉 segment/簡轉繁/冪等跳過) 都有測試
 - 改轉錄相關邏輯時**不要每次都重跑模型或 API**: 先把一次的原始回傳存成 json, 之後拿那份 json 餵純邏輯函式驗證。一小時的檔跑一次 Scribe 要 $0.62、跑一次 Breeze 要 20 分鐘, 反覆重跑很浪費
 - 實驗新參數時用 **5 分鐘切片**而不是整場, 迭代速度差 10 倍
