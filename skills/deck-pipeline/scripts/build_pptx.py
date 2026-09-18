@@ -82,6 +82,8 @@ def parse_slides(text: str) -> Deck:
         line = raw.rstrip()
         if not line.strip():
             continue
+        if line.startswith("<!--"):
+            continue  # 註解行 (頁碼、分隔線等給人看的標記), 不進投影片
         if line.startswith("# "):
             deck.title = line[2:].strip()
             continue

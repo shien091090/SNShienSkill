@@ -474,3 +474,16 @@ def test_validate_reports_svg_with_unsupported_element(tmp_path):
         '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><foreignObject width="1" height="1"/></svg>', encoding="utf-8")
     errors = bp.validate(deck, st, tmp_path)
     assert any("SVG" in e and "foreignObject" in e for e in errors)
+
+
+# F9: <!-- --> 註解行不進投影片, 給人看的頁碼標記用
+
+
+def test_parse_slides_ignores_html_comments():
+    deck = bp.parse_slides(
+        "# t\n\n## 01 a\n\n<!-- P01 -->\n### [text] x\n<!-- 分隔 -->\n- 條列\n"
+    )
+    page = deck.topics[0].pages[0]
+    assert page.subtitle == ""
+    assert page.bullets == ["條列"]
+    assert len(deck.topics[0].pages) == 1
