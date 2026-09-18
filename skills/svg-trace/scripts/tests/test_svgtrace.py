@@ -338,6 +338,64 @@ def test_render_reports_timeout_as_svgtrace_error(tmp_path, monkeypatch):
         st.render(svg)
 
 
+class _FakeProc:
+    def __init__(self, returncode, stderr=""):
+        self.returncode = returncode
+        self.stdout = ""
+        self.stderr = stderr
+
+
+def test_grab_reports_empty_clipboard(tmp_path, monkeypatch):
+    monkeypatch.setattr(st.subprocess, "run", lambda *a, **k: _FakeProc(3))
+    with pytest.raises(st.SvgTraceError, match="剪貼簿沒有圖片"):
+        st.grab(tmp_path / "out.png")
+
+
+def test_grab_reports_other_failures(tmp_path, monkeypatch):
+    monkeypatch.setattr(st.subprocess, "run", lambda *a, **k: _FakeProc(1, "存取被拒"))
+    with pytest.raises(st.SvgTraceError, match="取剪貼簿影像失敗"):
+        st.grab(tmp_path / "out.png")
+
+
+def test_grab_returns_path_on_success(tmp_path, monkeypatch):
+    target = tmp_path / "sub" / "out.png"
+
+    def fake_run(*a, **k):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (10, 10), "#FFFFFF").save(target)
+        return _FakeProc(0)
+
+    monkeypatch.setattr(st.subprocess, "run", fake_run)
+    assert st.grab(target) == target
+
+
+def test_work_dir_is_timestamped_under_home(tmp_path, monkeypatch):
+    monkeypatch.setattr(st.Path, "home", staticmethod(lambda: tmp_path))
+    d = st.work_dir()
+    assert d.exists()
+    assert d.parent == tmp_path / "svg-trace"
+    assert re.fullmatch(r"\d{8}-\d{6}", d.name)
+
+
+def test_grab_reports_svgtrace_error_not_attribute_error(tmp_path, monkeypatch):
+    class FakeProc:
+        returncode = 1
+        stderr = None
+
+    monkeypatch.setattr(st.subprocess, "run", lambda *a, **k: FakeProc())
+    with pytest.raises(st.SvgTraceError):
+        st.grab(tmp_path / "out.png")
+
+
+def test_grab_reports_timeout_as_svgtrace_error(tmp_path, monkeypatch):
+    def boom(*a, **k):
+        raise st.subprocess.TimeoutExpired(cmd="powershell.exe", timeout=st.GRAB_TIMEOUT_SEC)
+
+    monkeypatch.setattr(st.subprocess, "run", boom)
+    with pytest.raises(st.SvgTraceError, match="逾時"):
+        st.grab(tmp_path / "out.png")
+
+
 def test_svg_problems_reports_count_when_exceeds_limit(tmp_path):
     # 造 9 個 foreignObject, 超過 8 個上限
     svg_with_many = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">

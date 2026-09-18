@@ -14,6 +14,7 @@ import os
 import re
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -40,6 +41,15 @@ CHROME_CANDIDATES = (
 GUTTER_PX = 16
 LABEL_PX = 24
 RENDER_TIMEOUT_SEC = 60
+GRAB_TIMEOUT_SEC = 30
+
+PS_GRAB = '''
+Add-Type -AssemblyName System.Windows.Forms,System.Drawing
+$img = [System.Windows.Forms.Clipboard]::GetImage()
+if ($null -eq $img) {{ exit 3 }}
+$img.Save("{out}", [System.Drawing.Imaging.ImageFormat]::Png)
+Write-Output "$($img.Width)x$($img.Height)"
+'''
 
 P_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
 A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -304,7 +314,40 @@ def compare(original: Path, trace_png: Path, out_path: Path) -> Path:
     return out
 
 
+def work_dir() -> Path:
+    """走剪貼簿時沒有「原圖旁邊」可言, 所以開一個帶時間戳的工作資料夾"""
+    d = Path.home() / "svg-trace" / datetime.now().strftime("%Y%m%d-%H%M%S")
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def grab(out_path: Path) -> Path:
+    """從 Windows 剪貼簿取影像存成 PNG。使用者截圖後完全不必碰路徑"""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    script = PS_GRAB.format(out=str(out_path).replace("\\", "\\\\"))
+    try:
+        proc = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-STA", "-Command", script],
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=GRAB_TIMEOUT_SEC,
+        )
+    except subprocess.TimeoutExpired as e:
+        raise SvgTraceError(f"取剪貼簿影像逾時,超過 {GRAB_TIMEOUT_SEC} 秒沒有回應") from e
+    if proc.returncode == 3:
+        raise SvgTraceError("剪貼簿沒有圖片。請先截圖 (Win+Shift+S), 或直接給我圖片路徑")
+    if proc.returncode != 0 or not out_path.exists():
+        stderr = (proc.stderr or "").strip()
+        raise SvgTraceError(f"取剪貼簿影像失敗: {stderr[:200]}")
+    return out_path
+
+
 def _dispatch(args: argparse.Namespace) -> int:
+    if args.cmd == "grab":
+        out = Path(args.out) if args.out else work_dir() / "source.png"
+        print(f"已存檔 {grab(out)}")
+        return 0
     if args.cmd == "palette":
         result = palette(Path(args.image), args.n, args.at)
         print(f"尺寸 {result['size'][0]}x{result['size'][1]}")
