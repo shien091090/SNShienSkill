@@ -2,6 +2,8 @@
 
 輸入: `decisions.md`; 若 `round.spec-draft > 1`, 加上 `archive/spec.v<N-1>.md`。輸出: `spec.md`。只 spawn 企劃, 不討論。
 
+續接: spec.md 已存在且比 decisions.md 新 → 企劃已交稿, 直接做你的檢查。
+
 ## prompt
 
 spawn `game-planner`(新 session)。
@@ -32,4 +34,4 @@ spawn `game-planner`(新 session)。
 
 ## 轉移
 
-照 SKILL.md 轉移程序 → `spec-review`。回報使用者: 規格第 N 版落地、待定幾項。
+本次無檔案要搬 archive。照 SKILL.md 轉移程序 → `spec-review`。回報使用者: 規格第 N 版落地、待定幾項。

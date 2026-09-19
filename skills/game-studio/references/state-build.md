@@ -1,8 +1,8 @@
 # 狀態: build Demo 版實作
 
-兩條路徑, 看是從哪裡進來的(STATE.md log 最後一行):
-- log 最後一行是「spec v<N> 通過」→ **完整實作**: 美術 → RD
-- log 最後一行含「build 美術修正」→ **美術修正**: 美術 → (視需要)RD
+續接: game/art/ 兩檔已齊 → 跳過美術直接 spawn RD; game/index.html 已存在 → 直接做「你處理回報」的核對, 不重做。
+
+兩條路徑, 看是從哪裡進來的。STATE.md 的 log 由下往上找最近一條含「進 build」的事件: 含「spec v… 通過, 進 build 完整實作」→ 完整實作; 含「進 build 美術修正」→ 美術修正。
 
 ## 完整實作
 
@@ -16,11 +16,13 @@ spawn `game-artist`:
 輸出格式: 回報產了哪些 draw 函式、畫布尺寸、判斷不需獨立函式的物件與理由
 ```
 
-若 `feedback/` 內有尚未處理的美術回饋(上一輪 playtest 同時有玩法與美術回饋、走了退回路徑), 檔案清單加 `<game>/feedback/round-<N>.md`, 任務加一句「同時參考 feedback 的美術段」。這是完整實作路徑唯一允許多帶的檔。
+若 `feedback/` 內有尚未處理的美術回饋(上一輪 playtest 同時有玩法與美術回饋、走了退回路徑), 檔案清單加 `<game>/feedback/round-<round.playtest>.md`, 任務加一句「同時參考 feedback 的美術段」。這是完整實作路徑唯一允許多帶的檔。
 
 你檢查: `game/art/` 只有這兩檔; style.md 有物件表且每個函式簽章與 state 欄位寫全。不齊 → SendMessage 同 agent 補。
 
 ### RD(美術產出後才 spawn)
+
+rd-lessons.md 的路徑先把 ~ 展開成實際絕對路徑再放進清單(Windows 上 ~ 不是絕對路徑)。
 
 spawn `game-rd`:
 ```
@@ -31,23 +33,23 @@ spawn `game-rd`:
 ```
 
 你處理回報:
-- 佔位圖形非空 → SendMessage 給**美術**(同狀態內可續)補函式; 補完 SendMessage RD 接上。完整實作路徑中, 這是唯一允許美術新增函式的情況; 美術修正路徑的新增函式規則見下節
-- 規格疑問非空 → 你判斷: 規格層小洞你直接裁決告訴 RD; 真的是規格矛盾 → 這裡不修規格, 記進 log, 等 playtest 一起走退回
-- 自己開 `game/index.html` 玩三十秒: 能開、能操作、能結束。開不了或明顯不照規格 → 當 bug 走 SendMessage RD 修, 不轉移
+- 佔位圖形非空 → SendMessage 給**美術**(同狀態內可續)補函式; 補完 SendMessage RD 接上。完整實作路徑中, 這是唯一允許美術新增函式的情況; 美術修正路徑的新增函式規則見下節。RD 接上後刪掉對應的 Placeholder 條目
+- 規格疑問非空 → 你判斷: 規格層小洞你直接裁決告訴 RD; 真的是規格矛盾 → 這裡不修規格, 記進 log(寫在該次進 build 那一行的後面, 不另起新行), 等 playtest 一起走退回
+- 你沒有瀏覽器, 不得聲稱自己玩過。改用讀碼核對: 開 `index.html` 確認 script 載入順序是 `art/art.js` → `game.js` 且沒有 `type="module"`; 確認 RD 回報有跑 `node --check`; 逐條對 spec 的規則、操作、結束條件在 `game.js` 找到對應程式。對不上 → 當 bug 走 SendMessage RD 修, 不轉移。實際可玩性由使用者在 playtest 第一件事確認
 
 ## 美術修正(從 playtest 進來)
 
 spawn `game-artist`(新 session):
 ```
 狀態: build, 美術修正
-請讀取: <game>/spec.md、<game>/game/art/style.md、<game>/feedback/round-<N>.md
+請讀取: <game>/spec.md、<game>/game/art/style.md、<game>/feedback/round-<round.playtest>.md
 任務: 只看 feedback 的「美術」段, 修改 game/art/art.js 與 style.md 回應這些回饋。不改既有函式名與參數。
 輸出格式: 逐條回饋說明改了什麼; 若有新增函式列出來
 ```
 
-- 沒新增函式 → 你開遊戲確認畫面有變, 直接轉移
+- 沒新增函式 → 你讀 art.js 的 diff 確認每條美術回饋都有對應改動, 直接轉移
 - 有新增函式 → spawn `game-rd`, prompt 同完整實作的 RD 版, 任務改為「style.md 新增了 <函式>, 請在對應位置接上, 其他不動」
 
 ## 轉移
 
-照 SKILL.md 轉移程序 → `playtest`(round.playtest +1), 照模板建 `feedback/round-<N>.md` 空檔。回報使用者: 遊戲路徑(可直接雙擊的絕對路徑)、操作方式一句、請他試玩並回饋。
+照 SKILL.md 轉移程序 → `playtest`(round.playtest +1), 照模板建 feedback/round-<round.playtest>.md(用 +1 後的新輪號)。回報使用者: 遊戲路徑(可直接雙擊的絕對路徑)、操作方式一句、請他試玩並回饋。

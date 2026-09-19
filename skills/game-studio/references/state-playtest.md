@@ -1,6 +1,8 @@
 # 狀態: playtest 試玩回饋
 
-使用者玩, 你收。每則回饋先分類再處理, 邊收邊寫 `feedback/round-<N>.md`。
+續接: feedback/round-<round.playtest>.md 已有內容 → 從既有條目接著收, 不重建。
+
+使用者玩, 你收。每則回饋先分類再處理, 邊收邊寫 `feedback/round-<round.playtest>.md`。
 
 ## 分類
 
@@ -15,16 +17,19 @@
 ## bug 處理
 
 一批處理: 使用者一次講的 bug 你整理成一份描述(每條: 現象 / 重現步驟 / 對應 spec 條目), 然後 spawn `game-rd`(新 session):
+
+rd-lessons.md 的路徑先把 ~ 展開成實際絕對路徑再放進清單(Windows 上 ~ 不是絕對路徑)。
+
 ```
 狀態: playtest, 修 bug
-請讀取: ~/.claude/skills/game-studio/references/rd-lessons.md、<game>/spec.md, 以及 <game>/game/ 下的檔案
+請讀取: ~/.claude/skills/game-studio/references/rd-lessons.md、<game>/spec.md, 以及 <game>/game/ 下的檔案(這裡刻意給整個目錄, 因為修 bug 要看全部程式)
 任務: 修下列 bug, 每條先重現(讀碼定位)再修, 修完 node --check 並逐條自查:
 <bug 清單>
 不改 spec.md、不改 game/art/。收工前依經驗文件規則回寫。
 輸出格式: 逐條 bug 說明原因與修法; 經驗文件回寫了哪條 / 無
 ```
 
-修完你自己開遊戲確認, 在 feedback 檔 bug 條目打勾, 請使用者繼續玩。不轉移。
+修完你讀 RD 回報與 diff 確認每條 bug 都有對應修法, 在 feedback 檔 bug 條目打勾, 請使用者繼續玩。不轉移。
 
 ## 美術與玩法回饋
 

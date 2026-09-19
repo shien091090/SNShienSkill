@@ -56,7 +56,7 @@ log:
 ## spec.md
 
 ```
-# Demo 規格 v{N}
+# Demo 規格 v<N>
 
 ## 概述
 對應 decisions.md 的一句話概念與驗證問題
@@ -77,13 +77,13 @@ log:
 - (項目: 原因), 沒有就寫無
 ```
 
-## feedback/round-{N}.md
+## feedback/round-<N>.md
 
 ```
-# 試玩回饋 第 {N} 輪
+# 試玩回饋 第 <N> 輪
 
 日期: YYYY-MM-DD
-版本: spec v{M}
+版本: spec v<M>
 
 ## bug
 - [ ] 描述; 重現步驟
@@ -94,7 +94,7 @@ log:
 
 ## 製作人處理
 - bug: 已交 RD 修復 / 無
-- 玩法: 併入 decisions.md v{K} / 無
+- 玩法: 併入 decisions.md v<K> / 無
 - 美術: 留待下次 build 交美術 / 無
 ```
 

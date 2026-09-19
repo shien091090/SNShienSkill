@@ -53,4 +53,4 @@ SendMessage 給同兩個 agent:
 
 ## 轉移
 
-照 SKILL.md 轉移程序 → `spec-draft`(round.spec-draft 變 1)。向使用者回報: 定案的一句話概念、驗證問題、你做的關鍵取捨一到兩條。
+本次無檔案要搬 archive。照 SKILL.md 轉移程序 → `spec-draft`(round.spec-draft 變 1)。向使用者回報: 定案的一句話概念、驗證問題、你做的關鍵取捨一到兩條。

@@ -23,9 +23,10 @@ description: 觸發詞「做遊戲 demo」「遊戲製作人」或 /game-studio 
 
 1. 拿資料夾路徑, 沒帶就問
 2. 資料夾不存在 → 建立; 問使用者概念發想; 照模板寫 `concept.md`(原文照錄)與 `STATE.md`(state: concept); 建 `archive/ discussions/ feedback/ game/art/`
-3. 存在 → 讀 `STATE.md`, 與實況比對。衝突例: state 是 spec-draft 但 spec.md 比 decisions.md 新; state 是 build 但 game/index.html 不存在; round 數與 archive 檔數對不上。有衝突 → 列出差異問使用者, 以他裁決更新 STATE.md, 不自己猜
+3. 存在 → 讀 `STATE.md`, 與實況比對。衝突例: state 是 spec-draft 但 spec.md 比 decisions.md 新; state 是 build 但 game/index.html 不存在; archive 內 spec 檔數不符: spec.md 存在時應為 round.spec-draft − 1, spec.md 不存在時(spec-draft 狀態中, 已搬 archive、企劃未交稿, 這是正常的)應為 round.spec-draft。有衝突 → 列出差異問使用者, 以他裁決更新 STATE.md, 不自己猜
 4. 讀 `references/state-<state>.md`, 照它執行
 5. 回報一句: 「目前在 X 狀態, 規格第 N 版, 第 M 輪試玩」, 然後直接開始, 不問「要繼續嗎」
+6. state 為 done 時沒有參考檔: 回報最終摘要(幾版規格、幾輪試玩、驗證問題的答案)。使用者若要再迭代, 依他的回饋類型回到 playtest(bug / 美術)或 spec-draft(玩法), log 寫「重啟」與原因
 
 ## 資料夾樣貌
 
@@ -68,19 +69,20 @@ concept ─定案─▶ spec-draft ─spec落地─▶ spec-review ─通過─�
 
 ## 轉移程序(每次轉移三件事一起做)
 
-1. 要被取代的現行版先搬 archive: `decisions.md → archive/decisions.v<舊版號>.md`, `spec.md → archive/spec.v<舊版號>.md`。decisions 版號取自修訂紀錄最後一條; spec 版號取自 STATE.md 的 round.spec-draft
+1. 要被取代的現行版先搬 archive: `decisions.md → archive/decisions.v<舊版號>.md`, `spec.md → archive/spec.v<舊版號>.md`。decisions 版號取自修訂紀錄最後一條; spec 版號取自 STATE.md 的 round.spec-draft。本步驟只在該檔即將被下一個狀態覆寫時執行(spec-review 退回、playtest 玩法回饋)。concept → spec-draft 與 spec-draft → spec-review 不搬任何檔
 2. 更新 `STATE.md`: state、該加的 round、log 一行(退回必寫理由)
-3. 讀新狀態的參考檔, 開始
+3. 先做一次開場檢查第 3 步的比對, 再讀新狀態的參考檔, 開始
 
 ## 討論規則(concept 與 spec-review 共用)
 
 固定兩回合, 然後你拍板。不多不少。
 
-- **r1**: 同時 spawn `game-planner` 與 `game-balance`, 各給相同檔案清單、各自職能的任務指令。兩份回覆原文分別存 `discussions/<state>-r1-planner.md`、`-balance.md`
+- **r1**: 同時 spawn `game-planner` 與 `game-balance`, 各給相同檔案清單、各自職能的任務指令。兩份回覆原文分別存 `discussions/<state>-r1-planner.md`、`-balance.md`(spec-review 另有版號規則, 見該狀態檔)
 - **r1 之後你先整理**: 雙方共識 / 分歧點 / 你的追問(一到三個, 針對分歧或你認為漏掉的)。這份整理是 r2 的唯一輸入
 - **r2**: 用 SendMessage 續同兩個 agent, 給「對方重點(你整理過的, 不貼原文)+ 分歧點 + 追問」。回覆存 `discussions/<state>-r2-*.md`
 - **拍板**: 你統整寫結論。有分歧就選一邊並寫理由, 不折衷成模糊句。結論落地到 decisions.md(concept)或判定通過/退回(spec-review)
 - 跨狀態一律重新 spawn; 下一個狀態不續用這兩個 session
+- SendMessage 若不在可用工具清單, 先 ToolSearch "select:SendMessage" 載入; 真的載不到就把該 agent 自己的 r1 回覆原文附回去重新 spawn, 並在回報中說明降級
 
 ## agent 輸入契約(硬規則)
 

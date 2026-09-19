@@ -39,6 +39,8 @@
 
 ## 退回程序
 
+N = round.spec-draft, M = decisions.md 修訂紀錄最後一條的版號。
+
 1. 先照 SKILL.md 轉移程序把 `spec.md` 搬 `archive/spec.v<N>.md`, `decisions.md` 搬 `archive/decisions.v<M>.md`
 2. 改 `decisions.md`: 只改被這次討論推翻或補充的段落; 數值 agent 建議採納的參數寫進「數值方向」; 修訂紀錄加一條 `- v<M+1> <日期> 觸發: spec-review 第 N 版退回; 改了: ...; 原因: ...`
 3. STATE.md → `spec-draft`, round.spec-draft +1, log 寫退回理由
@@ -46,4 +48,4 @@
 
 ## 通過程序
 
-照 SKILL.md 轉移程序 → `build`, 檔案不動。log 寫「spec v<N> 通過」與容忍的小洞(若有)。數值建議的小幅參數調整(單一參數、不改規則)由你直接改 spec.md 並在 log 註記; 涉及規則或多個參數連動一律退回。回報使用者: 通過、調了什麼(若有)。
+照 SKILL.md 轉移程序 → `build`, 不搬 archive、版號不變。log 寫一行:「spec v<round.spec-draft> 通過, 進 build 完整實作; 容忍小洞: …(若有); 參數調整: …(若有)」。數值建議的小幅參數調整(單一參數、不改規則)由你直接改 spec.md, 註記併入這行 log, 不另起新行; 涉及規則或多個參數連動一律退回。回報使用者: 通過、調了什麼(若有)。
