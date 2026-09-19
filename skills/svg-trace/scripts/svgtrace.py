@@ -380,261 +380,27 @@ def grab(out_path: Path) -> Path:
     return out_path
 
 
-TRACE_MAX_TOLERANCE_PX = 5.0
-TRACE_MAX_MIN_AREA = 30
-TRACE_SMOOTH_BELOW_FIDELITY = 80
+SHAPE_BUDGET = 60
 
 
-def viewbox_for(w_px: int, h_px: int) -> tuple[float, float]:
-    """依 references/svg-rules.md 的換算, 算出這張圖該用的 viewBox 寬高。
+def count_shapes(pptx_path: Path) -> int:
+    """數最後一頁裡實際有幾個可選取的圖案 (群組不算, 只算群組裡的葉節點)。
 
-    寬先吃滿 1184 (12.333 吋可用寬 x 96); 推出的高超過 624 (6.5 吋 x 96) 就改以高為準。
+    使用者要靠這個數字對照 references/svg-rules.md 的圖案數預算, 判斷是不是畫太細了。
     """
-    if w_px <= 0 or h_px <= 0:
-        raise SvgTraceError(f"圖片尺寸必須是正數, 目前是 {w_px}x{h_px}")
-    scale = min(1184.0 / w_px, 624.0 / h_px)
-    return w_px * scale, h_px * scale
-
-
-def _auto_palette(im: Image.Image, colors: int):
-    """沒指定調色盤時自動取主色。相近的色會被併掉, 免得同一個紫被切成好幾階。"""
-    q = im.convert("P", palette=Image.Palette.ADAPTIVE, colors=max(2, min(256, colors)),
-                   dither=Image.Dither.NONE)
-    pal = q.getpalette()
-    picked = []
-    for _, i in sorted(q.getcolors() or [], reverse=True):
-        rgb = tuple(pal[i * 3: i * 3 + 3])
-        if all(sum((a - b) ** 2 for a, b in zip(rgb, kept)) > 900 for kept in picked):
-            picked.append(rgb)
-    return [(f"色{j + 1}", _hex(rgb), rgb) for j, rgb in enumerate(picked)]
-
-
-def _snap(im: Image.Image, palette) -> list[int]:
-    """每個像素歸到調色盤裡最接近的顏色; 反鋸齒的中間色因此併入鄰近色塊"""
-    px = im.load()
-    W, H = im.size
-    cache: dict = {}
-    out = []
-    for y in range(H):
-        for x in range(W):
-            rgb = px[x, y]
-            j = cache.get(rgb)
-            if j is None:
-                j = min(range(len(palette)),
-                        key=lambda k: sum((a - b) ** 2 for a, b in zip(rgb, palette[k][2])))
-                cache[rgb] = j
-            out.append(j)
-    return out
-
-
-def _regions(idx: list[int], W: int, H: int, min_area: int):
-    """同色的 4-連通區域"""
-    seen = bytearray(W * H)
-    found = []
-    for start in range(W * H):
-        if seen[start]:
-            continue
-        color, stack, cells = idx[start], [start], []
-        seen[start] = 1
-        while stack:
-            p = stack.pop()
-            cells.append(p)
-            x, y = p % W, p // W
-            for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
-                if 0 <= nx < W and 0 <= ny < H:
-                    q = ny * W + nx
-                    if not seen[q] and idx[q] == color:
-                        seen[q] = 1
-                        stack.append(q)
-        if len(cells) >= min_area:
-            found.append((color, cells))
-    return found
-
-
-def _outlines(cells: list[int], W: int, H: int):
-    """區域的封閉輪廓 (像素精確的階梯邊界)。外圈與內孔方向相反, 交給 nonzero 填色規則挖空。"""
-    s = set(cells)
-    edges: dict = {}
-
-    def add(a, b):
-        edges.setdefault(a, []).append(b)
-
-    for p in cells:
-        x, y = p % W, p // W
-        if y == 0 or (y - 1) * W + x not in s:
-            add((x, y), (x + 1, y))
-        if y == H - 1 or (y + 1) * W + x not in s:
-            add((x + 1, y + 1), (x, y + 1))
-        if x == 0 or y * W + (x - 1) not in s:
-            add((x, y + 1), (x, y))
-        if x == W - 1 or y * W + (x + 1) not in s:
-            add((x + 1, y), (x + 1, y + 1))
-
-    loops = []
-    while edges:
-        start = next(iter(edges))
-        loop, cur = [start], start
-        while True:
-            nxts = edges.get(cur)
-            if not nxts:
-                break
-            nxt = nxts.pop()
-            if not nxts:
-                del edges[cur]
-            loop.append(nxt)
-            cur = nxt
-            if cur == start:
-                break
-        if len(loop) > 3 and loop[0] == loop[-1]:
-            loops.append(loop)
-    return loops
-
-
-def _drop_collinear(loop):
-    """去掉共線的中間點。
-
-    loop 的末點是首點的重複, 要先去掉再取模; 否則算第一個點時「前一點」會取到自己,
-    起點被誤判成共線刪掉, 收尾的 Z 就會從尾點拉一條斜線回起點。
-    """
-    pts = loop[:-1]
-    n = len(pts)
-    return [pts[i] for i in range(n)
-            if (pts[i][0] - pts[i - 1][0]) * (pts[(i + 1) % n][1] - pts[i][1])
-            != (pts[i][1] - pts[i - 1][1]) * (pts[(i + 1) % n][0] - pts[i][0])]
-
-
-def _douglas_peucker(pts, eps: float):
-    if len(pts) < 3:
-        return pts
-    a, b = pts[0], pts[-1]
-    dx, dy = b[0] - a[0], b[1] - a[1]
-    length = (dx * dx + dy * dy) ** 0.5
-    far, far_d = 0, -1.0
-    for k in range(1, len(pts) - 1):
-        p = pts[k]
-        d = (abs(dx * (a[1] - p[1]) - dy * (a[0] - p[0])) / length if length
-             else ((p[0] - a[0]) ** 2 + (p[1] - a[1]) ** 2) ** 0.5)
-        if d > far_d:
-            far, far_d = k, d
-    if far_d <= eps:
-        return [a, b]
-    return _douglas_peucker(pts[:far + 1], eps)[:-1] + _douglas_peucker(pts[far:], eps)
-
-
-def _simplify_ring(pts, eps: float):
-    """閉合環的簡化: 取離起點最遠的點當第二個錨點, 切成兩段各自跑 Douglas-Peucker"""
-    if eps <= 0 or len(pts) < 4:
-        return pts
-    a = pts[0]
-    far = max(range(len(pts)), key=lambda k: (pts[k][0] - a[0]) ** 2 + (pts[k][1] - a[1]) ** 2)
-    ring = (_douglas_peucker(pts[:far + 1], eps)[:-1]
-            + _douglas_peucker(pts[far:] + [pts[0]], eps)[:-1])
-    return ring if len(ring) >= 3 else pts
-
-
-def _ring_to_path(pts, sx: float, sy: float, smooth: bool) -> str:
-    P = [(p[0] * sx, p[1] * sy) for p in pts]
-    n = len(P)
-    if not smooth or n < 3:
-        return "M" + " L".join(f"{x:.1f},{y:.1f}" for x, y in P) + " Z"
-    # Catmull-Rom 轉三次貝茲: 通過每一個點的封閉平滑曲線
-    d = [f"M{P[0][0]:.1f},{P[0][1]:.1f}"]
-    for k in range(n):
-        p0, p1, p2, p3 = P[(k - 1) % n], P[k], P[(k + 1) % n], P[(k + 2) % n]
-        c1 = (p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6)
-        c2 = (p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6)
-        d.append(f"C{c1[0]:.1f},{c1[1]:.1f} {c2[0]:.1f},{c2[1]:.1f} {p2[0]:.1f},{p2[1]:.1f}")
-    return " ".join(d) + " Z"
-
-
-def trace_image(img_path: Path, out_path: Path, *, fidelity: float = 85.0,
-                palette=None, colors: int = 8, tolerance: float | None = None,
-                min_area: int | None = None, smooth: bool | None = None) -> Path:
-    """把點陣圖的每個色塊描成向量輪廓, 寫出 SVG。
-
-    fidelity 是主刻度: 100 保留原始像素邊界的階梯輪廓, 0 大幅簡化成圓潤色塊。
-    它同時決定簡化容差、最小區域面積與是否平滑; 那三個參數各自給了就覆寫。
-    """
-    if not 0 <= fidelity <= 100:
-        raise SvgTraceError(f"fidelity 要在 0 到 100 之間, 目前是 {fidelity:g}")
-    eps = tolerance if tolerance is not None else (100 - fidelity) / 100 * TRACE_MAX_TOLERANCE_PX
-    area = (min_area if min_area is not None
-            else max(1, round((100 - fidelity) / 100 * TRACE_MAX_MIN_AREA)))
-    curved = smooth if smooth is not None else fidelity < TRACE_SMOOTH_BELOW_FIDELITY
-
-    im = _open_image(img_path, "圖片")
-    W, H = im.size
-    vb_w, vb_h = viewbox_for(W, H)
-
-    if palette:
-        pal = []
-        for name, hexv in palette:
-            h = hexv.lstrip("#")
-            if len(h) != 6:
-                raise SvgTraceError(f"顏色要寫成六位十六進位, 例如 #2B579A, 目前是 {hexv}")
-            try:
-                pal.append((name, "#" + h.upper(),
-                            (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))))
-            except ValueError as e:
-                raise SvgTraceError(f"看不懂的顏色 {hexv}") from e
-    else:
-        pal = _auto_palette(im, colors)
-    if not pal:
-        raise SvgTraceError(f"{img_path.name} 取不出任何顏色")
-
-    idx = _snap(im, pal)
-    sx, sy = vb_w / W, vb_h / H
-    by_color: dict = {}
-    for color, cells in _regions(idx, W, H, area):
-        for loop in _outlines(cells, W, H):
-            ring = _simplify_ring(_drop_collinear(loop), eps)
-            if len(ring) >= 3:
-                by_color.setdefault(color, []).append(
-                    (len(cells), _ring_to_path(ring, sx, sy, curved)))
-
-    lines = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {vb_w:.0f} {vb_h:.0f}">']
-    # 第一個顏色當底色直接鋪滿, 後面的色塊疊上去, 省掉替底色挖洞
-    lines.append(f'  <g id="{_xml_attr_escape(pal[0][0])}">')
-    lines.append(f'    <rect x="0" y="0" width="{vb_w:.0f}" height="{vb_h:.0f}" fill="{pal[0][1]}"/>')
-    lines.append('  </g>')
-    for j, (name, hexv, _rgb) in enumerate(pal):
-        if j == 0 or j not in by_color:
-            continue
-        lines.append(f'  <g id="{_xml_attr_escape(name)}">')
-        for _, d in sorted(by_color[j], key=lambda t: -t[0]):
-            lines.append(f'    <path d="{d}" fill="{hexv}"/>')
-        lines.append('  </g>')
-    lines.append('</svg>')
-
-    out_path = out_path.resolve()
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        out_path.write_text("\n".join(lines), encoding="utf-8")
-    except OSError as e:
-        raise SvgTraceError(f"寫不出 {out_path.name}: {e}") from e
-    return out_path
-
-
-def _parse_palette(specs: list[str]):
-    pal = []
-    for spec in specs:
-        if ":" not in spec:
-            raise SvgTraceError(f"調色盤要寫成 名稱:HEX, 例如 底色:515090, 目前是 {spec}")
-        name, hexv = spec.split(":", 1)
-        if not name.strip():
-            raise SvgTraceError(f"調色盤的名稱不能是空的: {spec}")
-        pal.append((name.strip(), hexv.strip()))
-    return pal
+    prs = Presentation(str(pptx_path))
+    def leaves(shapes):
+        n = 0
+        for shape in shapes:
+            if shape.shape_type is not None and "GROUP" in str(shape.shape_type):
+                n += leaves(shape.shapes)
+            else:
+                n += 1
+        return n
+    return leaves(list(prs.slides)[-1].shapes)
 
 
 def _dispatch(args: argparse.Namespace) -> int:
-    if args.cmd == "trace":
-        out = trace_image(Path(args.image), Path(args.out), fidelity=args.fidelity,
-                          palette=_parse_palette(args.palette) or None, colors=args.colors,
-                          tolerance=args.tolerance, min_area=args.min_area, smooth=args.smooth)
-        print(f"已描邊 {out}")
-        return 0
-
     if args.cmd == "grab":
         out = Path(args.out) if args.out else work_dir() / "source.png"
         print(f"已存檔 {grab(out)}")
@@ -649,7 +415,10 @@ def _dispatch(args: argparse.Namespace) -> int:
         return 0
     if args.cmd == "build":
         out = build(Path(args.svg), Path(args.out), args.name)
+        n = count_shapes(out)
         print(f"已寫入 {out}")
+        print(f"這頁 {n} 個圖案, 預算 {SHAPE_BUDGET} 個"
+              + ("" if n <= SHAPE_BUDGET else " — 超出了, 依撰寫規則的「圖案數預算」合併或砍掉細節再重畫"))
         return 0
     if args.cmd == "render":
         svg = Path(args.svg)
@@ -684,19 +453,6 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("svg", help="SVG 路徑")
     b.add_argument("--out", required=True, help="輸出 pptx 路徑; 已存在就追加一頁")
     b.add_argument("--name", help="圖案在簡報裡的名字, 預設用 SVG 檔名")
-
-    t = sub.add_parser("trace", help="點陣圖描邊成向量 SVG")
-    t.add_argument("image", help="來源圖路徑")
-    t.add_argument("--out", required=True, help="輸出 svg 路徑")
-    t.add_argument("--fidelity", type=float, default=85.0,
-                   help="逼近程度 0~100, 預設 85; 100 保留原始像素邊界, 越低越簡化")
-    t.add_argument("--colors", type=int, default=8, help="沒給調色盤時自動取幾個主色, 預設 8")
-    t.add_argument("--tolerance", type=float, help="覆寫輪廓簡化容差 (來源圖像素)")
-    t.add_argument("--min-area", type=int, dest="min_area", help="覆寫最小區域面積 (像素)")
-    t.add_argument("--smooth", action="store_true", default=None, help="強制開啟曲線平滑")
-    t.add_argument("--no-smooth", action="store_false", dest="smooth", help="強制關閉曲線平滑")
-    t.add_argument("--palette", action="append", default=[], metavar="名稱:HEX",
-                   help="固定調色盤, 可重複; 每個顏色成為一個具名群組, 第一個當底色")
 
     args = p.parse_args(argv)
     try:
