@@ -42,7 +42,7 @@
       style.md           色票、尺寸表、形狀語言
 ```
 
-- decisions.md、spec.md 永遠只有一份現行版, agent 輸入清單只寫檔名。改版前舊檔搬 `archive/` 加版號
+- decisions.md、spec.md 永遠只有一份現行版, agent 輸入清單只寫檔名。改版前舊檔搬 `archive/` 加版號, 但只在該檔即將被下一版覆寫時搬(spec-review 退回、playtest 玩法回饋); concept → spec-draft 與 spec-draft → spec-review 不搬檔
 - discussions/ 只寫不讀, 任何 agent 的輸入清單不含它
 - feedback/ 由製作人在 playtest 邊收邊寫
 - RD 經驗文件在 `~/.claude/skills/game-studio/references/rd-lessons.md`, 不在遊戲資料夾
@@ -75,7 +75,7 @@ concept ─定案─▶ spec-draft ─輸出spec─▶ spec-review ─通過─�
 | concept | 讀 concept.md, 兩回合三方討論 | 製作人寫出 decisions.md | spec-draft |
 | spec-draft | 企劃產 spec.md | spec.md 落地 | spec-review |
 | spec-review | 兩回合三方討論 | 製作人判定通過 | build |
-| | | 判定退回: 修 decisions.md, 舊 spec 進 archive | spec-draft |
+| | | 判定退回: 修 decisions.md, 舊 spec 與舊 decisions 都進 archive | spec-draft |
 | build | 美術先、RD 後 | game/index.html 可執行且 RD 自測通過 | playtest |
 | playtest | 收使用者回饋 | bug → RD 修, 不轉移 | playtest |
 | | | 美術回饋 → 確認本輪講完 → 修 | build(只跑美術修正 + RD 整合, 不重做) |
@@ -85,6 +85,7 @@ concept ─定案─▶ spec-draft ─輸出spec─▶ spec-review ─通過─�
 規則:
 - 狀態轉移是製作人唯一直接動手時刻: 更新 STATE.md、搬 archive、寫 log, 三件一起做
 - 退回 spec-draft 時, decisions.md 修訂紀錄必須寫改了什麼、觸發自哪個狀態的哪個問題
+- spec-review 通過時, 數值建議的單一參數微調由製作人就地改 spec.md 並在 log 註記; 涉及規則或多參數連動一律退回
 - 同一輪回饋混三類: 先修 bug 讓使用者能繼續玩; 美術與玩法收齊後只走玩法退回路徑, 美術回饋留在 feedback 檔, 下次 build 一併給美術
 - 每次進入任何狀態先讀 STATE.md, 與資料夾實況比對, 有衝突回報使用者裁決, 不自己猜
 - 兩回合討論規則寫在 SKILL.md 共通原則, concept 與 spec-review 共用:
@@ -107,7 +108,7 @@ concept ─定案─▶ spec-draft ─輸出spec─▶ spec-review ─通過─�
 | build 美術 | 美術 | spec.md | 產 art.js + style.md; 程式畫, 不生圖 | game/art/ |
 | build RD | RD | spec.md、game/art/style.md、rd-lessons.md; art.js 直接引用 | 實作 index.html 呼叫 art.js; 缺圖形用幾何佔位並列在回報; 排除障礙後回寫 rd-lessons.md | game/ |
 | build 美術修正 | 美術(新) | spec.md、style.md、feedback/round-N.md 美術段 | 只改 art.js / style.md, 不碰邏輯 | game/art/ |
-| playtest 修 bug | RD(新) | rd-lessons.md、製作人整理的 bug 描述、game/ | 重現 → 修 → 自測 → 回寫 rd-lessons.md | game/ |
+| playtest 修 bug | RD(新) | rd-lessons.md、spec.md、製作人整理的 bug 描述、game/ | 重現 → 修 → 自測 → 回寫 rd-lessons.md(bug 判準是與 spec 不符, 故帶 spec.md) | game/ |
 
 - build 順序美術先 RD 後; 美術產出前不 spawn RD
 - 美術修正不得改變既有繪製函式的名稱與參數, 只改內部畫法; 因此美術修正後通常不需 RD 出場。若美術新增函式或 spec 有變, 才 spawn RD 做整合(輸入同 build RD)
@@ -124,6 +125,8 @@ concept ─定案─▶ spec-draft ─輸出spec─▶ spec-review ─通過─�
 | game-balance.md | opus | Read, Glob, Grep | 數值。只評估與提參數, 不改文件; 必須給數字與推算, 不接受「感覺」 |
 | game-artist.md | opus | Read, Write, Edit, Glob, Grep, Bash | 美術。只產 art.js + style.md, 禁碰邏輯; Canvas 2D 程式繪製, 不生圖、不引外部資源 |
 | game-rd.md | sonnet | Read, Write, Edit, Glob, Grep, Bash | RD。單一 index.html 為主、零依賴、離線可跑; 開工讀 rd-lessons.md, 收工回寫; 禁改 spec.md 與 art/ |
+
+美術與 RD 的寫入範圍只靠 prompt 約束(Claude Code 無 per-agent 路徑權限); 數值是唯一靠工具權限硬性限制的角色。
 
 共通: prompt 寫明「只看製作人給的檔案清單, 清單外不要去找」。
 
