@@ -36,3 +36,7 @@ settings.local.json
 # hooks(memory-guard 等)
 !/hooks/
 !/hooks/**
+
+# 自訂 agents(game-studio 等)
+!/agents/
+!/agents/**
