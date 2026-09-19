@@ -36,7 +36,7 @@ description: 觸發詞「做遊戲 demo」「遊戲製作人」或 /game-studio 
   decisions.md      定案結果(現行版), 底部有修訂紀錄
   spec.md           Demo 規格(現行版)
   archive/          decisions.v1.md、spec.v1.md ..., 不刪
-  discussions/      <state>-r<回合>-<planner|balance>.md(spec-review 多帶 v<版號>), 只寫不讀
+  discussions/      <state>-r<回合>-<planner|balance>.md, spec-review 為 spec-review-v<版號>-r<回合>-*.md; 只寫不讀
   feedback/         round-<N>.md
   game/index.html   可玩的產物; game/art/ 是美術交付
 ```

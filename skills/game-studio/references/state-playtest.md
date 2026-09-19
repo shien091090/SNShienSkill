@@ -31,10 +31,10 @@
 使用者講到美術或玩法時, 記進 feedback 檔對應段。**在他繼續講的時候不動作**。你判斷他這輪告一段落(例如說「大概就這些」或停下來問你), 問一句:「這一輪回饋給完了嗎? 還是還有要補的?」這是本狀態唯一會問使用者的問題。
 
 他說給完了 →
-- **只有美術回饋**: feedback「製作人處理」寫「美術: 留待 build 交美術」→ 照 SKILL.md 轉移程序 → `build`(美術修正路徑)
-- **有玩法回饋(不論有沒有美術)**:
-  1. 先照轉移程序把 `decisions.md` 搬 `archive/decisions.v<M>.md`、`spec.md` 搬 `archive/spec.v<N>.md`
-  2. 改 `decisions.md`: 你把玩法回饋轉成設計決策(使用者說「太難」, 你決定是調參數方向還是改規則, 寫進對應段); 修訂紀錄加 `- v<M+1> <日期> 觸發: playtest 第 <N> 輪玩法回饋; 改了: ...; 原因: ...`
+- **只有美術回饋**: feedback「製作人處理」寫「美術: 留待 build 交美術」→ 照 SKILL.md 轉移程序 → `build`(美術修正路徑), log 最後一行寫「playtest 第 <round.playtest> 輪美術回饋, 進 build 美術修正」
+- **有玩法回饋(不論有沒有美術)**: M = decisions.md 修訂紀錄最後一條的版號
+  1. 先照轉移程序把 `decisions.md` 搬 `archive/decisions.v<M>.md`、`spec.md` 搬 `archive/spec.v<round.spec-draft>.md`
+  2. 改 `decisions.md`: 你把玩法回饋轉成設計決策(使用者說「太難」, 你決定是調參數方向還是改規則, 寫進對應段); 修訂紀錄加 `- v<M+1> <日期> 觸發: playtest 第 <round.playtest> 輪玩法回饋; 改了: ...; 原因: ...`
   3. feedback「製作人處理」寫: 玩法併入 decisions v<M+1>; 美術留待下次 build
   4. STATE.md → `spec-draft`, round.spec-draft +1, log
   5. 回報使用者: 你把他的回饋轉成了什麼決策, 接下來規格會重擬
