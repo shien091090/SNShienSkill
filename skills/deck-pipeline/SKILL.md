@@ -111,6 +111,15 @@ py -3 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan --promp
 
 ### 6. build 生 pptx
 
+**build 之前先把 SCRIPT.md 的講稿寫進各頁的 speaker notes。** 這是必做的一步, 不是加分項 — 投影片上只剩錨點 (階段 4 的四條理念), 講者真正要講的內容全在講稿裡, 沒寫進備忘稿的話台上就沒東西可看。
+
+- 用 `> ` 寫在 SLIDES.md 每頁區塊的最後, 一條講稿條列一行
+- 對應方式: 講稿一節通常對一頁; 一節被拆成多頁時 (例如案例段切三頁) 就把條列切開分配, 哪幾條對哪一頁要自己判斷
+- 寫入時**清掉 `**` 粗體標記與 `[這邊放 xxx.jpg]` 圖片指示** — 講者站在台上不需要看到這些
+- 章節頁 (`section`) 若講稿沒有對應的開場段就留空, 不要硬塞
+- ⚠️ **notes 必須寫在該頁區塊內、下一個 `##` topic 標題之前**。各 topic 最後一頁最容易寫錯位置 — 寫到 `## <下一個 topic>` 之後會被 parser 當成 topic 說明文字整段忽略, 而且**不會報錯**, 只是那頁沒有備忘稿
+- 寫完驗一次每頁的 `notes_slide.notes_text_frame.text`, 確認該有的都有
+
 ```
 py -3 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck>
 ```
