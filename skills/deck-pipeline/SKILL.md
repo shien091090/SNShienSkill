@@ -7,7 +7,7 @@ description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把�
 
 一個資料夾, 六個階段做出 `output/<title>.pptx`, 使用者拍板、AI 動手。排版美化不在這六階段範圍內, 由使用者自行處理 (例如手動送桌面版 Claude Design), 完成後放回 `output/`。輸入輸出都在同一個資料夾原地演化, 與任何專案無關。
 
-格式規格在 `references/formats.md`, 階段 5 細節在 `references/stage-style.md`, 需要時才讀。
+格式規格在 `references/formats.md`, 階段 4 的判準在 `references/stage-slides.md`, 階段 5 細節在 `references/stage-style.md`, 需要時才讀。
 
 ## 每次呼叫的固定開場
 
@@ -93,6 +93,8 @@ py -3 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan --promp
 - 完成: 全部 topic `script: done` → stage 改 slides
 
 ### 4. slides 頁面內容
+
+**開始擬第一頁之前先讀 `references/stage-slides.md` 全文**, 那份是「講稿怎麼變成頁面」的判準 — 四條理念、決策順序、什麼不該上投影片。不讀的話產出會是「講稿換個排版」。
 
 - 從 SCRIPT.md 出發, 逐 topic 擬頁面寫進 `SLIDES.md`, 格式見 `references/formats.md`
 - 每頁只留最核心的字, 能用圖就用圖。有現成截圖就填路徑, 沒有就寫圖片描述、路徑填 `TODO`, 描述要具體到能拿去找圖或生圖
