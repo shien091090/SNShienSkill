@@ -73,6 +73,7 @@ RE_TOPIC = re.compile(r"^## (\d{2})\s+(.+?)\s*$")
 RE_PAGE = re.compile(r"^### \[([\w-]+)\]\s*(.*?)\s*$")
 RE_LABEL = re.compile(r"^\[([^\]]+)\]\s*(.+?)\s*$")
 RE_IMAGE = re.compile(r"^!\[(.*?)\]\((.+?)\)\s*$")
+RE_SRC_TAG = re.compile(r"^@(photo|ai|svg)\s+(.*)$", re.S)
 RE_TABLE_SEP = re.compile(r"^\|?\s*:?-{2,}")
 
 
@@ -483,23 +484,45 @@ def safe_filename(name: str) -> str:
     return re.sub(r'[\\/:*?"<>|]+', "_", name).strip() or "deck"
 
 
+SRC_TAGS = {
+    "photo": ("使用者提供的照片或截圖", "放進建議路徑後把 TODO 換成實際路徑; build 前會檢查 EXIF 轉向, 斜拍的簡報畫面見 references/photo-dewarp.md"),
+    "ai": ("要 AI 生圖", "prompt 寫法見 references/stage-slides.md; 圖內不放文字與箭頭, 標籤用 decor 疊"),
+    "svg": ("要畫 SVG", "等 STYLE.md 定案後才畫, viewBox 要照版型 box 英吋 × 96"),
+    "": ("未標來源", "回 SLIDES.md 在描述開頭補上 @photo / @ai / @svg"),
+}
+
+
+def split_src_tag(desc: str) -> tuple[str, str]:
+    """描述開頭的 @photo / @ai / @svg 是圖片來源標籤, 回傳 (標籤, 去掉標籤的描述)"""
+    m = RE_SRC_TAG.match(desc.strip())
+    return (m.group(1), m.group(2).strip()) if m else ("", desc)
+
+
 def images_todo(deck: Deck) -> str:
+    groups: dict[str, list[str]] = {k: [] for k in SRC_TAGS}
+    for topic, i, page in deck.pages():
+        for k, (desc, path) in enumerate(page.images, 1):
+            if path != TODO:
+                continue
+            tag, body = split_src_tag(desc)
+            groups[tag].append(
+                f"| {topic.folder} 第{i}頁 {page.title} | {body} | {topic.folder}/p{i:02d}_img{k}.png |")
     rows = [
         "# 待補圖清單",
         "",
-        "由 SLIDES.md 中路徑為 TODO 的圖片產生。補圖後把 SLIDES.md 的 TODO 換成實際路徑, 重跑 `--images-todo` 更新本檔。",
-        "",
-        "| 頁 | 描述 | 建議檔名 |",
-        "|---|---|---|",
+        "由 SLIDES.md 中路徑為 TODO 的圖片產生, 依描述開頭的來源標籤分組。",
+        "補圖後把 SLIDES.md 的 TODO 換成實際路徑, 重跑 `--images-todo` 更新本檔。",
     ]
-    count = 0
-    for topic, i, page in deck.pages():
-        for k, (desc, path) in enumerate(page.images, 1):
-            if path == TODO:
-                count += 1
-                rows.append(f"| {topic.folder} 第{i}頁 {page.title} | {desc} | {topic.folder}/p{i:02d}_img{k}.png |")
-    if count == 0:
-        rows.append("| (無) | | |")
+    total = sum(len(v) for v in groups.values())
+    if total == 0:
+        rows += ["", "目前沒有待補圖。"]
+        return "\n".join(rows) + "\n"
+    for tag, (title, hint) in SRC_TAGS.items():
+        if not groups[tag]:
+            continue
+        label = f"@{tag}" if tag else "(未標籤)"
+        rows += ["", f"## {label} {title} ({len(groups[tag])} 張)", "", hint, "",
+                 "| 頁 | 描述 | 建議檔名 |", "|---|---|---|", *groups[tag]]
     return "\n".join(rows) + "\n"
 
 

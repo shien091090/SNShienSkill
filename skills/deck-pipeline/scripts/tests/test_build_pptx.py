@@ -625,3 +625,33 @@ def test_render_decor_shapes(tmp_path):
     assert len(shapes) == 4
     texts = [s.text_frame.text for s in shapes if s.has_text_frame]
     assert "產出" in texts and "章節標題" in texts
+
+
+# F14: 圖片描述開頭的 @photo / @ai / @svg 來源標籤, --images-todo 依此分組
+
+
+def test_split_src_tag():
+    assert bp.split_src_tag("@ai 意象: 沙堡") == ("ai", "意象: 沙堡")
+    assert bp.split_src_tag("@photo 現場照片") == ("photo", "現場照片")
+    assert bp.split_src_tag("@svg 流程圖") == ("svg", "流程圖")
+    assert bp.split_src_tag("沒有標籤的描述") == ("", "沒有標籤的描述")
+    assert bp.split_src_tag("@unknown 不是合法標籤") == ("", "@unknown 不是合法標籤")
+
+
+def test_images_todo_groups_by_src_tag():
+    deck = bp.parse_slides(
+        "# t\n\n## 01 a\n\n### [image]\n第一頁\n![@ai 沙堡](TODO)\n"
+        "\n### [image]\n第二頁\n![@svg 流程圖](TODO)\n"
+        "\n### [image]\n第三頁\n![@photo 現場照](TODO)\n"
+        "\n### [image]\n第四頁\n![沒標](TODO)\n"
+    )
+    md = bp.images_todo(deck)
+    for marker in ("## @photo", "## @ai", "## @svg", "## (未標籤)"):
+        assert marker in md, marker
+    assert "沙堡" in md and "@ai 沙堡" not in md      # 標籤已從描述剝掉
+    assert "回 SLIDES.md 在描述開頭補上" in md
+
+
+def test_images_todo_empty():
+    deck = bp.parse_slides("# t\n\n## 01 a\n\n### [image]\nx\n![d](01_a/p.png)\n")
+    assert "目前沒有待補圖" in bp.images_todo(deck)
