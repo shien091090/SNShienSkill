@@ -7,7 +7,7 @@ description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把�
 
 一個資料夾, 六個階段做出 `output/<title>.pptx`, 使用者拍板、AI 動手。排版美化不在這六階段範圍內, 由使用者自行處理 (例如手動送桌面版 Claude Design), 完成後放回 `output/`。輸入輸出都在同一個資料夾原地演化, 與任何專案無關。
 
-格式規格在 `references/formats.md`, 階段 4 的判準在 `references/stage-slides.md`, 階段 5 細節在 `references/stage-style.md`, 需要時才讀。
+格式規格在 `references/formats.md`, 階段 4 的判準在 `references/stage-slides.md`, 階段 5 細節在 `references/stage-style.md`, `@photo` 素材的轉正在 `references/photo-dewarp.md`, 需要時才讀。
 
 ## 每次呼叫的固定開場
 
@@ -111,7 +111,12 @@ py -3 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan --promp
 
 ### 6. build 生 pptx
 
-**build 之前先把 SCRIPT.md 的講稿寫進各頁的 speaker notes。** 這是必做的一步, 不是加分項 — 投影片上只剩錨點 (階段 4 的四條理念), 講者真正要講的內容全在講稿裡, 沒寫進備忘稿的話台上就沒東西可看。
+**build 之前有兩件事要做完:**
+
+1. `@photo` 素材過一次轉正 — EXIF 轉向與斜拍的透視校正, 見 `references/photo-dewarp.md`。`validate()` 會擋 EXIF, 但透視歪掉它看不出來, 要自己檢查
+2. 把 SCRIPT.md 的講稿寫進各頁的 speaker notes (下面這段)
+
+**講稿寫進 speaker notes。** 這是必做的一步, 不是加分項 — 投影片上只剩錨點 (階段 4 的四條理念), 講者真正要講的內容全在講稿裡, 沒寫進備忘稿的話台上就沒東西可看。
 
 - 用 `> ` 寫在 SLIDES.md 每頁區塊的最後, 一條講稿條列一行
 - 對應方式: 講稿一節通常對一頁; 一節被拆成多頁時 (例如案例段切三頁) 就把條列切開分配, 哪幾條對哪一頁要自己判斷
