@@ -596,3 +596,32 @@ def test_validate_reports_rotated_photo(tmp_path):
     )
     errors = bp.validate(deck, st, tmp_path)
     assert any("EXIF orientation" in e for e in errors)
+
+
+# F13: decor role — 版型固定的裝飾 (色塊 / 箭頭 / 疊在圖上的標籤), 不吃頁面內容
+
+
+def test_decor_role_is_valid():
+    assert "decor" in bp.VALID_ROLES
+
+
+def test_render_decor_shapes(tmp_path):
+    deck = bp.parse_slides("# t\n\n## 01 a\n\n### [section]\n章節標題\n")
+    st = bp.parse_style(
+        "```yaml\n"
+        "slide: {w: 13.333, h: 7.5}\n"
+        "theme: {bg: '#FFFFFF', fg: '#1F2937', accent: '#2563EB', font_title: A, font_body: B}\n"
+        "layouts:\n"
+        "  section:\n"
+        "    - {role: decor, box: [0.75, 2.73, 0.79, 0.04]}\n"
+        "    - {role: decor, box: [6.4, 3.0, 0.5, 0.4], shape: arrow, color: '#6B7280'}\n"
+        "    - {role: decor, box: [1.0, 4.0, 1.0, 0.4], shape: text, text: 產出, size: 14}\n"
+        "    - {role: title, box: [0.75, 3.13, 11.8, 1.9], size: 45, bold: true}\n"
+        "```\n"
+    )
+    assert bp.validate(deck, st, tmp_path) == []
+    prs = bp.render(deck, st, tmp_path)
+    shapes = list(prs.slides[0].shapes)
+    assert len(shapes) == 4
+    texts = [s.text_frame.text for s in shapes if s.has_text_frame]
+    assert "產出" in texts and "章節標題" in texts

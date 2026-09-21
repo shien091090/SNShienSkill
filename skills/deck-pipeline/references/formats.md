@@ -142,8 +142,10 @@ layouts:
 - `slide` / `theme` / `layouts` 三個 key 缺一報錯
 - 每個版型 = 元素清單, 依序放置
 - 元素欄位: `role` (必填) / `box` [x, y, w, h] 英吋 (必填) / `size` pt (文字類, 預設 18) / `bold` (預設 false) / `color` hex (預設 theme.fg)
-- role 字彙: `title` `label` `subtitle` `body` `image` `left` `right` `table` `cards`; 其他值報錯
+- role 字彙: `title` `label` `subtitle` `body` `image` `left` `right` `table` `cards` `decor`; 其他值報錯
 - `label` role: 頁標題行 `[xxx]` 前綴的章節標籤, 慣例放左上角、字級小於 title
+- `decor` role: 版型固定的裝飾, **不吃頁面內容**, 值全部寫在 STYLE.md。用在章節頁的色塊短線、圖與圖之間的箭頭、疊在圖上的固定標籤這類東西。額外欄位: `shape` (`rect` 預設 / `arrow` / `arrow-down` / `oval` / `text`)、`color` 圖形填色 (預設 theme.accent)、`text` 圖形內或文字框的文字、`text_color` 字色 (預設 theme.bg)、`size` 字級、`bold`。`shape: text` 是純文字框沒有底色, 適合疊在圖上; 其他 shape 是實心圖形。同一版型可以放多個 decor
+  生成圖不含文字與箭頭是刻意的 (生圖模型畫中文會壞, 箭頭獨立出來才改得動), 這些都用 decor 補回來, 所以重 build 不會掉
 - `cards` role: 把該頁的 markdown 表格畫成一格一張的卡片網格, 每列是一張卡 `| 徽章 | 標題 | 說明 |`, 編號 (01, 02…) 自動產生。用在「同一頁要並排講多個項目, 每個項目都有分類標記」的場合, 例如「能做到什麼 / 要自己寫 / 沒有」。額外欄位: `cols` 幾欄 (預設 3)、`gap` 卡片間距英吋 (預設 0.3)、`badges` 徽章文字對底色的 hex 對照表、`badge_fg` 徽章字色 (預設 theme.bg)、`size_badge` / `size_body` 字級、`body_color` 說明字色、`index_color` 編號字色 (預設 theme.accent); `size` 是卡片標題字級
 - `table` role: 把該頁的 markdown 表格畫成真正的 pptx 表格 (可編輯), 欄數不限; 第一列是表頭, 加粗、底色 `header_bg` (預設 theme.accent)、字色 `header_fg` (預設 theme.bg); 其餘列底色 theme.bg; `left`/`right` 仍可用於兩欄對照
 - 同一版型可放多個 `image` 元素, 依序吃該頁的第 1、2、... 張圖; 頁的圖比元素多的忽略, 比元素少的元素留空

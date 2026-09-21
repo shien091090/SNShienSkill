@@ -161,7 +161,7 @@ def parse_style(text: str) -> Style:
     return Style(data["slide"], data["theme"], data["layouts"])
 
 
-VALID_ROLES = {"title", "label", "subtitle", "body", "image", "left", "right", "table", "cards"}
+VALID_ROLES = {"title", "label", "subtitle", "body", "image", "left", "right", "table", "cards", "decor"}
 
 
 def validate(deck: Deck, style: Style, deck_dir: Path) -> list[str]:
@@ -344,6 +344,37 @@ def _table(slide, box, rows: list[list[str]], *, font, size, fg, bg, header_bg, 
     return frame
 
 
+DECOR_SHAPES = {
+    "rect": MSO_SHAPE.RECTANGLE,
+    "arrow": MSO_SHAPE.RIGHT_ARROW,
+    "arrow-down": MSO_SHAPE.DOWN_ARROW,
+    "oval": MSO_SHAPE.OVAL,
+}
+
+
+def _decor(slide, box, *, shape, color, text, font, size, text_color, bold):
+    """版型固定的裝飾: 色塊、箭頭、疊在圖上的標籤。不吃頁面內容, 值全部寫在 STYLE.md"""
+    if shape == "text":
+        return _textbox(slide, box, [text], font=font, size=size, color=text_color, bold=bold)
+    x, y, w, h = (Inches(v) for v in box)
+    shp = slide.shapes.add_shape(DECOR_SHAPES[shape], x, y, w, h)
+    shp.fill.solid()
+    shp.fill.fore_color.rgb = color
+    shp.line.fill.background()
+    shp.shadow.inherit = False
+    if text:
+        tf = shp.text_frame
+        tf.word_wrap = False
+        run = tf.paragraphs[0].add_run()
+        run.text = text
+        run.font.name = font
+        run.font.size = Pt(size)
+        run.font.bold = bold
+        run.font.color.rgb = text_color
+        tf.paragraphs[0].alignment = PP_ALIGN.CENTER
+    return shp
+
+
 def _cards(slide, box, rows: list[list[str]], *, font, size, fg, cols, gap, badges, badge_fg,
            size_badge, size_body, body_color, index_color):
     """把 page.table 畫成一格一張的卡片網格; 每列 = | 徽章 | 標題 | 說明 |, 編號自動產生"""
@@ -425,6 +456,10 @@ def render(deck: Deck, style: Style, deck_dir: Path) -> Presentation:
             elif role in ("left", "right"):
                 col = 0 if role == "left" else 1
                 _textbox(slide, box, _column(page, col), font=theme["font_body"], size=size, color=color, bold=bold, first_bold=True)
+            elif role == "decor":
+                _decor(slide, box, shape=el.get("shape", "rect"), color=_rgb(el.get("color", theme.get("accent", theme["fg"]))),
+                       text=el.get("text", ""), font=theme["font_body"], size=size,
+                       text_color=_rgb(el.get("text_color", theme["bg"])), bold=el.get("bold", False))
             elif role == "cards":
                 _cards(slide, box, page.table,
                        font=theme["font_body"], size=size, fg=el.get("color", theme["fg"]),
