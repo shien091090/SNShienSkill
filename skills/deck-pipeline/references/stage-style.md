@@ -19,6 +19,10 @@ title 1 頁 / image-icons4 1 頁 / compare 1 頁 / image 2 頁 / image-text 3 �
 
 一個問題, 純文字: 有沒有既定的配色/字體/品牌要求, 或參考的簡報風格。有就照著做, 第一輪只出 1 個方向 × 3 個代表頁讓使用者確認; 沒有就進第 3 步出 3 個方向讓使用者挑。
 
+**字型預設用微軟正黑體 `Microsoft JhengHei`**, 不用問。pptx 只記字型名稱, 播放機器沒裝就會退成系統預設、版面跟著跑掉, 而微軟正黑體是 Windows 內建, 一定有。使用者主動指定別的才換。
+
+canvas 上可以用網路字型看效果 (Google Fonts 之類), 但 STYLE.md 的 yaml 填微軟正黑體。兩者不同時在 STYLE.md 上半註明一句, 免得之後看 canvas 以為字型跑掉了。
+
 ## 3. 第一輪 canvas: 選配色方向
 
 3 個方向 × 3 個代表版型 = 9 張 artboard。

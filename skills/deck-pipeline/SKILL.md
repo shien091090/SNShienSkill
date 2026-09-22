@@ -158,7 +158,7 @@ py -3 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck>
 - 改了 SLIDES.md 或 STYLE.md 就重 build, 每次整份重建
 - 相依: `py -3 -m pip install python-pptx pyyaml` (SVG 轉換器已 vendor 在 scripts/vendor, 不用另裝)
 - pptx 正在 PowerPoint 裡開著會 build 失敗 (PermissionError), 先請使用者關掉再重跑
-- STYLE.md 用到的字型播放機器要裝, 沒裝 PowerPoint 會退系統字; 定案時提醒使用者
+- 字型預設用微軟正黑體 (Windows 內建, 播放機器一定有), 使用者主動指定別的才換; 換了要提醒他播放機器得裝, 否則 PowerPoint 會退系統字
 - 完成: 使用者確認內容無誤 (字、圖、頁序) → stage 改 done。build 到此結束, 排版美化由使用者自行處理 (例如手動送桌面版 Claude Design), 完成的檔案放回 `output/`
 
 ## 素材規則 (所有階段適用)
