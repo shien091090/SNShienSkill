@@ -42,6 +42,29 @@ description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把�
   output/<title>.pptx        階段 6 build 產物; 使用者美化後可能放回其他檔名的版本
 ```
 
+## 版控
+
+**deck 資料夾一開始就 `git init`**, 不要等做完才想到。理由有兩個, 都是實際發生過的:
+
+- 使用者會自己動手改 SLIDES.md / SCRIPT.md / STYLE.md。沒進版控就只能靠對話紀錄重建他改之前的版本才 diff 得出來, **跨 session 就重建不出來了**
+- 素材處理 (轉正、壓縮、改名) 出錯時能救回原檔。PIL 覆寫失敗會把目標檔清成 0 bytes, 這種事沒有版控就是素材直接沒了
+
+`.gitignore` 至少排掉:
+
+```
+# 語音檔太大且已轉成逐字稿
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.ogg
+*.aac
+# Office 鎖定檔
+~$*
+```
+
+**build 產物 (`output/*.pptx`) 在補圖階段先不要收** — 每改一張圖就重 build, 每次 commit 帶幾十 MB 二進位很吵。等圖都齊了再一次收進去當定版。
+
 ## 六階段
 
 ### 1. collect 堆素材
