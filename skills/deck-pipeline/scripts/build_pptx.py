@@ -10,6 +10,7 @@ import argparse
 import re
 import sys
 from dataclasses import dataclass, field
+from io import BytesIO
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -146,9 +147,14 @@ class Style:
     slide: dict
     theme: dict
     layouts: dict
+    export: dict = field(default_factory=dict)
 
 
 RE_YAML = re.compile(r"^```yaml\s*\n(.*?)\n^```", re.S | re.M)
+
+
+# 圖片嵌進 pptx 前的處理: 依實際顯示尺寸縮到這個 dpi, 再選較小的編碼
+DEFAULT_EXPORT = {"image_dpi": 150, "jpeg_quality": 88}
 
 
 def parse_style(text: str) -> Style:
@@ -159,7 +165,8 @@ def parse_style(text: str) -> Style:
     for key in ("slide", "theme", "layouts"):
         if key not in data:
             raise StyleParseError(f"STYLE.md yaml 缺少 {key}")
-    return Style(data["slide"], data["theme"], data["layouts"])
+    export = {**DEFAULT_EXPORT, **(data.get("export") or {})}
+    return Style(data["slide"], data["theme"], data["layouts"], export)
 
 
 VALID_ROLES = {"title", "label", "subtitle", "body", "image", "left", "right", "table", "cards", "decor"}
@@ -245,14 +252,42 @@ def _textbox(slide, box, lines, *, font, size, color, bold=False, first_bold=Fal
     return tb
 
 
-def _picture_fit(slide, box, img_path: Path):
+def _optimized_blob(img_path: Path, disp_w_in: float, export: dict):
+    """把圖縮到「實際顯示尺寸 × dpi」再選較小的編碼; 原素材檔不動, 只換嵌進 pptx 的副本。
+    有 alpha 的只考慮 PNG (轉 JPEG 會讓透明變黑塊)。回傳 None 表示原檔已經夠小, 直接用原檔"""
+    dpi = export.get("image_dpi") or 0
+    if dpi <= 0:
+        return None
+    with Image.open(img_path) as im:
+        im.load()
+        has_alpha = im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info)
+        target_w = max(1, int(round(disp_w_in * dpi)))
+        if im.width > target_w:
+            im = im.resize((target_w, max(1, round(target_w * im.height / im.width))), Image.LANCZOS)
+        cands = []
+        buf = BytesIO()
+        (im if has_alpha else im.convert("RGB")).save(buf, "PNG", optimize=True)
+        cands.append((buf.tell(), buf))
+        if not has_alpha:
+            buf = BytesIO()
+            im.convert("RGB").save(buf, "JPEG", quality=export.get("jpeg_quality", 88), optimize=True)
+            cands.append((buf.tell(), buf))
+    size, buf = min(cands, key=lambda c: c[0])
+    if size >= img_path.stat().st_size:
+        return None                      # 壓不贏原檔就別動
+    buf.seek(0)
+    return buf
+
+
+def _picture_fit(slide, box, img_path: Path, export: dict | None = None):
     x, y, w, h = box
     with Image.open(img_path) as im:
         iw, ih = im.size
     scale = min(w / iw, h / ih)
     pw, ph = iw * scale, ih * scale
     px, py = x + (w - pw) / 2, y + (h - ph) / 2
-    slide.shapes.add_picture(str(img_path), Inches(px), Inches(py), Inches(pw), Inches(ph))
+    src = _optimized_blob(img_path, pw, export) if export else None
+    slide.shapes.add_picture(src or str(img_path), Inches(px), Inches(py), Inches(pw), Inches(ph))
 
 
 def _svg_size_px(root: ET.Element) -> tuple[float, float]:
@@ -417,7 +452,8 @@ def _cards(slide, box, rows: list[list[str]], *, font, size, fg, cols, gap, badg
                  [desc], font=font, size=size_body, color=_rgb(body_color))
 
 
-def render(deck: Deck, style: Style, deck_dir: Path) -> Presentation:
+def render(deck: Deck, style: Style, deck_dir: Path, optimize: bool = True) -> Presentation:
+    export = style.export if optimize else {}
     prs = Presentation()
     prs.slide_width = Inches(style.slide["w"])
     prs.slide_height = Inches(style.slide["h"])
@@ -453,7 +489,7 @@ def render(deck: Deck, style: Style, deck_dir: Path) -> Presentation:
                     elif path.lower().endswith(SVG_SUFFIX):
                         _svg_group(slide, box, deck_dir / path)
                     else:
-                        _picture_fit(slide, box, deck_dir / path)
+                        _picture_fit(slide, box, deck_dir / path, export)
             elif role in ("left", "right"):
                 col = 0 if role == "left" else 1
                 _textbox(slide, box, _column(page, col), font=theme["font_body"], size=size, color=color, bold=bold, first_bold=True)
@@ -532,6 +568,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("deck_dir", help="工作資料夾, 內含 SLIDES.md 與 STYLE.md")
     ap.add_argument("--images-todo", action="store_true", help="只產 IMAGES_TODO.md, 不 build")
+    ap.add_argument("--no-optimize", action="store_true",
+                    help="圖片原樣嵌入, 不依顯示尺寸縮放也不重選編碼 (檔案會大很多)")
     args = ap.parse_args(argv)
     try:
         deck_dir = Path(args.deck_dir).resolve()
@@ -547,11 +585,11 @@ def main(argv: list[str] | None = None) -> int:
             for e in errors:
                 print(" -", e)
             return 1
-        prs = render(deck, style, deck_dir)
+        prs = render(deck, style, deck_dir, optimize=not args.no_optimize)
         out = deck_dir / "output" / f"{safe_filename(deck.title)}.pptx"
         out.parent.mkdir(exist_ok=True)
         prs.save(str(out))
-        print(f"已輸出 {out}")
+        print(f"已輸出 {out}  ({out.stat().st_size / 1024 / 1024:.1f} MB)")
         return 0
     except (SlidesParseError, StyleParseError, FileNotFoundError, PermissionError, KeyError) as e:
         print(f"build 失敗: {e}")

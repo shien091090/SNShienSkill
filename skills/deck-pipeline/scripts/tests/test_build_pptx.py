@@ -655,3 +655,94 @@ def test_images_todo_groups_by_src_tag():
 def test_images_todo_empty():
     deck = bp.parse_slides("# t\n\n## 01 a\n\n### [image]\nx\n![d](01_a/p.png)\n")
     assert "目前沒有待補圖" in bp.images_todo(deck)
+
+
+# F15: 圖片嵌進 pptx 前依顯示尺寸縮到目標 dpi, 並選較小的編碼
+
+
+def _png(path, size, mode="RGB"):
+    from PIL import Image
+    import random
+    im = Image.new(mode, size)
+    px = im.load()
+    random.seed(1)
+    for y in range(0, size[1], 4):          # 隨機雜訊, 免得 PNG 壓到極小失去比較意義
+        for x in range(0, size[0], 4):
+            v = random.randrange(256)
+            for dy in range(4):
+                for dx in range(4):
+                    if x+dx < size[0] and y+dy < size[1]:
+                        px[x+dx, y+dy] = (v, v, v) if mode == "RGB" else (v, v, v, 255)
+    im.save(path, "PNG")
+
+
+def test_optimized_blob_downscales_to_dpi(tmp_path):
+    f = tmp_path / "big.png"
+    _png(f, (1920, 1080))
+    buf = bp._optimized_blob(f, disp_w_in=5.71, export={"image_dpi": 150, "jpeg_quality": 88})
+    from PIL import Image
+    assert Image.open(buf).size[0] == round(5.71 * 150)
+
+
+def test_optimized_blob_never_upscales(tmp_path):
+    f = tmp_path / "small.png"
+    _png(f, (200, 100))
+    buf = bp._optimized_blob(f, disp_w_in=8.0, export=bp.DEFAULT_EXPORT)
+    from PIL import Image
+    assert buf is None or Image.open(buf).size[0] == 200
+
+
+def _flat_png(path, size, mode="RGB"):
+    """大尺寸但內容簡單的圖 — 縮放後一定壓得贏原檔"""
+    from PIL import Image, ImageDraw
+    im = Image.new(mode, size, (250, 250, 250) if mode == "RGB" else (250, 250, 250, 255))
+    d = ImageDraw.Draw(im)
+    for k in range(6):
+        d.rectangle([k * 90, k * 40, k * 90 + 300, k * 40 + 200],
+                    fill=(40 * k, 90, 200 - 20 * k) if mode == "RGB" else (40 * k, 90, 200 - 20 * k, 255))
+    im.save(path, "PNG")
+
+
+def test_optimized_blob_keeps_png_when_alpha(tmp_path):
+    f = tmp_path / "alpha.png"
+    _flat_png(f, (1600, 900), mode="RGBA")
+    buf = bp._optimized_blob(f, disp_w_in=4.0, export=bp.DEFAULT_EXPORT)
+    from PIL import Image
+    assert buf is not None
+    assert Image.open(buf).format == "PNG"      # 有 alpha 不可以轉成 JPEG
+
+
+def test_optimized_blob_disabled_by_zero_dpi(tmp_path):
+    f = tmp_path / "x.png"
+    _png(f, (1920, 1080))
+    assert bp._optimized_blob(f, 5.0, {"image_dpi": 0}) is None
+
+
+def test_parse_style_export_defaults_and_override():
+    base = ("```yaml\nslide: {w: 13.333, h: 7.5}\n"
+            "theme: {bg: '#FFF', fg: '#000', font_title: A, font_body: B}\n"
+            "layouts: {image: [{role: image, box: [1,1,5,4]}]}\n")
+    assert bp.parse_style(base + "```\n").export == bp.DEFAULT_EXPORT
+    st = bp.parse_style(base + "export: {image_dpi: 220}\n```\n")
+    assert st.export["image_dpi"] == 220 and st.export["jpeg_quality"] == bp.DEFAULT_EXPORT["jpeg_quality"]
+
+
+def test_render_optimize_flag_shrinks_output(tmp_path):
+    (tmp_path / "01_a").mkdir()
+    _flat_png(tmp_path / "01_a" / "p.png", (1920, 1080))
+    deck = bp.parse_slides("# t\n\n## 01 a\n\n### [image]\nx\n![d](01_a/p.png)\n")
+    st = bp.parse_style(
+        "```yaml\nslide: {w: 13.333, h: 7.5}\n"
+        "theme: {bg: '#FFFFFF', fg: '#000000', font_title: A, font_body: B}\n"
+        "layouts: {image: [{role: image, box: [0.75, 2.08, 5.71, 2.25]}]}\n```\n")
+    import zipfile
+    big, small = tmp_path / "big.pptx", tmp_path / "small.pptx"
+    bp.render(deck, st, tmp_path, optimize=False).save(str(big))
+    bp.render(deck, st, tmp_path, optimize=True).save(str(small))
+
+    def media_bytes(f):
+        with zipfile.ZipFile(f) as z:
+            return sum(i.file_size for i in z.infolist() if "/media/" in i.filename)
+
+    # 比 media 而不是 pptx 檔案大小 — 小圖進 zip 會再被壓一次, 蓋掉差異
+    assert media_bytes(small) < media_bytes(big)
