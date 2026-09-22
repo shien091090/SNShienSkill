@@ -1,7 +1,7 @@
-stage: build
+stage: 生簡報
 title: mini-deck 範例
 
-| # | 資料夾 | script | slides | 備註 |
+| # | 資料夾 | 講稿 | 頁面內容 | 備註 |
 |---|---|---|---|---|
 | 01 | 01_背景 | done | done | |
 | 02 | 02_做法 | done | done | 1 張待補圖 |

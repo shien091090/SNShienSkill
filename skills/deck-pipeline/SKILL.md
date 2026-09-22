@@ -1,6 +1,6 @@
 ---
 name: deck-pipeline
-description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把一個堆滿簡報素材 (截圖、txt、md、語音檔) 的資料夾, 經六個階段 (堆素材 → 分 topic → 講稿 → 頁面內容 → 版型定案 → 生 pptx) 帶到可編輯 pptx。跨多次會話進行, 進度靠資料夾內 STATUS.md 銜接。使用者提到要做簡報、整理簡報素材、寫講稿、把講稿變投影片、或指向一個已有 STATUS.md 的資料夾時使用。
+description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把一個堆滿簡報素材 (截圖、txt、md、語音檔) 的資料夾, 經六個階段 (堆素材 → 分 topic → 講稿 → 頁面內容 → 版型定案 → 生簡報) 帶到可編輯 pptx。跨多次會話進行, 進度靠資料夾內 STATUS.md 銜接。使用者提到要做簡報、整理簡報素材、寫講稿、把講稿變投影片、或指向一個已有 STATUS.md 的資料夾時使用。
 ---
 
 # deck-pipeline
@@ -12,8 +12,8 @@ description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把�
 ## 每次呼叫的固定開場
 
 1. 拿到資料夾路徑 (參數沒帶就問)。資料夾不存在就停下來問
-2. 讀 `STATUS.md`。不存在 → 視為 collect 起點, 建立它。格式損壞 → 回報, 問使用者重建還是手修, 不自行猜
-3. 比對 stage 與資料夾實況 (例如 stage: organize 但根目錄已有 SLIDES.md)。有打架 → 回報差異, 以使用者裁決為準更新 STATUS.md
+2. 讀 `STATUS.md`。不存在 → 視為「堆素材」起點, 建立它。格式損壞 → 回報, 問使用者重建還是手修, 不自行猜
+3. 比對 stage 與資料夾實況 (例如 `stage: 分topic` 但根目錄已有 SLIDES.md)。有打架 → 回報差異, 以使用者裁決為準更新 STATUS.md
 4. 回報一句: 「目前在 X 階段, Y 個 topic, 其中 Z 個講稿完成」
 5. 問: 繼續當前階段, 還是回頭改前面的東西
 
@@ -39,7 +39,7 @@ description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把�
   SLIDES.md            頁面內容, 單一檔
   IMAGES_TODO.md       待補圖清單 (腳本產生)
   STYLE.md             版型規則
-  output/<title>.pptx        階段 6 build 產物; 使用者美化後可能放回其他檔名的版本
+  output/<title>.pptx        階段 6 的產物; 使用者美化後可能放回其他檔名的版本
 ```
 
 ## 版控
@@ -67,10 +67,10 @@ description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把�
 
 ## 六階段
 
-### 1. collect 堆素材
+### 1. 堆素材
 
-- 做: 建立 STATUS.md (`stage: collect`)。素材由使用者自行堆放, AI 不動
-- 使用者說堆好了 → 先掃語音檔, 不要直接轉 organize:
+- 做: 建立 STATUS.md (`stage: 堆素材`)。素材由使用者自行堆放, AI 不動
+- 使用者說堆好了 → 先掃語音檔, 不要直接轉下一階段:
 
 ```
 py -3 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan --prompt 詞1,詞2
@@ -87,21 +87,21 @@ py -3 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan --promp
 
   - 使用者說走線上 → `--scribe`; 說不要花錢 → `--local`。**不指定引擎腳本會直接 exit 2 拒絕執行**, 這是刻意的, 防止跳過詢問
   - 轉完把逐字稿貼幾段給使用者確認辨識品質, 明顯錯的詞請他直接改 `.md` (腳本不會覆蓋已存在的逐字稿)
-- 完成: 語音檔都有逐字稿了 → stage 改 organize
+- 完成: 語音檔都有逐字稿了 → stage 改「分topic」
 
-### 2. organize 分 topic
+### 2. 分 topic
 
 - 讀全部散檔: 截圖用 Read 看圖, 文字檔讀內容。檔案多就用 subagent 平行讀回摘要
-- 語音檔不直接讀 (讀不了), 讀它同層同名的 `.md` 逐字稿。還有語音檔沒逐字稿 → 回頭補跑 collect 的轉錄步驟
+- 語音檔不直接讀 (讀不了), 讀它同層同名的 `.md` 逐字稿。還有語音檔沒逐字稿 → 回頭補跑「堆素材」的轉錄步驟
 - 提出 topic 切分與順序, 附每份素材的歸屬建議, 標出需要拆分的檔
 - topic = 講述段落, 不等於素材資料夾。使用者的素材常已按主題預分好資料夾, 提案以 3~5 個敘事層 topic 為底 (例如: 以往怎麼做 / 這次怎麼做 / 流程展開 / 痛點與下一步), 既有資料夾當 topic 底下的步驟保留, 加 `N_` 前綴排序; 不要一個資料夾一個 topic
 - 提拆分方案時逐段貼出每一份拆分後的原文, 不寫「第 N~N 行」, 使用者看不出內容
 - 不要為了 parser 改資料夾名 (路徑帶括號、空白都能 parse); 改名只在使用者要求或要加排序前綴時做
 - 使用者反覆調整到滿意才動檔
 - 定案後: 建 `01_<topic>/` 子資料夾、搬檔 (不複製)、拆分 (見素材規則)、不用的進 `_unsorted/`、寫 STATUS.md topic 表
-- 完成: 根目錄除 STATUS.md 與流程檔 (SCRIPT.md / SLIDES.md / IMAGES_TODO.md / STYLE.md) 外沒有散檔; `_archive/` 每個**文字檔**都對得到至少一個拆分檔 (音檔不算, 它是陪逐字稿一起進去的) → stage 改 script
+- 完成: 根目錄除 STATUS.md 與流程檔 (SCRIPT.md / SLIDES.md / IMAGES_TODO.md / STYLE.md) 外沒有散檔; `_archive/` 每個**文字檔**都對得到至少一個拆分檔 (音檔不算, 它是陪逐字稿一起進去的) → stage 改「講稿」
 
-### 3. script 講稿
+### 3. 講稿
 
 - 逐 topic 寫 `SCRIPT.md`, 每個 topic 一個 `## 01 <topic>` 章節
 - 內容是演講重點條列, 密度是「講者在備忘稿上一眼看懂接下來要講什麼」: 一個 topic 3~6 條, 每條一句, 可帶「這邊放 xxx.png」註記。不寫長文、不鋪陳、不寫講稿逐字稿。不是要放上投影片的字, 但也不是文章
@@ -112,10 +112,10 @@ py -3 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan --promp
   - 寫完一個 topic 後掃一遍自己的產出, 把混進去的 meta 抓出來搬走再給使用者看
 - 開寫前先問聽眾是誰、時長、簡報標題, 記進 SCRIPT.md 檔頭與 STATUS.md title
 - 自己補的觀點 (原素材沒有的) 標 `[待確認]`, 由使用者決定留不留
-- 每個 topic 寫完停下給使用者看, 回饋修改後才往下一個; STATUS.md 該 topic `script` 欄 doing → done
-- 完成: 全部 topic `script: done` → stage 改 slides
+- 每個 topic 寫完停下給使用者看, 回饋修改後才往下一個; STATUS.md 該 topic 的「講稿」欄 doing → done
+- 完成: 全部 topic 的「講稿」欄轉 `done` → stage 改「頁面內容」
 
-### 4. slides 頁面內容
+### 4. 頁面內容
 
 **開始擬第一頁之前先讀 `references/stage-slides.md` 全文**, 那份是「講稿怎麼變成頁面」的判準 — 四條理念、決策順序、什麼不該上投影片。不讀的話產出會是「講稿換個排版」。
 
@@ -124,16 +124,16 @@ py -3 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan --promp
 - 沒有截圖但「畫得出來」的圖 (架構示意、流程圖、比喻圖、icon 方塊) 不要留 TODO 給使用者找圖: 由 AI 依描述寫成 `.svg` 落在該 topic 資料夾, 路徑填進 SLIDES.md, build 時會轉成可編輯的 PowerPoint 原生圖案。SVG 撰寫規則見 `references/formats.md`。真的需要照片/實機截圖的才留 TODO
 - 用 `> ` 註記對應講稿段落, 會進 speaker notes
 - 版型可以在這階段新增: 內容需要現有六種以外的排法 (兩圖並排、主圖加多個圖示、三欄以上表格) 就直接取名用 (`image2` / `image-icons4` / `table` 這類), 記進 STATUS.md log, 階段 5 照清單出方案
-- 逐 topic 確認; STATUS.md 該 topic `slides` 欄 doing → done
+- 逐 topic 確認; STATUS.md 該 topic 的「頁面內容」欄 doing → done
 - 全部完成後跑 `py -3 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck> --images-todo` 產 IMAGES_TODO.md, 依 `@photo` / `@ai` / `@svg` 分組告知使用者哪些圖要補。沒補的圖 build 時會是灰框
 - `@ai` 那組要產一份可直接複製的 prompt 清單給使用者去生圖, 寫法見 `references/image-prompts.md`; 生圖本身不在 skill 範圍
-- 完成: 全部 topic `slides: done` → stage 改 style
+- 完成: 全部 topic 的「頁面內容」欄轉 `done` → stage 改「版型定案」
 
-### 5. style 版型定案
+### 5. 版型定案
 
-照 `references/stage-style.md` 做。摘要: 歸納 SLIDES.md 用到的版型 → 問風格方向 → design skill 出 canvas (每版型 2~3 方案) → 使用者挑選微調 → 轉寫 STYLE.md → 使用者確認 → stage 改 build。
+照 `references/stage-style.md` 做。摘要: 歸納 SLIDES.md 用到的版型 → 問風格方向 → design skill 出 canvas (每版型 2~3 方案) → 使用者挑選微調 → 轉寫 STYLE.md → 使用者確認 → stage 改「生簡報」。
 
-### 6. build 生 pptx
+### 6. 生簡報
 
 **build 之前有兩件事要做完:**
 
@@ -159,7 +159,7 @@ py -3 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck>
 - 相依: `py -3 -m pip install python-pptx pyyaml` (SVG 轉換器已 vendor 在 scripts/vendor, 不用另裝)
 - pptx 正在 PowerPoint 裡開著會 build 失敗 (PermissionError), 先請使用者關掉再重跑
 - 字型預設用微軟正黑體 (Windows 內建, 播放機器一定有), 使用者主動指定別的才換; 換了要提醒他播放機器得裝, 否則 PowerPoint 會退系統字
-- 完成: 使用者確認內容無誤 (字、圖、頁序) → stage 改 done。build 到此結束, 排版美化由使用者自行處理 (例如手動送桌面版 Claude Design), 完成的檔案放回 `output/`
+- 完成: 使用者確認內容無誤 (字、圖、頁序) → stage 改「完成」。build 到此結束, 排版美化由使用者自行處理 (例如手動送桌面版 Claude Design), 完成的檔案放回 `output/`
 
 ## 素材規則 (所有階段適用)
 

@@ -1,4 +1,4 @@
-# 階段 5: 版型定案
+# 階段 5 版型定案
 
 目標: 從 SLIDES.md 歸納出要幾種版型, 用 design skill 出方案讓使用者挑, 把定案轉寫成 STYLE.md。
 版型定一次整份沿用, 不逐頁調。
@@ -82,4 +82,4 @@ canvas 發出去之前、SVG 畫完之後, 都該自己先看過 — 元素跑�
 
 ## 完成條件
 
-STYLE.md 存在且標定案, yaml 涵蓋 SLIDES.md 用到的全部版型, 使用者確認。STATUS.md 的 stage 改為 build。
+STYLE.md 存在且標定案, yaml 涵蓋 SLIDES.md 用到的全部版型, 使用者確認。STATUS.md 的 stage 改為「生簡報」。
