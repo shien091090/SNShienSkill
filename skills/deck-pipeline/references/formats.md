@@ -154,4 +154,5 @@ layouts:
 - 圖片路徑以 `.svg` 結尾時不貼圖, 而是轉成一組 PowerPoint 原生圖案 (group), 等比縮放置中塞進 box, 群組內每個框/線/文字在 PowerPoint 裡都可個別編輯。用途: 示意圖、流程圖、icon 這類「沒有截圖、要畫」的圖, 由 AI 依 SLIDES.md 的描述寫 SVG 落檔
 - SVG 撰寫規則: 根元素給 `viewBox="0 0 W H"`, W/H 用 box 英吋 × 96 (例如 box 寬 6.67 → 640px), 這樣文字大小在 pptx 裡才會跟版型一致; 顏色直接寫 STYLE.md theme 的 hex; 支援 rect/circle/ellipse/line/polyline/polygon/path/text/tspan/g/marker (箭頭)/stroke-dasharray (虛線)/漸層; 不支援 foreignObject、filter 以外的濾鏡、外部圖片, validate 會列出不支援元素; 用 `<g id="...">` 分群, 每群在 pptx 裡是一個子群組
 - 轉換器: `scripts/vendor/svg_to_pptx/` (MIT, 來自 ppt-master / typ2pptx)
+- **畫完自己截圖看一眼**再填進 SLIDES.md, 方法見 `stage-style.md` 第 6 節。元素掉出 viewBox、流程線交叉到看不懂語意這類問題, 只看程式碼看不出來
 - 從 canvas 轉寫尺寸: canvas artboard 1280x720 px 時, 英吋 = px / 96

@@ -58,7 +58,21 @@ title 1 頁 / image-icons4 1 頁 / compare 1 頁 / image 2 頁 / image-text 3 �
 - 上半: 配色與字體說明、每種版型一句話描述、腳本不畫的裝飾備註、字型安裝提醒、選用的 artboard 名稱與 canvas URL
 - 下半: yaml, 格式見 `formats.md`
 
-## 6. design skill 不可用時
+## 6. 自己看一眼產出
+
+canvas 發出去之前、SVG 畫完之後, 都該自己先看過 — 元素跑出畫面、文字溢出、線條交疊到看不懂這類問題, 不看圖是看不出來的。
+
+有瀏覽器 MCP 工具就用它。**沒有的話用本機的 headless Chrome**, 不要直接把沒驗證過的東西丟給使用者:
+
+```
+"<chrome 路徑>" --headless=new --disable-gpu --hide-scrollbars --window-size=1180,1830 --virtual-time-budget=5000 --screenshot=<out.png> <url>
+```
+
+- 畫布比視窗大時加 `--force-device-scale-factor=0.5` 縮著截, 一次看完整張
+- **canvas 的 serve_url 帶 token, 不可以寫進任何會留下來的檔案**。要傳給 Chrome 就寫進暫存檔, 讀完立刻刪
+- **檢查 SVG 要用 `<img src="file:///...">` 引用, 不要把 SVG 內容 inline 進 HTML** — SVG 沒有 width/height 屬性時 inline 會塌陷成看不見, 你會以為是自己畫錯
+
+## 7. design skill 不可用時
 
 退化為文字描述: 3 個方向各用文字描述配色與字體, 使用者選; 再對每種版型給 1 個文字版面方案 (各元素位置以英吋描述), 直接寫 STYLE.md 並試 build 給使用者看 pptx。
 
