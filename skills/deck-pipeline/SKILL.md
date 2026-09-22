@@ -7,7 +7,7 @@ description: 觸發詞「做簡報」或 /deck-pipeline <資料夾路徑>。把�
 
 一個資料夾, 六個階段做出 `output/<title>.pptx`, 使用者拍板、AI 動手。排版美化不在這六階段範圍內, 由使用者自行處理 (例如手動送桌面版 Claude Design), 完成後放回 `output/`。輸入輸出都在同一個資料夾原地演化, 與任何專案無關。
 
-格式規格在 `references/formats.md`, 階段 4 的判準在 `references/stage-slides.md`, 階段 5 細節在 `references/stage-style.md`, `@photo` 素材的轉正在 `references/photo-dewarp.md`, 需要時才讀。
+格式規格在 `references/formats.md`, 階段 4 的判準在 `references/stage-slides.md`, 階段 5 細節在 `references/stage-style.md`, `@photo` 素材的轉正在 `references/photo-dewarp.md`, `@ai` 圖的 prompt 寫法在 `references/image-prompts.md`, 需要時才讀。
 
 ## 每次呼叫的固定開場
 
@@ -102,7 +102,8 @@ py -3 ~/.claude/skills/deck-pipeline/scripts/transcribe.py <deck> --scan --promp
 - 用 `> ` 註記對應講稿段落, 會進 speaker notes
 - 版型可以在這階段新增: 內容需要現有六種以外的排法 (兩圖並排、主圖加多個圖示、三欄以上表格) 就直接取名用 (`image2` / `image-icons4` / `table` 這類), 記進 STATUS.md log, 階段 5 照清單出方案
 - 逐 topic 確認; STATUS.md 該 topic `slides` 欄 doing → done
-- 全部完成後跑 `py -3 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck> --images-todo` 產 IMAGES_TODO.md, 告知使用者哪些圖要補。補圖不在 skill 範圍, 沒補的圖 build 時會是灰框
+- 全部完成後跑 `py -3 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck> --images-todo` 產 IMAGES_TODO.md, 依 `@photo` / `@ai` / `@svg` 分組告知使用者哪些圖要補。沒補的圖 build 時會是灰框
+- `@ai` 那組要產一份可直接複製的 prompt 清單給使用者去生圖, 寫法見 `references/image-prompts.md`; 生圖本身不在 skill 範圍
 - 完成: 全部 topic `slides: done` → stage 改 style
 
 ### 5. style 版型定案
