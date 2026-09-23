@@ -42,7 +42,13 @@ description: 觸發詞「做遊戲 demo」「遊戲製作人」或 /game-studio 
   game/index.html   可玩的產物; game/art/ 是美術交付
 ```
 
-RD 經驗文件在 `references/rd-lessons.md`, 跨遊戲共用, **只出現在 RD 的輸入清單**, 你不讀不改。
+經驗文件兩份, 跨遊戲共用, **你不讀不改**, 各自只出現在該角色的輸入清單:
+- `references/rd-lessons.md` — 只給 RD
+- `references/art-lessons.md` — 只給美術(完整實作與美術修正兩條路徑都要帶)
+
+兩份都只收「下次做別的遊戲也會踩」的通則。**單一遊戲的參數、版位、色票不寫進去**, 那些屬該遊戲的 spec.md 與 style.md。
+
+**美術回饋的流向(不可跳步)**: playtest 的美術回饋先照常進 `feedback/round-<N>.md` 的美術段 → 走美術修正路徑實際改過一次 → 修正完成後, 你判斷哪幾條是「下次還會犯」的, 才抽進 art-lessons.md。中間必須隔一次實際修正, 否則會把「這一輪的版面偏好」誤寫成通則。
 
 ## 狀態機
 
