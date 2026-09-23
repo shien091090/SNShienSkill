@@ -1,6 +1,6 @@
 # 狀態: spec-review 團隊規格討論
 
-輸入: `decisions.md`、`spec.md`。兩回合討論後你判定通過或退回。
+輸入: `decisions.md`、`spec.md`、`guide.md`。兩回合討論後你判定通過或退回。企劃清單另加 guide-principles.md。
 
 ## r1 prompt
 
@@ -9,9 +9,9 @@
 企劃:
 ```
 狀態: spec-review, 第 1 回合
-請讀取: <game>/decisions.md、<game>/spec.md
-任務: 審這份規格: (1) 每一條定案是否都在規格裡有對應, 列出缺的 (2) 規則之間有沒有矛盾或沒定義的情況(例如兩件事同時發生怎麼判) (3) 操作是否足以支撐核心循環 (4) 「Demo 要驗證的問題」靠這份規格做出來的東西驗得到嗎
-輸出格式: 依四點分段; 第 1、2 點用條列, 沒問題就寫「無」
+請讀取: <game>/decisions.md、<game>/spec.md、<game>/guide.md、~/.claude/skills/game-studio/references/guide-principles.md
+任務: 審這份規格: (1) 每一條定案是否都在規格裡有對應, 列出缺的 (2) 規則之間有沒有矛盾或沒定義的情況(例如兩件事同時發生怎麼判) (3) 操作是否足以支撐核心循環, 且只用一種輸入 (4) 「Demo 要驗證的問題」靠這份規格做出來的東西驗得到嗎 (5) 玩家說明: 與規格有沒有對不上、玩家會操作到的動作有沒有漏、有沒有違反 guide-principles.md(尤其是有沒有教玩家去做 Demo 要驗證的那個行為)
+輸出格式: 依五點分段; 第 1、2、5 點用條列, 沒問題就寫「無」
 ```
 
 數值:
@@ -34,6 +34,7 @@
 - 企劃列的「缺對應」與「矛盾」為無, 或你判斷是規格層可容忍的小洞(寫進 log)
 - 數值推算的時長與目標差距在你可接受範圍, 且沒有無解/無限的組合
 - 你自己讀一遍: RD 拿到這份能不能開工不用猜
+- 執行守則中標記 spec-review 的條目; 企劃第 5 點若只是說明的文字問題, 你直接改 guide.md 並註記進通過那行 log, 不必退回
 
 任一不成立 → 退回。
 
@@ -41,7 +42,7 @@
 
 N = round.spec-draft, M = decisions.md 修訂紀錄最後一條的版號。
 
-1. 先照 SKILL.md 轉移程序把 `spec.md` 搬 `archive/spec.v<N>.md`, `decisions.md` 搬 `archive/decisions.v<M>.md`
+1. 先照 SKILL.md 轉移程序把 `spec.md` 搬 `archive/spec.v<N>.md`、`guide.md` 搬 `archive/guide.v<N>.md`, `decisions.md` 搬 `archive/decisions.v<M>.md`
 2. 改 `decisions.md`: 只改被這次討論推翻或補充的段落; 數值 agent 建議採納的參數寫進「數值方向」; 修訂紀錄加一條 `- v<M+1> <日期> 觸發: spec-review 第 N 版退回; 改了: ...; 原因: ...`
 3. STATE.md → `spec-draft`, round.spec-draft +1, log 寫退回理由
 4. 回報使用者: 退回原因一到兩條、決策改了什麼

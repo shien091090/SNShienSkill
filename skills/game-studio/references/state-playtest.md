@@ -6,6 +6,8 @@
 
 ## 分類
 
+先執行守則中標記 playtest 的條目(R2: 說明與遊戲實際行為不符算 bug), 再照下表分類。
+
 | 類型 | 判準 | 處理 |
 |---|---|---|
 | bug | 行為與 spec.md 不符, 或報錯、卡死、開不了 | 立刻交 RD, 不等 |
@@ -17,8 +19,6 @@
 ## bug 處理
 
 一批處理: 使用者一次講的 bug 你整理成一份描述(每條: 現象 / 重現步驟 / 對應 spec 條目), 然後 spawn `game-rd`(新 session):
-
-rd-lessons.md 的路徑先把 ~ 展開成實際絕對路徑再放進清單(Windows 上 ~ 不是絕對路徑)。
 
 ```
 狀態: playtest, 修 bug
@@ -38,7 +38,7 @@ rd-lessons.md 的路徑先把 ~ 展開成實際絕對路徑再放進清單(Windo
 他說給完了 →
 - **只有美術回饋**: feedback「製作人處理」寫「美術: 留待 build 交美術」→ 照 SKILL.md 轉移程序 → `build`(美術修正路徑), log 最後一行寫「playtest 第 <round.playtest> 輪美術回饋, 進 build 美術修正」
 - **有玩法回饋(不論有沒有美術)**: M = decisions.md 修訂紀錄最後一條的版號
-  1. 先照轉移程序把 `decisions.md` 搬 `archive/decisions.v<M>.md`、`spec.md` 搬 `archive/spec.v<round.spec-draft>.md`
+  1. 先照轉移程序把 `decisions.md` 搬 `archive/decisions.v<M>.md`、`spec.md` 搬 `archive/spec.v<round.spec-draft>.md`、`guide.md`(存在才搬)搬 `archive/guide.v<round.spec-draft>.md`
   2. 改 `decisions.md`: 你把玩法回饋轉成設計決策(使用者說「太難」, 你決定是調參數方向還是改規則, 寫進對應段); 修訂紀錄加 `- v<M+1> <日期> 觸發: playtest 第 <round.playtest> 輪玩法回饋; 改了: ...; 原因: ...`
   3. feedback「製作人處理」寫: 玩法併入 decisions v<M+1>; 美術留待下次 build
   4. STATE.md → `spec-draft`, round.spec-draft +1, log
