@@ -107,7 +107,7 @@ function gate(input) {
       permissionDecision: 'deny',
       permissionDecisionReason:
         `這次 commit 含有尚未 audit 的 skill 變更:\n${list}\n` +
-        `先用 skill-audit skill 逐一檢查並修正, 修正的檔案重新 git add, ` +
+        `先用 skill-audit skill 逐一檢查, 列出可優化項目讓使用者選擇, 修正選中的項目後重新 git add, ` +
         `再對每個目錄執行 node "${selfPath}" --stamp "<skill 目錄>", 最後重新 commit。`
     }
   }));

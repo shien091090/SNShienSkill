@@ -1,11 +1,11 @@
 ---
 name: skill-audit
-description: Use when a skill directory (SKILL.md and its supporting files) was created or modified, when a git commit is denied by the skill-audit gate, or when the user asks to audit, optimize, or health-check a skill (「優化 skill」「檢查 skill」「skill 健檢」). Applies to any skill, in any repo.
+description: Use when a skill directory (SKILL.md and its supporting files) was created or modified, when a git commit is denied by the skill-audit gate, or when the user asks to audit, review, optimize, or health-check a skill's text (「優化 skill」「檢查 skill」「skill 健檢」). Static review of the skill's files, not running evals or benchmarking trigger accuracy. Applies to any skill, in any repo.
 ---
 
 # skill-audit
 
-對一個 skill 目錄逐項套用下方檢查清單, 發現問題直接修, 不逐項詢問使用者; 使用者事後用 `git diff` 審。
+對一個 skill 目錄逐項套用下方檢查清單, 先列出可優化項目讓使用者挑選, 只修使用者選中的項目。
 
 ## 輸入
 
@@ -15,17 +15,40 @@ description: Use when a skill directory (SKILL.md and its supporting files) was 
 
 ## 流程
 
-1. **前置檢查**: 目錄存在且含 SKILL.md(不分大小寫)。確認目錄在 git 版控下(`git -C <目錄> rev-parse`); 不在版控下就先把整個目錄複製到暫存區當備份, 並在回報中寫出備份位置
+1. **前置檢查**: 目錄存在且含 SKILL.md(不分大小寫)。不符就告知使用者並中止
 2. **讀取**: 讀目錄內所有文字檔(含子目錄的 .md 與腳本)。只讀這個 skill 目錄, 不讀它提到的外部大檔
-3. **檢查並修正**: 逐項對照「檢查清單」, 有問題直接改檔
-4. **驗證**: 重讀改過的檔案, 確認 frontmatter 仍是合法 YAML、`name` / `description` 都在、所有 step 引用與檔案引用都對得上。驗證不過就修到過為止
-5. **收尾**: 若這次是被 commit 關卡擋下的, 把改過的檔案 `git add`, 再執行 `node <本 SKILL.md 所在目錄>/gate.js --stamp <skill 目錄>` 登記已檢查, 然後重跑原本的 commit
-6. **回報**: 列出每個修正(檔名 + 改了什麼), 沒問題的項目不列; 有判斷不確定而保留原文的地方另外標出。最後提醒可用 `git diff` 檢視
+3. **檢查**: 逐項對照「檢查清單」, 記下每個問題的所在檔案與段落、問題、建議改法。這一步不改檔
+4. **列出並等待選擇**: 依下方「建議清單格式」輸出, 然後停下等使用者回覆。沒有任何問題時輸出無問題格式後直接跳到收尾
+5. **套用**: 只修使用者選中的項目。動手前確認目錄在 git 版控下(`git -C <目錄> rev-parse`); 不在版控下就先把整個目錄複製到暫存區當備份, 並在回報中寫出備份位置
+6. **驗證**: 重讀改過的檔案, 確認 frontmatter 仍是合法 YAML、`name` / `description` 都在、所有 step 引用與檔案引用都對得上。驗證不過就修到過為止
+7. **收尾**: 若這次是被 commit 關卡擋下的, 把改過的檔案 `git add`, 再執行 `node <本 SKILL.md 所在目錄>/gate.js --stamp <skill 目錄>` 登記已檢查, 然後重跑原本的 commit。使用者一項都不選時同樣要登記, 否則 commit 會一直被擋
+8. **回報**: 逐項列出已修正的內容(檔名 + 改了什麼), 提醒可用 `git diff` 檢視
+
+## 建議清單格式
+
+```
+## Skill 優化建議: {skill 名稱}
+
+1. `{檔名}` {段落} — {問題}
+   → {建議改法}
+2. ...
+
+請回覆要修正的編號(例如「1, 3」)、「全部」, 或「都不修」。
+```
+
+判斷不確定是刻意設計還是問題的項目, 在該項末尾加「(可能是刻意設計)」, 讓使用者決定。
+
+沒有任何問題時輸出:
+
+```
+## Skill 優化建議: {skill 名稱}
+
+✅ 未發現需要優化的項目。
+```
 
 ## 修正原則
 
 - 修正只改寫法, 不改 skill 原本要達成的行為與適用範圍
-- 拿不準某處是刻意設計還是問題時, 保留原文, 在回報中標註「保留, 待確認」
 - 拆出新檔(腳本、reference)時, 同步把原處改成引用, 路徑從本 SKILL.md 所在位置推算
 
 ## 檢查清單
@@ -60,10 +83,10 @@ description: Use when a skill directory (SKILL.md and its supporting files) was 
 - 破壞性操作(覆寫、刪除、reset)前有確認或備份, 並寫明怎麼還原
 - 步驟之間有成功驗證, 上一步失敗就中止, 不繼續往下
 - 不引用不存在的 step(重新編號後殘留的跳轉)
-- 引用的檔案、腳本實際存在於 skill 目錄或寫明的位置; 不存在又無從得知其內容時不要自行補寫, 保留引用並在回報中標「待確認」
+- 引用的檔案、腳本實際存在於 skill 目錄或寫明的位置; 不存在又無從得知其內容時, 建議改法寫「請提供該檔內容或移除引用」, 不自行補寫
 - 腳本自己處理錯誤, 不丟給 agent 收拾; 常數附上取值理由; 寫清楚是要「執行」還是「讀來參考」
 - MCP 工具寫完整名稱(`Server:tool`)
 - 給 sub-agent 的指令帶足 context: 要讀哪份規範、輸出什麼格式、結果回傳什麼
 
 **Memory 汙染**
-- 掃 `~/.claude/projects/*/memory/` 全部目錄, 找出與這個 skill 相關的內容(提到 skill 名稱、其觸發詞或其流程)。skill 執行需要的搬進 SKILL.md; 跨專案通則搬進 `~/.claude/rules/` 或 `~/.claude/CLAUDE.md`; 搬完刪除該 memory 檔與 MEMORY.md 索引行, 並寫進回報
+- 掃 `~/.claude/projects/*/memory/` 全部目錄, 找出與這個 skill 相關的內容(提到 skill 名稱、其觸發詞或其流程)。建議改法: skill 執行需要的搬進 SKILL.md, 跨專案通則搬進 `~/.claude/rules/` 或 `~/.claude/CLAUDE.md`, 搬完刪除該 memory 檔與 MEMORY.md 索引行
