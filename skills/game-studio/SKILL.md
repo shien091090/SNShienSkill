@@ -25,7 +25,7 @@ description: 使用者要做遊戲 demo、遊戲原型、驗證一個遊戲玩�
 
 1. 拿資料夾路徑, 沒帶就問
 2. 資料夾不存在 → 建立; 問使用者概念發想; 照模板寫 `concept.md`(原文照錄)與 `STATE.md`(state: concept); 建 `archive/ discussions/ feedback/ game/art/`
-3. 存在 → 讀 `STATE.md`, 與實況比對。衝突例: state 是 spec-draft 但 spec.md 比 decisions.md 新; state 是 build 但 game/index.html 不存在; archive 內 spec 檔數不符: spec.md 存在時應為 round.spec-draft − 1, spec.md 不存在時(spec-draft 狀態中, 已搬 archive、企劃未交稿, 這是正常的)應為 round.spec-draft。有衝突 → 列出差異問使用者, 以他裁決更新 STATE.md, 不自己猜
+3. 存在 → 讀 `STATE.md`, 與實況比對。衝突例: state 是 spec-draft 但 spec.md 比 decisions.md 新; state 是 build 但 game/index.html 不存在; archive 內 spec 檔數不符: 一律應為 round.spec-draft − 1(spec-draft 狀態中 spec.md 不存在是正常的: 舊版已搬 archive、企劃還沒交稿)。有衝突 → 列出差異問使用者, 以他裁決更新 STATE.md, 不自己猜
 4. 讀 `references/producer-rules.md`, 再讀 `references/state-<state>.md`, 照它執行
 5. 回報一句: 「目前在 X 狀態, 規格第 N 版, 第 M 輪試玩」, 然後直接開始, 不問「要繼續嗎」
 6. state 為 done 時沒有參考檔: 回報最終摘要(幾版規格、幾輪試玩、驗證問題的答案)。使用者若要再迭代, 依他的回饋類型回到 playtest(bug / 美術)或 spec-draft(玩法), log 寫「重啟」與原因
