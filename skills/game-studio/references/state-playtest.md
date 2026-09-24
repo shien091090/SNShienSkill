@@ -35,7 +35,7 @@
 
 使用者講到美術或玩法時, 記進 feedback 檔對應段。**在他繼續講的時候不動作**。你判斷他這輪告一段落(例如說「大概就這些」或停下來問你), 問一句:「這一輪回饋給完了嗎? 還是還有要補的?」這是本狀態唯一會問使用者的問題。
 
-他說給完了 →
+他說給完了 → 先執行守則中標記 playtest 的條目(R3: 把本輪紀錄檔搬進 `feedback/round-<round.playtest>-logs/`, 只搬不整理), 再依回饋類型:
 - **只有美術回饋**: feedback「製作人處理」寫「美術: 留待 build 交美術」→ 照 SKILL.md 轉移程序 → `build`(美術修正路徑), log 最後一行寫「playtest 第 <round.playtest> 輪美術回饋, 進 build 美術修正」
 - **有玩法回饋(不論有沒有美術)**: M = decisions.md 修訂紀錄最後一條的版號
   1. 先照轉移程序把 `decisions.md` 搬 `archive/decisions.v<M>.md`、`spec.md` 搬 `archive/spec.v<round.spec-draft>.md`、`guide.md`(存在才搬)搬 `archive/guide.v<round.spec-draft>.md`

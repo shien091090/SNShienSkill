@@ -26,14 +26,14 @@ spawn `game-rd`:
 ```
 狀態: build, RD
 請讀取: <game>/spec.md、<game>/guide.md、<game>/game/art/style.md、~/.claude/skills/game-studio/references/rd-lessons.md
-任務: 依規格實作 <game>/game/index.html(可拆 game.js / style.css), 繪製一律呼叫 game/art/art.js 提供的 Art.drawXxx。另依 guide.md 做玩家說明畫面: 開場先顯示、可翻頁、遊戲中可再叫出, 文字照 guide.md, 圖呼叫 Art.drawGuidePage。所有操作(含說明翻頁與關閉)只用規格「操作」章節列的那一種輸入, 不掛另一種輸入的事件監聽。開工前先讀經驗文件, 收工前依它的規則回寫。
+任務: 依規格實作 <game>/game/index.html(可拆 game.js / style.css), 繪製一律呼叫 game/art/art.js 提供的 Art.drawXxx。另依 guide.md 做玩家說明畫面: 開場先顯示、可翻頁、遊戲中可再叫出, 文字照 guide.md, 圖呼叫 Art.drawGuidePage。所有操作(含說明翻頁與關閉)只用規格「操作」章節列的那一種輸入, 不掛另一種輸入的事件監聽。依規格「埋點」章節逐筆與逐局記錄, 每局結束自動下載一個 JSON 檔, 檔名 gamelog-<遊戲資料夾名>-<YYYYMMDD-HHMMSS>.json。開工前先讀經驗文件, 收工前依它的規則回寫。
 輸出格式: 四段回報(做了什麼 / 佔位圖形 / 規格疑問 / 經驗文件)
 ```
 
 你處理回報:
 - 佔位圖形非空 → SendMessage 給**美術**(同狀態內可續)補函式; 補完 SendMessage RD 接上。完整實作路徑中, 這是唯一允許美術新增函式的情況; 美術修正路徑的新增函式規則見下節。RD 接上後刪掉對應的 Placeholder 條目
 - 規格疑問非空 → 你判斷: 規格層小洞你直接裁決告訴 RD; 真的是規格矛盾 → 這裡不修規格, 記進 log(寫在該次進 build 那一行的後面, 不另起新行), 等 playtest 一起走退回
-- 你沒有瀏覽器, 不得聲稱自己玩過。改用讀碼核對: 開 `index.html` 確認 script 載入順序是 `art/art.js` → `game.js` 且沒有 `type="module"`; 確認 RD 回報有跑 `node --check`; 逐條對 spec 的規則、操作、結束條件在 `game.js` 找到對應程式; 執行守則中標記 build 的條目(R1: 沒有另一種輸入的監聽; R2: 說明畫面存在且文字與 guide.md 一致)。對不上 → 當 bug 走 SendMessage RD 修, 不轉移。實際可玩性由使用者在 playtest 第一件事確認
+- 你沒有瀏覽器, 不得聲稱自己玩過。改用讀碼核對: 開 `index.html` 確認 script 載入順序是 `art/art.js` → `game.js` 且沒有 `type="module"`; 確認 RD 回報有跑 `node --check`; 逐條對 spec 的規則、操作、結束條件在 `game.js` 找到對應程式; 執行守則中標記 build 的條目(R1: 沒有另一種輸入的監聽; R2: 說明畫面存在且文字與 guide.md 一致; R3: 紀錄欄位與規格「埋點」章節一致、每局結束會觸發下載、檔名合規)。對不上 → 當 bug 走 SendMessage RD 修, 不轉移。實際可玩性由使用者在 playtest 第一件事確認
 
 ## 美術修正(從 playtest 進來)
 

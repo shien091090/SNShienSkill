@@ -41,7 +41,7 @@ description: 使用者要做遊戲 demo、遊戲原型、驗證一個遊戲玩�
   guide.md          玩家說明(現行版, 與 spec.md 同版號; 企劃依 references/guide-principles.md 撰寫)
   archive/          decisions.v1.md、spec.v1.md ..., 不刪
   discussions/      <state>-r<回合>-<planner|balance>.md, spec-review 為 spec-review-v<版號>-r<回合>-*.md; 只寫不讀
-  feedback/         round-<N>.md
+  feedback/         round-<N>.md; round-<N>-logs/ 放該輪的試玩紀錄 JSON(守則 R3)
   game/index.html   可玩的產物; game/art/ 是美術交付
 ```
 
