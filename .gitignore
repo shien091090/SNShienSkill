@@ -40,3 +40,7 @@ settings.local.json
 # 自訂 agents(game-studio 等)
 !/agents/
 !/agents/**
+
+# 自製 plugin 正本(skill-gate 等), 兩台電腦從這裡用本機路徑安裝; 發佈時複製到 lobby-agent-client
+!/plugins-src/
+!/plugins-src/**

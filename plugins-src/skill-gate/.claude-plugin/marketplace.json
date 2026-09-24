@@ -1,0 +1,14 @@
+{
+  "name": "skill-gate-local",
+  "description": "skill-gate 的個人市集, 從本機路徑安裝(公司 GitLab 連不到時使用)",
+  "owner": {
+    "name": "NK.Shien"
+  },
+  "plugins": [
+    {
+      "name": "skill-gate",
+      "description": "git commit 前自動檢查這次改到的 skill, 列出可優化項目讓使用者挑選後才放行; 附 skill 健檢 skill",
+      "source": "./"
+    }
+  ]
+}

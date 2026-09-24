@@ -9,7 +9,16 @@
     "padding": 2
   },
   "enabledPlugins": {
-    "superpowers@claude-plugins-official": true
+    "superpowers@claude-plugins-official": true,
+    "skill-gate@skill-gate-local": true
+  },
+  "extraKnownMarketplaces": {
+    "skill-gate-local": {
+      "source": {
+        "source": "directory",
+        "path": "C:/Users/lithoshu/.claude/plugins-src/skill-gate"
+      }
+    }
   },
   "syntaxHighlightingDisabled": false,
   "askUserQuestionTimeout": "never",
@@ -32,17 +41,6 @@
             "command": "node ~/.claude/hooks/memory-guard.js",
             "timeout": 10,
             "statusMessage": "memory-guard"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash|PowerShell",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ~/.claude/skills/skill-audit/gate.js",
-            "timeout": 15,
-            "statusMessage": "skill-audit gate"
           }
         ]
       }
