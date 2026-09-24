@@ -2,7 +2,7 @@
   "permissions": {
     "defaultMode": "auto"
   },
-  "model": "claude-fable-5-1[1m]",
+  "model": "opus[1m]",
   "statusLine": {
     "type": "command",
     "command": "node ~/.claude/statusline.js",
@@ -10,13 +10,20 @@
   },
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
-    "skill-gate@skill-gate-local": true
+    "skill-gate@skill-gate-local": true,
+    "unity@unity-agent-plugin": true
   },
   "extraKnownMarketplaces": {
     "skill-gate-local": {
       "source": {
         "source": "directory",
         "path": "C:/Users/lithoshu/.claude/plugins-src/skill-gate"
+      }
+    },
+    "unity-agent-plugin": {
+      "source": {
+        "source": "github",
+        "repo": "Unity-Technologies/unity-agent-plugin"
       }
     }
   },
