@@ -140,7 +140,17 @@ layouts:
     - {role: body,  box: [0.8, 6.6, 11.7, 0.6], size: 16}
 ```
 
-- `slide` / `theme` / `layouts` 三個 key 缺一報錯
+- `slide` / `theme` / `layouts` 三個 key 缺一報錯; `export` 可選, 沒寫就用預設
+- `export` 控制圖片嵌進 pptx 前的處理, **不動原素材檔**:
+
+```yaml
+export:
+  image_dpi: 150      # 依「這張圖在版型裡的實際顯示英吋」縮到這個 dpi; 設 0 關閉
+  jpeg_quality: 88
+```
+
+  縮完會把同一張圖分別壓成 JPEG 與 PNG, **取較小的那個**。這個規則自己會做對的事: 插畫與照片選 JPEG, 文字截圖與線條圖選 PNG。有 alpha 通道的只考慮 PNG (轉 JPEG 會讓透明變黑塊); 壓不贏原檔就用原檔; 原圖比目標小不會放大。
+  實測一份 35 頁、27 張圖的簡報從 32.8 MB 降到 3.3 MB。要原圖品質就跑 `--no-optimize`
 - 每個版型 = 元素清單, 依序放置
 - 元素欄位: `role` (必填) / `box` [x, y, w, h] 英吋 (必填) / `size` pt (文字類, 預設 18) / `bold` (預設 false) / `color` hex (預設 theme.fg)
 - role 字彙: `title` `label` `subtitle` `body` `image` `left` `right` `table` `cards` `decor`; 其他值報錯

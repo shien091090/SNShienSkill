@@ -2,15 +2,24 @@
 // skill-audit 的 commit 關卡。兩種用法:
 //   PreToolUse hook(stdin 收 hook JSON): git commit 的 staged 檔案落在某個 skill 目錄內,
 //     且該目錄的 staged 內容還沒 audit 過 → deny, 要 Claude 先跑 skill-audit
-//   node gate.js --stamp <skill 目錄>: audit 完、重新 git add 後呼叫, 記下目前 staged 內容的指紋
-// 指紋存在 ~/.claude/skill-audit-stamps.json(被 ~/.claude/.gitignore 的 * 排除, 只留本機)
+//   node gate.js --stamp <skill 目錄> --stamp-file <指紋檔>: audit 完、重新 git add 後呼叫, 記下目前內容的指紋
+// 指紋存在 plugin 的持久資料夾(CLAUDE_PLUGIN_DATA, plugin 更新時不會被清掉), 只留本機。
+// 這個環境變數只有 hook 執行時才有, 所以 deny 訊息會把解析出的指紋檔路徑寫進 --stamp-file,
+// 讓事後手動登記和 hook 讀的是同一個檔案。不在 plugin 裡執行時退回 ~/.claude/skill-audit-stamps.json
 const { execFileSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const STAMP_FILE = path.join(os.homedir(), '.claude', 'skill-audit-stamps.json');
+function argValue(name) {
+  const i = process.argv.indexOf(name);
+  return i > 0 ? process.argv[i + 1] : undefined;
+}
+
+const STAMP_FILE = argValue('--stamp-file')
+  || (process.env.CLAUDE_PLUGIN_DATA && path.join(process.env.CLAUDE_PLUGIN_DATA, 'skill-audit-stamps.json'))
+  || path.join(os.homedir(), '.claude', 'skill-audit-stamps.json');
 
 function git(cwd, args) {
   return execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
@@ -57,17 +66,23 @@ function findSkillDir(root, relFile) {
 
 // 從指令推 commit 發生在哪個目錄: git -C <path>, 或 commit 之前最後一個 cd / Set-Location, 否則用 hook 的 cwd
 function repoDirOf(command, commit, cwd) {
-  const unq = s => s.replace(/^["']|["']$/g, '');
+  // 展開 ~ 與 $HOME; Windows 上把 Git Bash 的 /c/xxx 轉成 C:/xxx, 不然 path.resolve 會解析成錯的目錄而放行
+  const norm = s => {
+    s = s.replace(/^["']|["']$/g, '').replace(/^(~|\$HOME|\$env:USERPROFILE)(?=[\\/]|$)/i, os.homedir());
+    if (process.platform === 'win32') s = s.replace(/^\/([a-zA-Z])(?=\/|$)/, '$1:');
+    return path.resolve(cwd, s);
+  };
   let m = commit[0].match(/\bgit\s+-C\s+("[^"]+"|'[^']+'|\S+)/);
-  if (m) return path.resolve(cwd, unq(m[1]));
+  if (m) return norm(m[1]);
   const cds = [...command.slice(0, commit.index).matchAll(/(?:^|[;&|]\s*|\n\s*)(?:cd|Set-Location)\s+("[^"]+"|'[^']+'|[^\s;&|]+)/gi)];
-  if (cds.length) return path.resolve(cwd, unq(cds[cds.length - 1][1]));
+  if (cds.length) return norm(cds[cds.length - 1][1]);
   return cwd;
 }
 
 function stamp(dir) {
   const stamps = loadStamps();
   stamps[keyOf(dir)] = fingerprint(dir);
+  fs.mkdirSync(path.dirname(STAMP_FILE), { recursive: true });
   fs.writeFileSync(STAMP_FILE, JSON.stringify(stamps, null, 2));
   console.log(`stamped ${path.resolve(dir)}`);
 }
@@ -100,6 +115,7 @@ function gate(input) {
   if (!pending.length) return;
 
   const selfPath = __filename.replace(/\\/g, '/');
+  const stampFile = STAMP_FILE.replace(/\\/g, '/');
   const list = pending.map(d => `- ${d.replace(/\\/g, '/')}`).join('\n');
   process.stdout.write(JSON.stringify({
     hookSpecificOutput: {
@@ -108,13 +124,13 @@ function gate(input) {
       permissionDecisionReason:
         `這次 commit 含有尚未 audit 的 skill 變更:\n${list}\n` +
         `先用 skill-audit skill 逐一檢查, 列出可優化項目讓使用者選擇, 修正選中的項目後重新 git add, ` +
-        `再對每個目錄執行 node "${selfPath}" --stamp "<skill 目錄>", 最後重新 commit。`
+        `再對每個目錄執行 node "${selfPath}" --stamp "<skill 目錄>" --stamp-file "${stampFile}", 最後重新 commit。`
     }
   }));
 }
 
 if (process.argv[2] === '--stamp') {
-  if (!process.argv[3]) { console.error('usage: node gate.js --stamp <skill dir>'); process.exit(1); }
+  if (!process.argv[3] || process.argv[3].startsWith('--')) { console.error('usage: node gate.js --stamp <skill dir> [--stamp-file <file>]'); process.exit(1); }
   stamp(process.argv[3]);
 } else {
   let raw = '';

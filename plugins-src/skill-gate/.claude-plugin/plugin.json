@@ -1,0 +1,8 @@
+{
+  "name": "skill-gate",
+  "description": "git commit 前自動檢查這次改到的 skill, 列出可優化項目讓使用者挑選後才放行; 附 skill 健檢 skill",
+  "version": "1.0.0",
+  "author": {
+    "name": "NK.Shien"
+  }
+}

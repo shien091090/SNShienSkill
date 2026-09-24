@@ -156,6 +156,7 @@ py -3 ~/.claude/skills/deck-pipeline/scripts/build_pptx.py <deck>
 - 成功: `output/<title>.pptx`, 文字皆可編輯, TODO 圖為灰框加描述, `>` 進 notes
 - 失敗: 腳本列出全部錯誤 (版型未定義 / 圖片不存在), 修 SLIDES.md 或 STYLE.md 後重跑
 - 改了 SLIDES.md 或 STYLE.md 就重 build, 每次整份重建
+- **圖片會自動最佳化**: 依實際顯示尺寸縮到 150 dpi, 再選 JPEG / PNG 裡較小的編碼。原素材檔不動, 只換嵌進 pptx 的副本。參數在 STYLE.md 的 `export` 區塊, 要原圖跑 `--no-optimize`
 - 相依: `py -3 -m pip install python-pptx pyyaml` (SVG 轉換器已 vendor 在 scripts/vendor, 不用另裝)
 - pptx 正在 PowerPoint 裡開著會 build 失敗 (PermissionError), 先請使用者關掉再重跑
 - 字型預設用微軟正黑體 (Windows 內建, 播放機器一定有), 使用者主動指定別的才換; 換了要提醒他播放機器得裝, 否則 PowerPoint 會退系統字
