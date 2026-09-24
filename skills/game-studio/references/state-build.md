@@ -8,17 +8,19 @@
 
 ### 美術
 
+art-lessons.md 的路徑先把 ~ 展開成實際絕對路徑再放進清單(Windows 上 ~ 不是絕對路徑)。
+
 spawn `game-artist`:
 ```
 狀態: build, 美術
-請讀取: <game>/spec.md
-任務: 依規格「物件清單」產出 <game>/game/art/art.js 與 <game>/game/art/style.md。畫布邏輯尺寸依「數值參數表」的畫面寬高。
-輸出格式: 回報產了哪些 draw 函式、畫布尺寸、判斷不需獨立函式的物件與理由
+請讀取: <game>/spec.md、~/.claude/skills/game-studio/references/art-lessons.md
+任務: 依規格「物件清單」產出 <game>/game/art/art.js 與 <game>/game/art/style.md。畫布邏輯尺寸依「數值參數表」的畫面寬高。開工前先讀經驗文件(設計理念與經驗兩層), style.md 要有「理念落實」一節; 收工前依它的規則回寫。
+輸出格式: 回報產了哪些 draw 函式、畫布尺寸、判斷不需獨立函式的物件與理由、以及回寫了哪幾條經驗與理念異動(新增候選 / 升格 / 縮邊界 / 降格, 各附證據; 沒有就說無)
 ```
 
 若 `feedback/` 內有尚未處理的美術回饋(上一輪 playtest 同時有玩法與美術回饋、走了退回路徑), 檔案清單加 `<game>/feedback/round-<round.playtest>.md`, 任務加一句「同時參考 feedback 的美術段」。這是完整實作路徑唯一允許多帶的檔。
 
-你檢查: `game/art/` 只有這兩檔; style.md 有物件表且每個函式簽章與 state 欄位寫全。不齊 → SendMessage 同 agent 補。
+你檢查: `game/art/` 只有這兩檔; style.md 有物件表且每個函式簽章與 state 欄位寫全, 且有「理念落實」一節。不齊 → SendMessage 同 agent 補。
 
 ### RD(美術產出後才 spawn)
 
@@ -42,9 +44,9 @@ spawn `game-rd`:
 spawn `game-artist`(新 session):
 ```
 狀態: build, 美術修正
-請讀取: <game>/spec.md、<game>/game/art/style.md、<game>/feedback/round-<round.playtest>.md
-任務: 只看 feedback 的「美術」段, 修改 game/art/art.js 與 style.md 回應這些回饋。不改既有函式名與參數。
-輸出格式: 逐條回饋說明改了什麼; 若有新增函式列出來
+請讀取: <game>/spec.md、<game>/game/art/style.md、<game>/feedback/round-<round.playtest>.md、~/.claude/skills/game-studio/references/art-lessons.md
+任務: 只看 feedback 的「美術」段, 修改 game/art/art.js 與 style.md 回應這些回饋。不改既有函式名與參數。開工前先讀經驗文件, 每條回饋動手前先判定它違反了哪條理念; 收工前依它的規則回寫。
+輸出格式: 逐條回饋說明違反了哪條理念(或無)、改了什麼; 若有新增函式列出來; 回寫了哪幾條經驗與理念異動(新增候選 / 升格 / 縮邊界 / 降格, 各附證據; 沒有就說無)
 ```
 
 - 沒新增函式 → 你讀 art.js 的 diff 確認每條美術回饋都有對應改動, 直接轉移

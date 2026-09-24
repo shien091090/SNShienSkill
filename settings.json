@@ -34,6 +34,17 @@
             "statusMessage": "memory-guard"
           }
         ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/skills/skill-audit/gate.js",
+            "timeout": 15,
+            "statusMessage": "skill-audit gate"
+          }
+        ]
       }
     ]
   }
