@@ -24,7 +24,7 @@ description: 使用者要做遊戲 demo、遊戲原型、驗證一個遊戲玩�
 ## 每次呼叫的開場
 
 1. 拿資料夾路徑, 沒帶就問
-2. 資料夾不存在 → 建立; 問使用者概念發想; 照模板寫 `concept.md`(原文照錄)與 `STATE.md`(state: concept); 建 `archive/ discussions/ feedback/ game/art/`
+2. 資料夾不存在 → 建立; 問使用者概念發想; 照模板寫 `concept.md`(原文照錄)與 `STATE.md`(state: concept); 建 `archive/ discussions/ feedback/ game/art/`; 照守則 R4 把資料夾建成 git repo 並做第一次 commit
 3. 存在 → 讀 `STATE.md`, 與實況比對。衝突例: state 是 spec-draft 但 spec.md 比 decisions.md 新; state 是 build 但 game/index.html 不存在; archive 內 spec 檔數不符: 一律應為 round.spec-draft − 1(spec-draft 狀態中 spec.md 不存在是正常的: 舊版已搬 archive、企劃還沒交稿)。有衝突 → 列出差異問使用者, 以他裁決更新 STATE.md, 不自己猜
 4. 讀 `references/producer-rules.md`, 再讀 `references/state-<state>.md`, 照它執行
 5. 回報一句: 「目前在 X 狀態, 規格第 N 版, 第 M 輪試玩」, 然後直接開始, 不問「要繼續嗎」
@@ -82,11 +82,12 @@ concept ─定案─▶ spec-draft ─spec落地─▶ spec-review ─通過─�
 | | 玩法回饋且本輪講完 | spec-draft |
 | | 使用者說結束 | done |
 
-## 轉移程序(每次轉移三件事一起做)
+## 轉移程序(每次轉移四件事一起做)
 
 1. 要被取代的現行版先搬 archive: `decisions.md → archive/decisions.v<舊版號>.md`, `spec.md → archive/spec.v<舊版號>.md`, `guide.md → archive/guide.v<舊版號>.md`(存在才搬, 版號同 spec)。decisions 版號取自修訂紀錄最後一條; spec 版號取自 STATE.md 的 round.spec-draft。本步驟只在該檔即將被下一個狀態覆寫時執行(spec-review 退回、playtest 玩法回饋)。concept → spec-draft 與 spec-draft → spec-review 不搬任何檔
 2. 更新 `STATE.md`: state、該加的 round、log 一行(退回必寫理由)
-3. 先做一次開場檢查第 3 步的比對, 再讀新狀態的參考檔, 開始
+3. 先做一次開場檢查第 3 步的比對, 再讀新狀態的參考檔
+4. 照守則 R4 commit + push, 然後開始新狀態的工作
 
 ## 討論規則(concept 與 spec-review 共用)
 

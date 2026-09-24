@@ -42,3 +42,17 @@
   - playtest: 老闆說本輪回饋給完了之後, 你到下載資料夾(預設 `~/Downloads`, 找不到就問老闆)把本輪的紀錄檔搬進 `feedback/round-<N>-logs/`。**只搬不整理**: 不寫摘要, 免得你的整理先替數值下判斷。一個檔都沒有 → 在 feedback 的「製作人處理」註明, 不阻擋流程
 - **已在迭代中的遊戲**: 本條生效前做的版本沒有紀錄功能, 從下一次改版起適用; 該次 spec-review 由數值先補出欄位清單
 
+## R4 每次迭代自動 commit + push
+
+- **規則**: 遊戲資料夾是一個 git repo。每次迭代的產出都要 commit 並 push, 不問老闆。**push 是老闆專門授權給 game-studio 流程的**, 只適用於遊戲資料夾, 不延伸到其他 repo(包括 `~/.claude`)
+- **為什麼**: 遊戲資料夾裡的決策、規格、討論與可玩產物是整個迭代的唯一紀錄, 改壞或誤刪時 archive 的手動副本救不回來; push 讓另一台電腦也接得上
+- **何時 commit + push**:
+  - 每次狀態轉移, 在 SKILL.md 轉移程序的最後一步
+  - playtest 中每一批 bug 修完、核對通過之後(不轉移, 但照樣 commit + push)
+  - 同一狀態內若有會跨 session 才接得上的中途產出(例: agent 已交稿、你還沒檢查完就要結束對話), 也先 commit + push, 不要留在工作區
+- **怎麼 commit**: 格式照 `~/.claude/rules/commit-format.md`; 系統名稱用 decisions.md 的「遊戲名(暫定)」(concept 定案前用資料夾名)。commit 前照該檔流程看一次不帶 pathspec 的 `git status --short`, 只收這個遊戲資料夾內的檔
+- **repo 還沒建好時**:
+  - 資料夾不是 git repo → `git init` 後照常 commit
+  - 沒有 remote → 停下來問老闆 remote 網址, 不自己開遠端 repo; 他給了就設 origin 並 push, 之後照常自動 push
+  - push 失敗(認證、衝突、遠端有新 commit)→ 不 force、不自行 rebase, 回報錯誤原文給老闆, commit 保留在本地
+

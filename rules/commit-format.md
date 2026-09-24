@@ -14,6 +14,8 @@
 
 改動完成後直接 `git commit`, 不用問。push 一律等使用者明確指示。
 
+例外: game-studio 流程的遊戲資料夾, 使用者已長期授權自動 push(規則在 game-studio 的 `references/producer-rules.md` R4)。只限遊戲資料夾, 不延伸到其他 repo。
+
 ## 操作流程
 
 1. 涉及 submodule 時, 先進 submodule 目錄 commit, 拿到短 SHA(或確認落在哪個 Tag)後才回主專案 commit
