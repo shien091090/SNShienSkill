@@ -12,6 +12,7 @@
 |---|---|---|
 | bug | 行為與 spec.md 不符, 或報錯、卡死、開不了 | 立刻交 RD, 不等 |
 | 美術 | 看不清、分不出、不好看、尺寸怪, 但行為對 | 記下, 等本輪講完 |
+| 音效 | 聽不出是哪個事件、太吵或蓋掉別的聲音、不好聽、時機不對, 但遊戲行為對 | 記下, 等本輪講完 |
 | 玩法 | 規則、節奏、難度、操作感、「不好玩」 | 記下, 等本輪講完 |
 
 分不清 bug 還是玩法 → 對 spec.md: spec 有寫而沒做到是 bug; spec 寫了但玩起來不對是玩法。你判, 不問使用者。
@@ -25,7 +26,7 @@
 請讀取: ~/.claude/skills/game-studio/references/rd-lessons.md、<game>/spec.md, 以及 <game>/game/ 下的檔案(這裡刻意給整個目錄, 因為修 bug 要看全部程式)
 任務: 修下列 bug, 每條先重現(讀碼定位)再修, 修完 node --check 並逐條自查:
 <bug 清單>
-不改 spec.md、不改 game/art/。收工前依經驗文件規則回寫。
+不改 spec.md、不改 game/art/、不改 game/audio/。收工前依經驗文件規則回寫。
 輸出格式: 逐條 bug 說明原因與修法; 經驗文件回寫了哪條 / 無
 ```
 
@@ -33,18 +34,20 @@
 
 ## 美術與玩法回饋
 
-使用者講到美術或玩法時, 記進 feedback 檔對應段。**在他繼續講的時候不動作**。你判斷他這輪告一段落(例如說「大概就這些」或停下來問你), 問一句:「這一輪回饋給完了嗎? 還是還有要補的?」這是本狀態唯一會問使用者的問題。
+使用者講到美術、音效或玩法時, 記進 feedback 檔對應段。**在他繼續講的時候不動作**。你判斷他這輪告一段落(例如說「大概就這些」或停下來問你), 問一句:「這一輪回饋給完了嗎? 還是還有要補的?」這是本狀態唯一會問使用者的問題。
 
 他說給完了 → 先執行守則中標記 playtest 的條目(R3: 把本輪紀錄檔搬進 `feedback/round-<round.playtest>-logs/`, 只搬不整理), 再依回饋類型:
-- **只有美術回饋**: feedback「製作人處理」寫「美術: 留待 build 交美術」→ 照 SKILL.md 轉移程序 → `build`(美術修正路徑), log 最後一行寫「playtest 第 <round.playtest> 輪美術回饋, 進 build 美術修正」
-- **有玩法回饋(不論有沒有美術)**: M = decisions.md 修訂紀錄最後一條的版號
+- **只有美術及 / 或音效回饋(沒有玩法)**: feedback「製作人處理」寫「美術: 留待 build 交美術」「音效: 留待 build 交音效」(有的才寫)→ 照 SKILL.md 轉移程序 → `build`(修正路徑), log 最後一行寫「playtest 第 <round.playtest> 輪美術回饋, 進 build 美術修正」, 只有音效寫「進 build 音效修正」, 兩者都有寫「進 build 美術與音效修正」
+- **有玩法回饋(不論有沒有美術、音效)**: M = decisions.md 修訂紀錄最後一條的版號
   1. 先照轉移程序把 `decisions.md` 搬 `archive/decisions.v<M>.md`、`spec.md` 搬 `archive/spec.v<round.spec-draft>.md`、`guide.md`(存在才搬)搬 `archive/guide.v<round.spec-draft>.md`
   2. 改 `decisions.md`: 你把玩法回饋轉成設計決策(使用者說「太難」, 你決定是調參數方向還是改規則, 寫進對應段); 修訂紀錄加 `- v<M+1> <日期> 觸發: playtest 第 <round.playtest> 輪玩法回饋; 改了: ...; 原因: ...`
-  3. feedback「製作人處理」寫: 玩法併入 decisions v<M+1>; 美術留待下次 build
+  3. feedback「製作人處理」寫: 玩法併入 decisions v<M+1>; 美術 / 音效留待下次 build
   4. STATE.md → `spec-draft`, round.spec-draft +1, log
   5. 回報使用者: 你把他的回饋轉成了什麼決策, 接下來規格會重擬
 
-美術回饋留在 feedback 檔, 下次走到 build 完整實作時, 美術的檔案清單多帶這份 feedback(見 state-build.md)。
+美術與音效回饋留在 feedback 檔, 下次走到 build 完整實作時, 美術與音效的檔案清單各多帶這份 feedback(見 state-build.md)。
+
+「加音樂音效」「換一種聲音風格」這類要改規格「音效清單」的要求, 算玩法回饋(要改 decisions 與 spec), 不算音效回饋。
 
 ## 結束
 

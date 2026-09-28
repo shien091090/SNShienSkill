@@ -12,7 +12,7 @@ spawn `game-planner`(新 session)。
 ```
 狀態: spec-draft, 規格第 1 版
 請讀取: <game>/decisions.md、~/.claude/skills/game-studio/references/guide-principles.md
-任務: 依定案結果寫 Demo 玩法規格, 存到 <game>/spec.md。「操作」章節只列 decisions.md 選定的那一種輸入, 每個玩家動作都要有對應。「埋點」章節照 decisions.md「埋點」段寫, 不自己增刪欄位。只寫玩法, 不寫美術表現、不寫音效、不寫技術實作。「數值參數表」以定案的數值方向為底給出具體初始值, 並包含畫面寬與畫面高。「物件清單」列出所有會出現在畫面上、玩家需要辨識的東西與它們的狀態。「Demo 範圍邊界」把定案的「明確不做的」抄進來並補上你認為 Demo 不該碰的。
+任務: 依定案結果寫 Demo 玩法規格, 存到 <game>/spec.md。「操作」章節只列 decisions.md 選定的那一種輸入, 每個玩家動作都要有對應。「埋點」章節照 decisions.md「埋點」段寫, 不自己增刪欄位。只寫玩法, 不寫美術表現、不寫技術實作; 聲音只寫在「音效清單」章節(哪些事件要有聲音、要讓玩家感覺到什麼、背景音樂幾首、靜音怎麼操作), 不寫素材與做法, decisions.md 沒要音效就寫無。「數值參數表」以定案的數值方向為底給出具體初始值, 並包含畫面寬與畫面高。「物件清單」列出所有會出現在畫面上、玩家需要辨識的東西與它們的狀態。「Demo 範圍邊界」把定案的「明確不做的」抄進來並補上你認為 Demo 不該碰的。
 輸出格式: 章節照下列模板, 不增刪:
 <貼 templates.md 的 spec.md 區塊, 標題 v1>
 規格寫完後, 依 guide-principles.md 另寫給玩家看的遊戲說明, 存到 <game>/guide.md。
@@ -23,7 +23,7 @@ spawn `game-planner`(新 session)。
 ```
 狀態: spec-draft, 規格第 <N> 版
 請讀取: <game>/decisions.md、<game>/archive/spec.v<N-1>.md、<game>/archive/guide.v<N-1>.md(存在才列)、~/.claude/skills/game-studio/references/guide-principles.md
-任務: decisions.md 已修訂, 重點看「修訂紀錄」最後一條, 那是這次改版的原因。以上一版規格為底改出第 <N> 版存到 <game>/spec.md, 沒被修訂影響的章節維持原樣, 不要無故重寫。「操作」章節只列 decisions.md 選定的那一種輸入。規格寫完後, 依 guide-principles.md 寫玩家說明存到 <game>/guide.md: 有上一版說明就以它為底, 只改受影響的頁; 沒有就新寫。
+任務: decisions.md 已修訂, 重點看「修訂紀錄」最後一條, 那是這次改版的原因。以上一版規格為底改出第 <N> 版存到 <game>/spec.md, 沒被修訂影響的章節維持原樣, 不要無故重寫; 上一版沒有「音效清單」章節時照模板補上。「操作」章節只列 decisions.md 選定的那一種輸入。規格寫完後, 依 guide-principles.md 寫玩家說明存到 <game>/guide.md: 有上一版說明就以它為底, 只改受影響的頁; 沒有就新寫。
 輸出格式: 章節照模板(同上, 標題 v<N>)。寫完回報: 改了哪些章節、對應修訂紀錄的哪一點; 說明改了哪幾頁(或新寫幾頁)
 ```
 

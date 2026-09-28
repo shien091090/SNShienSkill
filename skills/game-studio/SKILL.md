@@ -14,8 +14,8 @@ description: 使用者要做遊戲 demo、遊戲原型、驗證一個遊戲玩�
 | 企劃 | game-planner | opus | concept、spec-draft、spec-review |
 | 數值 | game-balance | opus | concept、spec-review |
 | 美術 | game-artist | opus | build |
+| 音效 | game-audio | opus | build(與美術並行) |
 | RD | game-rd | sonnet | build、playtest |
-| 音效 | (尚未啟用) | | |
 
 每個狀態的操作在 `references/state-<狀態>.md`, **進到那個狀態才讀**。文件模板在 `references/templates.md`。
 
@@ -42,12 +42,13 @@ description: 使用者要做遊戲 demo、遊戲原型、驗證一個遊戲玩�
   archive/          decisions.v1.md、spec.v1.md ..., 不刪
   discussions/      <state>-r<回合>-<planner|balance>.md, spec-review 為 spec-review-v<版號>-r<回合>-*.md; 只寫不讀
   feedback/         round-<N>.md; round-<N>-logs/ 放該輪的試玩紀錄 JSON(守則 R3)
-  game/index.html   可玩的產物; game/art/ 是美術交付
+  game/index.html   可玩的產物; game/art/ 是美術交付; game/audio/ 是音效交付(sound.js、sound.md、credits.md、assets/)
 ```
 
 經驗文件跨遊戲共用, **你不讀不改**, 各自只出現在該角色的輸入清單:
 - `references/rd-lessons.md` — 只給 RD
 - `references/art-lessons.md` — 只給美術(完整實作與美術修正兩條路徑都要帶)
+- `references/audio-lessons.md` — 只給音效(完整實作與音效修正兩條路徑都要帶)
 
 `references/guide-principles.md` 是玩家說明的寫法原則, 只給企劃(spec-draft 撰寫、spec-review 審查)。**這份由你維護**: 老闆對說明的回饋, 你抽成跨遊戲通則寫進去。
 
@@ -59,12 +60,14 @@ art-lessons.md 分兩層: 上層是**設計理念**(抽象、跨遊戲的判斷�
 - 只憑單條證據就升成「成立」, 或把這一輪的版面偏好寫成理念 → 退回候選或撤掉
 - 老闆說的是「好不好看」卻被標成「可讀性」 → 改標「品味」。可讀性是對任何玩家都成立的, 品味是老闆個人偏好, 混在一起會把品味當鐵律
 
+**音效回饋的流向**同美術: 先進 `feedback/round-<N>.md` 的音效段 → 走音效修正路徑實際改過一次 → 音效收工時回寫 audio-lessons.md。你審音效回報裡的經驗異動, 同樣擋兩件事: 只憑一次回饋就寫成通則; 老闆說「好不好聽」卻標成「辨識」(應標「品味」)。另外核對 credits.md: 每個音檔都要有來源與授權, 授權不是 CC0 / CC-BY / 免署名可商用的 → SendMessage 要求換掉
+
 ## 狀態機
 
 ```
 concept ─定案─▶ spec-draft ─spec落地─▶ spec-review ─通過─▶ build ─可玩─▶ playtest ─使用者說結束─▶ done
                    ▲                        │                 ▲            │
-                   │       退回(修decisions) │                 │ bug/美術   │
+                   │       退回(修decisions) │                 │bug/美術/音效│
                    └────────────────────────┘                 └────────────┘
                    ▲                                                       │
                    └─────────────── 玩法回饋(修decisions) ──────────────────┘
@@ -78,7 +81,7 @@ concept ─定案─▶ spec-draft ─spec落地─▶ spec-review ─通過─�
 | | 你判定退回 | spec-draft |
 | build | index.html 可執行且 RD 自測通過 | playtest |
 | playtest | bug → RD 修 | 不轉移 |
-| | 美術回饋且本輪講完 | build(只跑美術修正) |
+| | 美術 / 音效回饋且本輪講完(沒有玩法回饋) | build(只跑美術修正、音效修正, 或兩者並行) |
 | | 玩法回饋且本輪講完 | spec-draft |
 | | 使用者說結束 | done |
 
