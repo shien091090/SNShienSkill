@@ -9,11 +9,11 @@
 在 Claude Code 裡執行(從哪個目錄啟動都可以):
 
 ```
-/plugin marketplace add https://git-it.yile808.com/bu01/game-platform-team/lobby-agent-client.git
+/plugin marketplace add https://git-it.yile808.com/bu01/game-platform-team/lobby-agent-client.git#develop
 /plugin install skill-gate@lobby-agent-client
 ```
 
-私有 repo 沿用電腦上的 git 帳號設定, 能 clone lobby-agent-client 就能裝。裝完重開 Claude Code 生效。
+網址結尾的 `#develop` 不能省: repo 的預設分支是 main, 省略的話會抓 main, 找不到市集清單而加入失敗。私有 repo 沿用電腦上的 git 帳號設定, 能 clone lobby-agent-client 就能裝。裝完重開 Claude Code 生效。
 
 - 更新: `/plugin marketplace update lobby-agent-client`, 或在 `/plugin` 介面開啟自動更新
 - 移除: `/plugin uninstall skill-gate@lobby-agent-client`, 不會留下任何設定
