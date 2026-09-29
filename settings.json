@@ -2,7 +2,22 @@
   "permissions": {
     "defaultMode": "auto"
   },
-  "model": "opus[1m]",
+  "model": "claude-fable-5-1",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/memory-guard.js",
+            "timeout": 10,
+            "statusMessage": "memory-guard"
+          }
+        ]
+      }
+    ]
+  },
   "statusLine": {
     "type": "command",
     "command": "node ~/.claude/statusline.js",
@@ -37,20 +52,5 @@
   "allowedTools": [
     "Bash",
     "PowerShell"
-  ],
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ~/.claude/hooks/memory-guard.js",
-            "timeout": 10,
-            "statusMessage": "memory-guard"
-          }
-        ]
-      }
-    ]
-  }
+  ]
 }
