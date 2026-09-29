@@ -39,13 +39,13 @@ Get-ChildItem "{資料夾路徑}" -Filter "*.csv" | Select-Object -ExpandPropert
 
 ### 3. 讀取 GAS API URL
 
-讀取 `D:\Git\SNShien\linebot_liveManagerIntegration\settings.py`，找到 `URL_GAS_API = '...'` 這行，取出單引號內的 URL。
+讀取 `E:\Project\LineBot\linebot_liveManagerIntegration\settings.py`，找到 `URL_GAS_API = '...'` 這行，取出單引號內的 URL。
 
 若找不到該行，告知使用者「無法從 settings.py 讀取 URL_GAS_API」並停止。
 
 ### 4. 呼叫 GAS API 取得記帳資料
 
-日期範圍 = 發票清單中最早的 date 至最晚的 date。
+日期範圍 = 發票清單中最早的 date 「再往前一天」至最晚的 date（比對池含 D-1，起始日前一天的記帳也要抓進來）。
 
 ```powershell
 $startDate = "yyyy/MM/dd"   # 最早發票日期（從發票清單取得）
