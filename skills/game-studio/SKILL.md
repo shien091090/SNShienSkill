@@ -37,7 +37,8 @@ description: 使用者要做遊戲 demo、遊戲原型、驗證一個遊戲玩�
   STATE.md          狀態、輪次、log
   concept.md        使用者原文, 永不改
   decisions.md      定案結果(現行版), 底部有修訂紀錄
-  spec.md           Demo 規格(現行版)
+  spec.md           Demo 規格(現行版), 只寫現行規則, 不寫歷版沿革與理由(理由在 decisions.md 修訂紀錄)
+  telemetry.md      埋點規格(現行版, 與 spec.md 同版號); 守則 R3 說的「規格『埋點』章節」即指這份
   guide.md          玩家說明(現行版, 與 spec.md 同版號; 企劃依 references/guide-principles.md 撰寫)
   archive/          decisions.v1.md、spec.v1.md ..., 不刪
   discussions/      <state>-r<回合>-<planner|balance>.md, spec-review 為 spec-review-v<版號>-r<回合>-*.md; 只寫不讀
@@ -76,8 +77,9 @@ concept ─定案─▶ spec-draft ─spec落地─▶ spec-review ─通過─�
 | 狀態 | 離開條件 | 去哪 |
 |---|---|---|
 | concept | 你寫出 decisions.md | spec-draft |
-| spec-draft | spec.md 與 guide.md 落地 | spec-review |
+| spec-draft | spec.md、telemetry.md 與 guide.md 落地 | spec-review |
 | spec-review | 你判定通過 | build |
+| | 你判定就地修正(雙方對修法有共識) | build(修完核對後) |
 | | 你判定退回 | spec-draft |
 | build | index.html 可執行且 RD 自測通過 | playtest |
 | playtest | bug → RD 修 | 不轉移 |
@@ -87,7 +89,7 @@ concept ─定案─▶ spec-draft ─spec落地─▶ spec-review ─通過─�
 
 ## 轉移程序(每次轉移四件事一起做)
 
-1. 要被取代的現行版先搬 archive: `decisions.md → archive/decisions.v<舊版號>.md`, `spec.md → archive/spec.v<舊版號>.md`, `guide.md → archive/guide.v<舊版號>.md`(存在才搬, 版號同 spec)。decisions 版號取自修訂紀錄最後一條; spec 版號取自 STATE.md 的 round.spec-draft。本步驟只在該檔即將被下一個狀態覆寫時執行(spec-review 退回、playtest 玩法回饋)。concept → spec-draft 與 spec-draft → spec-review 不搬任何檔
+1. 要被取代的現行版先搬 archive: `decisions.md → archive/decisions.v<舊版號>.md`, `spec.md → archive/spec.v<舊版號>.md`, `guide.md → archive/guide.v<舊版號>.md`、`telemetry.md → archive/telemetry.v<舊版號>.md`(存在才搬, 版號同 spec)。decisions 版號取自修訂紀錄最後一條; spec 版號取自 STATE.md 的 round.spec-draft。本步驟只在該檔即將被下一個狀態覆寫時執行(spec-review 退回、playtest 玩法回饋)。concept → spec-draft 與 spec-draft → spec-review 不搬任何檔
 2. 更新 `STATE.md`: state、該加的 round、log 一行(退回必寫理由)
 3. 先做一次開場檢查第 3 步的比對, 再讀新狀態的參考檔
 4. 照守則 R4 commit + push, 然後開始新狀態的工作
