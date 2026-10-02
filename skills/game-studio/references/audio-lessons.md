@@ -18,11 +18,12 @@
 
 ## 素材來源
 
-(尚無)
+- `品味` **程式合成的背景音樂被嫌「太快、一直重複很膩」** → 為了拍速與循環點精準而自己合成, 結果只有 8 小節(12.8 秒)一個循環, 一關聽好幾十輪, 加上 150 BPM 偏快 → 背景音樂優先找現成整首曲子截段, 一關的循環至少幾十小節; 合成只當最後手段。(BubbleCatcher round-7, 老闆原話「現在 BPM 太快、節奏一直重複聽得很膩, 希望換比較好聽的音樂」; 換成三首現成曲, 效果待試玩)
+- `辨識` **需要精準 BPM 與整數小節循環的背景音樂找不到可驗證的** → CC0 音樂站多半沒標 BPM 或只有短循環(OpenGameArt), FreePD 已在 2025 年關站, Pixabay 對下載工具回 403 → incompetech(Kevin MacLeod, CC BY 4.0, 免登入)有一份 `https://incompetech.com/music/royalty-free/pieces.json` 列出每首曲名、BPM、長度、風格, 先用它篩拍速與長度, 再下載候選實測; 他用編曲軟體做的電子 / 流行曲量起來 BPM 跟標示一致到 ±0.01, 漂移幾乎為 0(真人演奏的曲子殘差會到 10 毫秒以上, 要排除)。代價是要署名。(BubbleCatcher round-7 後的 build)
 
 ## 授權與下載
 
-(尚無)
+- `辨識` **CC BY 音樂的署名文字** → incompetech 的授權頁會生成固定格式(曲名、Kevin MacLeod (incompetech.com)、Licensed under Creative Commons: By Attribution 4.0、授權網址), 照抄進 credits.md, 並在回報裡提醒製作人遊戲畫面上要放署名。(BubbleCatcher round-7 後的 build)
 
 ## 混音與音量
 
@@ -35,3 +36,4 @@
 ## 技術
 
 - `辨識` **即時回饋音聽起來延遲** → 素材開頭有長段低音量前奏(例: 翻書聲在「啪」之前有細碎紙聲), 剪靜音時用峰值 0.3% 當門檻會把前奏當成聲音保留, 實際峰值落在 0.5 秒後; 其次才是 mp3 開頭填充與 HTMLAudioElement 剛建好尚未載入(第一鍵既是 init 又是觸發鍵時最明顯) → 挑素材時量「出到峰值一成的時間」, 按鍵直接回饋的音要在 0.03 秒內, 超過就換素材而不是硬剪; 這類音另以 16-bit PCM base64 內嵌、init 時直接填進 AudioBuffer(不經 decodeAudioData, 同步可用), 以 Web Audio 播放, 沒有 Web Audio 再退回播放池。刻意漸強的音(掃掠、上揚)不受此限, 但要有立即出聲的層墊著。(SlimeTetris round-11, 老闆原話「說明頁左右翻頁時的音效延遲太久」; 量得原素材 0.52 秒才到峰值一成, 換素材 + 內嵌兩項一起做, 哪一項貢獻多少待試玩)
+- `辨識` **背景音樂要跟拍子時鐘對齊、還要整數小節無縫循環, 但 file:// 不能 fetch、HTMLAudio 循環有縫** → mp3 以 base64 內嵌進 sound.js(三首約 6 MB), 頁面載入時用 OfflineAudioContext 先 decodeAudioData(不需使用者操作、不會被自動播放擋), 用 AudioBufferSource 的 loopStart / loopEnd 循環; 檔頭放 0.05 秒數位靜音, 解碼後找第一個 |樣本| > 0.02 的位置跟編碼前比, 自動校正各瀏覽器解碼器的開頭填充差異; 循環終點後多放 0.5 秒循環起點的聲音, 解碼位置有幾毫秒誤差也不會跳。Python soundfile(libsndfile 1.2)寫出的 mp3 是無縫的(本機解碼前後偏移 0 樣本), 不需要 ffmpeg。(BubbleCatcher round-7 後的 build, 瀏覽器實測待試玩)
