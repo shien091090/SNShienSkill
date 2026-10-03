@@ -1,0 +1,1 @@
+{ "name": "dashboard", "version": "0.1.0", "description": "輸入框上方的綜合儀表板: 目前顯示 usage 血條(ctx、5 小時、7 天)", "types": "./types/index.d.ts" }
