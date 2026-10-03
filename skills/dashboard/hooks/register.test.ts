@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { strWidth, fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, resetText, SEP, shimmer, spinnerAt, toGauges } from './register'
+import { strWidth, fmtTokens, hp, hpColor, infoText, layout, prettyModel, resetText, segments, SEP, shimmer, spinnerAt, toGauges } from './register'
 
 const sample = toGauges(
   [
@@ -15,9 +15,9 @@ const INFO = infoText({ input: 1_234_567, output: 45_600 }, 3.21)
 function rowWidths(cols: number): [number, number] {
   const { bar, showReset, pad } = layout(sample, cols, INFO)
   const limits = sample.filter(g => g.label !== 'ctx')
-  const row2 = 4 + bar + 5 + pad + SEP.length + strWidth(INFO)
+  const row2 = 4 + bar + pad + SEP.length + strWidth(INFO)
   const row3 =
-    limits.reduce((sum, g) => sum + 4 + bar + 5 + (showReset ? resetText(g).length : 0), 0) +
+    limits.reduce((sum, g) => sum + 4 + bar + (showReset ? resetText(g).length : 0), 0) +
     SEP.length * (limits.length - 1)
   return [row2, row3]
 }
@@ -59,10 +59,17 @@ test('寬視窗血條不會無限拉長', () => {
   expect(layout(sample, 300, INFO).bar).toBe(20)
 })
 
-test('%數固定 5 格寬', () => {
-  expect(pctText(5)).toBe('   5%')
-  expect(pctText(79.4)).toBe('  79%')
-  expect(pctText(100)).toBe(' 100%')
+test('%數置中嵌在細條內, 依填滿範圍分段', () => {
+  const segs = segments(50, 12)
+  expect(segs.map(x => x.text).join('')).toBe('▄▄▄ 50% ▄▄▄▄')
+  expect(segs.map(x => [x.isFilled, x.isLabel])).toEqual([
+    [true, false],
+    [true, true],
+    [false, true],
+    [false, false],
+  ])
+  expect(segments(100, 8).map(x => x.text).join('')).toBe('▄ 100% ▄')
+  expect(segments(0, 8).every(x => !x.isFilled)).toBe(true)
 })
 
 test('模型識別字轉成好讀的名字', () => {
@@ -102,8 +109,8 @@ test('第二行分隔線與第三行第一個分隔線對齊', () => {
   for (const cols of [80, 95]) {
     const { bar, showReset, pad } = layout(sample, cols, INFO)
     const limits = sample.filter(g => g.label !== 'ctx')
-    const row2Sep = 4 + bar + 5 + pad
-    const row3Sep = 4 + bar + 5 + (showReset ? resetText(limits[0]!).length : 0)
+    const row2Sep = 4 + bar + pad
+    const row3Sep = 4 + bar + (showReset ? resetText(limits[0]!).length : 0)
     expect(row2Sep).toBe(row3Sep)
   }
 })

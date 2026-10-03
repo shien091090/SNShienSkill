@@ -17,7 +17,7 @@ const ORDER = ['ctx', '5h', '7d']
 
 // 區塊之間的分隔線
 export const SEP = ' │ '
-const MIN_BAR = 4
+const MIN_BAR = 8
 const MAX_BAR = 20
 const EMPTY_BG = '#3a3a3a'
 
@@ -123,9 +123,26 @@ export function resetText(g: Gauge): string {
 // 半格高細條: 下半格方塊, 上下兩行血條之間自然留出半格空隙
 const THIN = '▄'
 
-// 血條後的%數, 固定 5 格寬( 100%)
-export function pctText(left: number): string {
-  return ' ' + String(Math.round(left)).padStart(3) + '%'
+const EMPTY_TEXT = '#8a8a8a'
+
+// 細條拆成連續片段: %數置中嵌在條內(前後各留一格空白), 其餘是細條方塊
+// isFilled 決定顏色: 在已填滿範圍內用血量色, 否則用灰色
+export type Segment = { text: string; isFilled: boolean; isLabel: boolean }
+
+export function segments(left: number, bar: number): Segment[] {
+  const filled = Math.round((left / 100) * bar)
+  const label = ` ${Math.round(left)}% `
+  const start = Math.floor((bar - label.length) / 2)
+  const out: Segment[] = []
+  for (let i = 0; i < bar; i++) {
+    const isLabel = i >= start && i < start + label.length
+    const ch = isLabel ? label[i - start]! : THIN
+    const isFilled = i < filled
+    const last = out[out.length - 1]
+    if (last && last.isFilled === isFilled && last.isLabel === isLabel) last.text += ch
+    else out.push({ text: ch, isFilled, isLabel })
+  }
+  return out
 }
 
 // 依可用寬度決定血條長度: 第二行 ctx + 資訊, 第三行 5h/7d; 所有血條等長, 太窄時先拿掉重置時間
@@ -139,11 +156,11 @@ export function layout(
   // ctx 後補空白, 讓第二行的分隔線對齊第三行第一個分隔線
   const padFor = (showReset: boolean) => (showReset && limits[0] ? resetText(limits[0]).length : 0)
   const row2 = (showReset: boolean) =>
-    hasCtx ? cols - 4 - 5 - padFor(showReset) - (info ? SEP.length + strWidth(info) : 0) : MAX_BAR
+    hasCtx ? cols - 4 - padFor(showReset) - (info ? SEP.length + strWidth(info) : 0) : MAX_BAR
   const row3 = (showReset: boolean) => {
     if (limits.length === 0) return MAX_BAR
     const fixed =
-      limits.reduce((sum, g) => sum + 4 + 5 + (showReset ? resetText(g).length : 0), 0) +
+      limits.reduce((sum, g) => sum + 4 + (showReset ? resetText(g).length : 0), 0) +
       SEP.length * (limits.length - 1)
     return Math.floor((cols - fixed) / limits.length)
   }
@@ -221,14 +238,19 @@ export const register: Register = on => {
     const gauge = (g: Gauge, withSep: boolean) => {
       const left = hp(g.used)
       const color = hpColor(left)
-      const filled = Math.round((left / 100) * bar)
       return (
         <Box key={g.label} flexDirection="row">
           {withSep ? <Text dimColor>{SEP}</Text> : null}
           <Text bold>{g.label.padEnd(3)} </Text>
-          <Text color={color}>{THIN.repeat(filled)}</Text>
-          <Text color={EMPTY_BG}>{THIN.repeat(bar - filled)}</Text>
-          <Text color={color}>{pctText(left)}</Text>
+          {segments(left, bar).map((seg, j) => (
+            <Text
+              key={`s${j}`}
+              color={seg.isFilled ? color : seg.isLabel ? EMPTY_TEXT : EMPTY_BG}
+              bold={seg.isLabel}
+            >
+              {seg.text}
+            </Text>
+          ))}
           {showReset ? <Text dimColor>{resetText(g)}</Text> : null}
         </Box>
       )
