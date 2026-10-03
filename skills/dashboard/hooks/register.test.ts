@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { hp, hpColor, layout, resetText, segments, SEP, toGauges } from './register'
+import { hp, hpColor, layout, modelWidth, prettyModel, resetText, segments, SEP, shimmer, spinnerAt, toGauges } from './register'
 
 const sample = toGauges(
   [
@@ -65,4 +65,31 @@ test('%數置中疊在血條上, 填滿與未填滿分段', () => {
   ])
   expect(segments(100, 6).map(s => s.text).join('')).toBe(' 100% ')
   expect(segments(0, 6).every(s => !s.isFilled)).toBe(true)
+})
+
+test('模型識別字轉成好讀的名字', () => {
+  expect(prettyModel('claude-opus-5-5')).toBe('Opus 5.5')
+  expect(prettyModel('claude-opus-5-5[1m]')).toBe('Opus 5.5')
+  expect(prettyModel('claude-haiku-4-5-20251001')).toBe('Haiku 4.5')
+  expect(prettyModel('Opus 5.5')).toBe('Opus 5.5')
+})
+
+test('亮光每個字一個顏色, 且會隨時間移動', () => {
+  const a = shimmer('Opus 5.5', 0)
+  const b = shimmer('Opus 5.5', 400)
+  expect(a.length).toBe(8)
+  expect(a.every(c => /^#[0-9a-f]{6}$/.test(c))).toBe(true)
+  expect(a).not.toEqual(b)
+  expect(spinnerAt(0)).not.toBe(spinnerAt(100))
+})
+
+test('加上模型名字後半寬視窗仍放得下一列', () => {
+  const extra = modelWidth('Opus 5.5')
+  const { bar, showReset } = layout(sample, 80, extra)
+  const width =
+    extra +
+    sample.reduce((sum, g) => sum + 4 + bar + (showReset ? resetText(g).length : 0), 0) +
+    SEP.length * (sample.length - 1)
+  expect(width).toBeLessThanOrEqual(80)
+  expect(showReset).toBe(true)
 })
