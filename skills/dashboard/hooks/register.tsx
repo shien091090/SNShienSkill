@@ -257,6 +257,8 @@ export const register: Register = on => {
           {ctx ? <Text dimColor>{SEP}</Text> : null}
           <Text>{info}</Text>
         </Box>
+        {/* 兩行血條之間空一行, 避免上下色塊黏在一起 */}
+        {ctx && limits.length > 0 ? <Text key="gap"> </Text> : null}
         {limits.length > 0 ? (
           <Box key="limit-row" flexDirection="row">
             {limits.map((g, i) => gauge(g, i > 0))}
