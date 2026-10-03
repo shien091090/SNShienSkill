@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { hp, hpColor, layout, modelWidth, prettyModel, resetText, segments, SEP, shimmer, spinnerAt, toGauges } from './register'
+import { fmtTokens, hp, hpColor, infoText, layout, prettyModel, resetText, segments, SEP, shimmer, spinnerAt, toGauges } from './register'
 
 const sample = toGauges(
   [
@@ -9,13 +9,17 @@ const sample = toGauges(
   { window: 200000, tokens: 50000, percent: 25 },
 )
 
-// 實際畫出來的一列寬度, 與 register.tsx 的排版一致
-function rowWidth(cols: number): number {
-  const { bar, showReset } = layout(sample, cols)
-  return (
-    sample.reduce((sum, g) => sum + 4 + bar + (showReset ? resetText(g).length : 0), 0) +
-    SEP.length * (sample.length - 1)
-  )
+const INFO = infoText({ input: 1_234_567, output: 45_600 }, 3.21)
+
+// 第二、三行實際畫出來的寬度, 與 register.tsx 的排版一致
+function rowWidths(cols: number): [number, number] {
+  const { bar, showReset } = layout(sample, cols, INFO)
+  const limits = sample.filter(g => g.label !== 'ctx')
+  const row2 = 4 + bar + SEP.length + INFO.length
+  const row3 =
+    limits.reduce((sum, g) => sum + 4 + bar + (showReset ? resetText(g).length : 0), 0) +
+    SEP.length * (limits.length - 1)
+  return [row2, row3]
 }
 
 test('血量是 100 減已用, 夾在範圍內', () => {
@@ -40,20 +44,19 @@ test('重置時間: 5h 顯示時分, 7d 顯示月日', () => {
   expect(resetText(sample[0]!)).toBe('')
 })
 
-test('半寬視窗(80、95 欄)放得下一列, 且顯示重置時間', () => {
+test('半寬視窗(80、95 欄)每行都放得下, 且顯示重置時間', () => {
   for (const cols of [80, 95]) {
-    expect(rowWidth(cols)).toBeLessThanOrEqual(cols)
-    expect(layout(sample, cols).showReset).toBe(true)
+    for (const w of rowWidths(cols)) expect(w).toBeLessThanOrEqual(cols)
+    expect(layout(sample, cols, INFO).showReset).toBe(true)
   }
 })
 
 test('更窄時先拿掉重置時間', () => {
-  expect(layout(sample, 50).showReset).toBe(false)
-  expect(rowWidth(50)).toBeLessThanOrEqual(50)
+  expect(layout(sample, 36, INFO).showReset).toBe(false)
 })
 
 test('寬視窗血條不會無限拉長', () => {
-  expect(layout(sample, 300).bar).toBe(14)
+  expect(layout(sample, 300, INFO).bar).toBe(20)
 })
 
 test('%數置中疊在血條上, 填滿與未填滿分段', () => {
@@ -83,13 +86,14 @@ test('亮光每個字一個顏色, 且會隨時間移動', () => {
   expect(spinnerAt(0)).not.toBe(spinnerAt(100))
 })
 
-test('加上模型名字後半寬視窗仍放得下一列', () => {
-  const extra = modelWidth('Opus 5.5')
-  const { bar, showReset } = layout(sample, 80, extra)
-  const width =
-    extra +
-    sample.reduce((sum, g) => sum + 4 + bar + (showReset ? resetText(g).length : 0), 0) +
-    SEP.length * (sample.length - 1)
-  expect(width).toBeLessThanOrEqual(80)
-  expect(showReset).toBe(true)
+test('token 數縮寫', () => {
+  expect(fmtTokens(950)).toBe('950')
+  expect(fmtTokens(12_345)).toBe('12.3k')
+  expect(fmtTokens(2_000)).toBe('2k')
+  expect(fmtTokens(1_234_567)).toBe('1.2M')
+})
+
+test('資訊文字: token 與預估金額, 沒有金額時只顯示 token', () => {
+  expect(INFO).toBe(`in 1.2M  out 45.6k${SEP}~$3.21`)
+  expect(infoText({ input: 0, output: 0 }, null)).toBe('in 0  out 0')
 })

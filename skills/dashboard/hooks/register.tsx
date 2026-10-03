@@ -1,10 +1,12 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionContextUsage, SessionRateLimit } from 'claude-code'
 
-import type { Gauge } from '../types'
+import type { Gauge, Tokens } from '../types'
 
 const gauges = atom({ plugin: 'dashboard', key: 'gauges' } as const, [] as Gauge[])
 const model = atom({ plugin: 'dashboard', key: 'model' } as const, '')
+const tokens = atom({ plugin: 'dashboard', key: 'tokens' } as const, { input: 0, output: 0 } as Tokens)
+const cost = atom({ plugin: 'dashboard', key: 'cost' } as const, null as number | null)
 
 const LABELS: Record<string, string> = {
   five_hour: '5h',
@@ -16,7 +18,7 @@ const ORDER = ['ctx', '5h', '7d']
 // 區塊之間的分隔線
 export const SEP = ' │ '
 const MIN_BAR = 6
-const MAX_BAR = 14
+const MAX_BAR = 20
 const EMPTY_BG = '#3a3a3a'
 
 // 模型名稱: 平常是底色, 工作中有一道亮光從左掃到右, 前面加轉圈符號
@@ -51,9 +53,19 @@ export function spinnerAt(now: number): string {
   return SPINNER[Math.floor(now / FRAME_MS) % SPINNER.length]!
 }
 
-// 模型區塊佔的寬度: 符號 + 空格 + 名字 + 分隔線
-export function modelWidth(name: string): number {
-  return name ? 2 + name.length + SEP.length : 0
+// token 數縮寫: 950 / 12.3k / 1.2M
+export function fmtTokens(n: number): string {
+  const short = (v: number, unit: string) => `${v.toFixed(1).replace(/\.0$/, '')}${unit}`
+  if (n >= 1_000_000) return short(n / 1_000_000, 'M')
+  if (n >= 1_000) return short(n / 1_000, 'k')
+  return String(n)
+}
+
+// 第二行血條右邊的資訊: 本 session 的 token 與預估金額
+export function infoText(t: Tokens, usd: number | null): string {
+  const parts = [`in ${fmtTokens(t.input)}  out ${fmtTokens(t.output)}`]
+  if (usd !== null) parts.push(`~$${usd.toFixed(2)}`)
+  return parts.join(SEP)
 }
 
 export function toGauges(rateLimits: SessionRateLimit[], context: SessionContextUsage): Gauge[] {
@@ -110,20 +122,28 @@ export function segments(left: number, bar: number): Segment[] {
   return out
 }
 
-// 依可用寬度決定血條長度(三條等長), 太窄時先拿掉重置時間
-export function layout(list: Gauge[], cols: number, extra = 0): { bar: number; showReset: boolean } {
-  const fixed = (showReset: boolean) =>
-    extra +
-    list.reduce((sum, g) => sum + 4 + (showReset ? resetText(g).length : 0), 0) +
-    SEP.length * Math.max(0, list.length - 1)
-  const barFor = (showReset: boolean) =>
-    Math.floor((cols - fixed(showReset)) / Math.max(1, list.length))
-
-  const withReset = barFor(true)
-  if (withReset >= MIN_BAR + 2) {
-    return { bar: Math.min(MAX_BAR, withReset), showReset: true }
+// 依可用寬度決定血條長度: 第二行 ctx + 資訊, 第三行 5h/7d; 所有血條等長, 太窄時先拿掉重置時間
+export function layout(
+  list: Gauge[],
+  cols: number,
+  info: string,
+): { bar: number; showReset: boolean } {
+  const limits = list.filter(g => g.label !== 'ctx')
+  const hasCtx = list.some(g => g.label === 'ctx')
+  const row2 = hasCtx ? cols - 4 - (info ? SEP.length + info.length : 0) : MAX_BAR
+  const row3 = (showReset: boolean) => {
+    if (limits.length === 0) return MAX_BAR
+    const fixed =
+      limits.reduce((sum, g) => sum + 4 + (showReset ? resetText(g).length : 0), 0) +
+      SEP.length * (limits.length - 1)
+    return Math.floor((cols - fixed) / limits.length)
   }
-  return { bar: Math.max(MIN_BAR, Math.min(MAX_BAR, barFor(false))), showReset: false }
+  const clampBar = (v: number) => Math.max(MIN_BAR, Math.min(MAX_BAR, v))
+
+  if (row3(true) >= MIN_BAR + 2) {
+    return { bar: clampBar(Math.min(row2, row3(true))), showReset: true }
+  }
+  return { bar: clampBar(Math.min(row2, row3(false))), showReset: false }
 }
 
 async function refreshModel($: EngineInterface) {
@@ -139,6 +159,7 @@ export const register: Register = on => {
     const result = await next(e)
     const u = await $.session.usage()
     await update($, gauges, () => toGauges(u.rateLimits, u.context))
+    await update($, cost, () => u.cost?.usd ?? null)
     await refreshModel($)
 
     $.clock.every(FRAME_MS, () => {
@@ -154,8 +175,21 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // 主對話與子代理的每一輪都算進本 session 的 token
+  on('turn.complete', async ($, e, next) => {
+    const u = e.usage
+    if (u) {
+      await update($, tokens, t => ({
+        input: t.input + u.input_tokens + u.cache_read_input_tokens + u.cache_creation_input_tokens,
+        output: t.output + u.output_tokens,
+      }))
+    }
+    return next(e)
+  })
+
   on('session.measure', async ($, e, next) => {
     await update($, gauges, () => toGauges(e.rateLimits, e.context))
+    await update($, cost, () => e.cost?.usd ?? null)
     await refreshModel($)
     return next(e)
   })
@@ -163,17 +197,43 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const list = await read($, gauges)
     const name = await read($, model)
+    const info = infoText(await read($, tokens), await read($, cost))
     isWorking = e.props.isWorking
     if (e.props.hasSurvey || (list.length === 0 && !name)) {
       return next(e)
     }
 
     const { Box, Text } = $.ui.resolve(e)
-    const { bar, showReset } = layout(list, e.props.bodyColumns, modelWidth(name))
+    const { bar, showReset } = layout(list, e.props.bodyColumns, info)
     const now = Date.now()
+    const ctx = list.find(g => g.label === 'ctx')
+    const limits = list.filter(g => g.label !== 'ctx')
+
+    const gauge = (g: Gauge, withSep: boolean) => {
+      const left = hp(g.used)
+      const color = hpColor(left)
+      return (
+        <Box key={g.label} flexDirection="row">
+          {withSep ? <Text dimColor>{SEP}</Text> : null}
+          <Text bold>{g.label.padEnd(3)} </Text>
+          {segments(left, bar).map((seg, j) =>
+            seg.isFilled ? (
+              <Text key={`s${j}`} backgroundColor={color} color="black" bold>
+                {seg.text}
+              </Text>
+            ) : (
+              <Text key={`s${j}`} backgroundColor={EMPTY_BG} color="white">
+                {seg.text}
+              </Text>
+            ),
+          )}
+          {showReset ? <Text dimColor>{resetText(g)}</Text> : null}
+        </Box>
+      )
+    }
 
     return (
-      <Box flexDirection="row">
+      <Box flexDirection="column">
         {name ? (
           <Box key="model" flexDirection="row">
             {isWorking ? (
@@ -190,31 +250,18 @@ export const register: Register = on => {
             ) : (
               <Text color={MODEL_BASE} bold>{name}</Text>
             )}
-            {list.length > 0 ? <Text dimColor>{SEP}</Text> : null}
           </Box>
         ) : null}
-        {list.map((g, i) => {
-          const left = hp(g.used)
-          const color = hpColor(left)
-          return (
-            <Box key={g.label} flexDirection="row">
-              {i > 0 ? <Text dimColor>{SEP}</Text> : null}
-              <Text bold>{g.label.padEnd(3)} </Text>
-              {segments(left, bar).map((seg, j) =>
-                seg.isFilled ? (
-                  <Text key={`s${j}`} backgroundColor={color} color="black" bold>
-                    {seg.text}
-                  </Text>
-                ) : (
-                  <Text key={`s${j}`} backgroundColor={EMPTY_BG} color="white">
-                    {seg.text}
-                  </Text>
-                ),
-              )}
-              {showReset ? <Text dimColor>{resetText(g)}</Text> : null}
-            </Box>
-          )
-        })}
+        <Box key="ctx-row" flexDirection="row">
+          {ctx ? gauge(ctx, false) : null}
+          {ctx ? <Text dimColor>{SEP}</Text> : null}
+          <Text>{info}</Text>
+        </Box>
+        {limits.length > 0 ? (
+          <Box key="limit-row" flexDirection="row">
+            {limits.map((g, i) => gauge(g, i > 0))}
+          </Box>
+        ) : null}
       </Box>
     )
   })
