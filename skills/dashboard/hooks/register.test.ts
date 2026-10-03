@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { fmtTokens, hp, hpColor, infoText, layout, prettyModel, resetText, segments, SEP, shimmer, spinnerAt, toGauges } from './register'
+import { fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, resetText, SEP, shimmer, spinnerAt, toGauges } from './register'
 
 const sample = toGauges(
   [
@@ -15,9 +15,9 @@ const INFO = infoText({ input: 1_234_567, output: 45_600 }, 3.21)
 function rowWidths(cols: number): [number, number] {
   const { bar, showReset } = layout(sample, cols, INFO)
   const limits = sample.filter(g => g.label !== 'ctx')
-  const row2 = 4 + bar + SEP.length + INFO.length
+  const row2 = 4 + bar + 5 + SEP.length + INFO.length
   const row3 =
-    limits.reduce((sum, g) => sum + 4 + bar + (showReset ? resetText(g).length : 0), 0) +
+    limits.reduce((sum, g) => sum + 4 + bar + 5 + (showReset ? resetText(g).length : 0), 0) +
     SEP.length * (limits.length - 1)
   return [row2, row3]
 }
@@ -52,22 +52,17 @@ test('半寬視窗(80、95 欄)每行都放得下, 且顯示重置時間', () =>
 })
 
 test('更窄時先拿掉重置時間', () => {
-  expect(layout(sample, 36, INFO).showReset).toBe(false)
+  expect(layout(sample, 40, INFO).showReset).toBe(false)
 })
 
 test('寬視窗血條不會無限拉長', () => {
   expect(layout(sample, 300, INFO).bar).toBe(20)
 })
 
-test('%數置中疊在血條上, 填滿與未填滿分段', () => {
-  const segs = segments(50, 10)
-  expect(segs.map(s => s.text).join('')).toBe('   50%    ')
-  expect(segs).toEqual([
-    { text: '   50', isFilled: true },
-    { text: '%    ', isFilled: false },
-  ])
-  expect(segments(100, 6).map(s => s.text).join('')).toBe(' 100% ')
-  expect(segments(0, 6).every(s => !s.isFilled)).toBe(true)
+test('%數固定 5 格寬', () => {
+  expect(pctText(5)).toBe('   5%')
+  expect(pctText(79.4)).toBe('  79%')
+  expect(pctText(100)).toBe(' 100%')
 })
 
 test('模型識別字轉成好讀的名字', () => {
