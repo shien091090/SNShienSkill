@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, resetText, SEP, shimmer, spinnerAt, toGauges } from './register'
+import { strWidth, fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, resetText, SEP, shimmer, spinnerAt, toGauges } from './register'
 
 const sample = toGauges(
   [
@@ -13,9 +13,9 @@ const INFO = infoText({ input: 1_234_567, output: 45_600 }, 3.21)
 
 // 第二、三行實際畫出來的寬度, 與 register.tsx 的排版一致
 function rowWidths(cols: number): [number, number] {
-  const { bar, showReset } = layout(sample, cols, INFO)
+  const { bar, showReset, pad } = layout(sample, cols, INFO)
   const limits = sample.filter(g => g.label !== 'ctx')
-  const row2 = 4 + bar + 5 + SEP.length + INFO.length
+  const row2 = 4 + bar + 5 + pad + SEP.length + strWidth(INFO)
   const row3 =
     limits.reduce((sum, g) => sum + 4 + bar + 5 + (showReset ? resetText(g).length : 0), 0) +
     SEP.length * (limits.length - 1)
@@ -89,6 +89,21 @@ test('token 數縮寫', () => {
 })
 
 test('資訊文字: token 與預估金額, 沒有金額時只顯示 token', () => {
-  expect(INFO).toBe(`in 1.2M  out 45.6k${SEP}~$3.21`)
-  expect(infoText({ input: 0, output: 0 }, null)).toBe('in 0  out 0')
+  expect(INFO).toBe(`Token消耗 in 1.2M  out 45.6k${SEP}~$3.21`)
+  expect(infoText({ input: 0, output: 0 }, null)).toBe('Token消耗 in 0  out 0')
+})
+
+test('中文字佔 2 格寬', () => {
+  expect(strWidth('Token消耗')).toBe(9)
+  expect(strWidth('abc')).toBe(3)
+})
+
+test('第二行分隔線與第三行第一個分隔線對齊', () => {
+  for (const cols of [80, 95]) {
+    const { bar, showReset, pad } = layout(sample, cols, INFO)
+    const limits = sample.filter(g => g.label !== 'ctx')
+    const row2Sep = 4 + bar + 5 + pad
+    const row3Sep = 4 + bar + 5 + (showReset ? resetText(limits[0]!).length : 0)
+    expect(row2Sep).toBe(row3Sep)
+  }
 })

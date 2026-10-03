@@ -61,9 +61,27 @@ export function fmtTokens(n: number): string {
   return String(n)
 }
 
+// 終端機顯示寬度: 中日韓全形字佔 2 格
+export function strWidth(text: string): number {
+  let w = 0
+  for (const ch of text) {
+    const c = ch.codePointAt(0)!
+    const isWide =
+      (c >= 0x1100 && c <= 0x115f) ||
+      (c >= 0x2e80 && c <= 0xa4cf) ||
+      (c >= 0xac00 && c <= 0xd7a3) ||
+      (c >= 0xf900 && c <= 0xfaff) ||
+      (c >= 0xfe30 && c <= 0xfe4f) ||
+      (c >= 0xff00 && c <= 0xff60) ||
+      (c >= 0xffe0 && c <= 0xffe6)
+    w += isWide ? 2 : 1
+  }
+  return w
+}
+
 // 第二行血條右邊的資訊: 本 session 的 token 與預估金額
 export function infoText(t: Tokens, usd: number | null): string {
-  const parts = [`in ${fmtTokens(t.input)}  out ${fmtTokens(t.output)}`]
+  const parts = [`Token消耗 in ${fmtTokens(t.input)}  out ${fmtTokens(t.output)}`]
   if (usd !== null) parts.push(`~$${usd.toFixed(2)}`)
   return parts.join(SEP)
 }
@@ -115,10 +133,13 @@ export function layout(
   list: Gauge[],
   cols: number,
   info: string,
-): { bar: number; showReset: boolean } {
+): { bar: number; showReset: boolean; pad: number } {
   const limits = list.filter(g => g.label !== 'ctx')
   const hasCtx = list.some(g => g.label === 'ctx')
-  const row2 = hasCtx ? cols - 4 - 5 - (info ? SEP.length + info.length : 0) : MAX_BAR
+  // ctx 後補空白, 讓第二行的分隔線對齊第三行第一個分隔線
+  const padFor = (showReset: boolean) => (showReset && limits[0] ? resetText(limits[0]).length : 0)
+  const row2 = (showReset: boolean) =>
+    hasCtx ? cols - 4 - 5 - padFor(showReset) - (info ? SEP.length + strWidth(info) : 0) : MAX_BAR
   const row3 = (showReset: boolean) => {
     if (limits.length === 0) return MAX_BAR
     const fixed =
@@ -128,10 +149,10 @@ export function layout(
   }
   const clampBar = (v: number) => Math.max(MIN_BAR, Math.min(MAX_BAR, v))
 
-  if (row3(true) >= MIN_BAR + 2) {
-    return { bar: clampBar(Math.min(row2, row3(true))), showReset: true }
+  if (Math.min(row2(true), row3(true)) >= MIN_BAR + 2) {
+    return { bar: clampBar(Math.min(row2(true), row3(true))), showReset: true, pad: padFor(true) }
   }
-  return { bar: clampBar(Math.min(row2, row3(false))), showReset: false }
+  return { bar: clampBar(Math.min(row2(false), row3(false))), showReset: false, pad: 0 }
 }
 
 async function refreshModel($: EngineInterface) {
@@ -192,7 +213,7 @@ export const register: Register = on => {
     }
 
     const { Box, Text } = $.ui.resolve(e)
-    const { bar, showReset } = layout(list, e.props.bodyColumns, info)
+    const { bar, showReset, pad } = layout(list, e.props.bodyColumns, info)
     const now = Date.now()
     const ctx = list.find(g => g.label === 'ctx')
     const limits = list.filter(g => g.label !== 'ctx')
@@ -235,6 +256,7 @@ export const register: Register = on => {
         ) : null}
         <Box key="ctx-row" flexDirection="row">
           {ctx ? gauge(ctx, false) : null}
+          {ctx && pad > 0 ? <Text>{' '.repeat(pad)}</Text> : null}
           {ctx ? <Text dimColor>{SEP}</Text> : null}
           <Text>{info}</Text>
         </Box>
