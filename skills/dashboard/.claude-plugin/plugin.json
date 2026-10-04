@@ -1,1 +1,1 @@
-{ "name": "dashboard", "version": "0.1.0", "description": "輸入框上方的綜合儀表板: 目前顯示 usage 血條(ctx、5 小時、7 天)", "types": "./types/index.d.ts" }
+{ "name": "dashboard", "version": "0.1.0", "description": "輸入框上方的綜合儀表板: 模型、session 名稱、usage 血條與 token 用量; 回應完成時跳出 Windows 通知", "types": "./types/index.d.ts" }

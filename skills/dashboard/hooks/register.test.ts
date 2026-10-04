@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
-import { strWidth, fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, resetText, SEP, shimmer, spinnerAt, toGauges } from './register'
+import { folderName, taskSummary, toastText } from './notify'
+import { autoTitlePrompt, cleanTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, resetText, SEP, shimmer, spinnerAt, toGauges } from './register'
 
 const sample = toGauges(
   [
@@ -106,4 +107,58 @@ test('第二行分隔線與第三行第一個分隔線對齊', () => {
     const row3Sep = 4 + bar + 5 + (showReset ? resetText(limits[0]!).length : 0)
     expect(row2Sep).toBe(row3Sep)
   }
+})
+
+const PROPS = {
+  hasSurvey: false,
+  isWorking: false,
+  maxRows: 10,
+  bodyColumns: 80,
+  scroll: { offset: 0, bodyRows: 10 },
+  view: {},
+}
+
+test('改名按鈕: 按下出現輸入框, 送出後名稱顯示在模型旁邊', async ($, on) => {
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.model', () => ({ value: 'claude-opus-5-5' }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: [] } }))
+  await $.session.start({ cwd: 'C:\proj', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ plugin: 'dashboard', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
+  expect((await ui.find({ key: 'title-input' }))).toBeUndefined()
+  await ui.press({ key: 'title-rename' })
+  expect(await ui.find({ key: 'title-input' })).toBeDefined()
+  await ui.input({ key: 'title-input', text: '資格賽修正' })
+  expect(await ui.find({ key: 'title-input' })).toBeUndefined()
+  expect(await ui.find({ text: '資格賽修正' })).toBeDefined()
+})
+
+test('自動命名: 模型回覆整理成一行乾淨的標題', () => {
+  expect(cleanTitle('「儀表板改名按鈕」\n多餘說明')).toBe('儀表板改名按鈕')
+  expect(cleanTitle('\n  修正資格賽API。 ')).toBe('修正資格賽API')
+  expect(cleanTitle('一'.repeat(40)).length).toBe(24)
+  expect(cleanTitle('')).toBe('')
+})
+
+test('自動命名的提示包含第一則訊息與回覆開頭', () => {
+  const p = autoTitlePrompt('幫我修 bug', '好的, 先看一下')
+  expect(p).toContain('幫我修 bug')
+  expect(p).toContain('好的, 先看一下')
+})
+
+test('通知內文: 回覆段落接成一段, 去掉 markdown 符號, 太長截斷', () => {
+  expect(taskSummary('## 完成\n\n- 改好**按鈕**\n- 加上測試')).toBe('完成 改好按鈕 加上測試')
+  expect(taskSummary('字'.repeat(200)).length).toBe(90)
+})
+
+test('通知標題是 session 名稱, 沒有名稱時用資料夾名', () => {
+  expect(toastText('資格賽修正', 'D:\\Git\\MYS-808', 'answer', '好了').title).toBe('資格賽修正')
+  expect(toastText('', 'D:\\Git\\MYS-808', 'answer', '好了').title).toBe('未命名 · MYS-808')
+  expect(folderName('/home/u/proj/')).toBe('proj')
+})
+
+test('通知內文依結束原因加上狀態', () => {
+  expect(toastText('a', 'c', 'answer', '改好了').body).toBe('改好了')
+  expect(toastText('a', 'c', 'aborted', '').body).toBe('已中斷')
+  expect(toastText('a', 'c', 'error', '連線失敗').body).toBe('出錯了: 連線失敗')
+  expect(toastText('a', 'c', 'answer', '').body).toBe('回應完成')
 })

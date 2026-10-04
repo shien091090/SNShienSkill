@@ -2,11 +2,35 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionContextUsage, SessionRateLimit } from 'claude-code'
 
 import type { Gauge, Tokens } from '../types'
+import { TAG_CHARS, TOAST_SCRIPT, toastText } from './notify'
 
 const gauges = atom({ plugin: 'dashboard', key: 'gauges' } as const, [] as Gauge[])
 const model = atom({ plugin: 'dashboard', key: 'model' } as const, '')
 const tokens = atom({ plugin: 'dashboard', key: 'tokens' } as const, { input: 0, output: 0 } as Tokens)
 const cost = atom({ plugin: 'dashboard', key: 'cost' } as const, null as number | null)
+// session 名稱: 改名後先顯示在儀表板, 下次送出訊息時才真正寫進 session
+const title = atom({ plugin: 'dashboard', key: 'title' } as const, '')
+const pendingTitle = atom({ plugin: 'dashboard', key: 'pendingTitle' } as const, null as string | null)
+const isEditing = atom({ plugin: 'dashboard', key: 'isEditing' } as const, false)
+// 自動命名: 記下第一則訊息, 第一輪回應完且還沒命名時請 haiku 取一個名字(只試一次)
+const firstPrompt = atom({ plugin: 'dashboard', key: 'firstPrompt' } as const, '')
+const autoTried = atom({ plugin: 'dashboard', key: 'autoTried' } as const, false)
+const isAutoTitle = atom({ plugin: 'dashboard', key: 'isAutoTitle' } as const, false)
+
+const AUTO_TITLE_SYSTEM =
+  '你負責替 Claude Code 的一段對話取簡短標題。只輸出標題本身: 繁體中文, 6 到 16 個字, 不加引號、不加句尾標點、不要解釋。'
+const AUTO_TITLE_MAX = 24
+
+export function autoTitlePrompt(prompt: string, answer: string): string {
+  return `使用者的第一則訊息:\n${prompt.slice(0, 1000)}\n\n助理回覆的開頭:\n${answer.slice(0, 600)}`
+}
+
+// 模型回覆整理成一行標題: 取第一行、去掉引號與句尾標點、限制長度
+export function cleanTitle(text: string): string {
+  const line = text.split('\n').map(l => l.trim()).find(l => l.length > 0) ?? ''
+  const bare = line.replace(/^["'「『《]+|["'」』》]+$/g, '').replace(/[。．.!！?？]+$/, '').trim()
+  return bare.length > AUTO_TITLE_MAX ? bare.slice(0, AUTO_TITLE_MAX) : bare
+}
 
 const LABELS: Record<string, string> = {
   five_hour: '5h',
@@ -160,6 +184,48 @@ async function refreshModel($: EngineInterface) {
   await update($, model, () => name)
 }
 
+// 第一輪主對話回應完, 還沒有名稱就自動取一個; 回傳 { done } 包住取名的 promise, 呼叫端不必等它完成
+async function maybeAutoTitle($: EngineInterface, answer: string): Promise<{ done: Promise<void> }> {
+  const idle = { done: Promise.resolve() }
+  if ((await read($, title)) || (await read($, autoTried))) return idle
+  const prompt = await read($, firstPrompt)
+  if (!prompt) return idle
+
+  await update($, autoTried, () => true)
+  const done = $.model
+    .complete({
+      model: 'haiku',
+      system: AUTO_TITLE_SYSTEM,
+      prompt: autoTitlePrompt(prompt, answer),
+      maxTokens: 64,
+      effort: 'low',
+      timeoutMs: 20_000,
+    })
+    .then(async r => {
+      const name = r.isAnswered ? cleanTitle(r.text) : ''
+      // 等待期間使用者已手動命名就不覆蓋
+      if (!name || (await read($, title))) return
+      await update($, title, () => name)
+      await update($, isAutoTitle, () => true)
+      await update($, pendingTitle, () => name)
+    })
+    .catch(() => {})
+  return { done }
+}
+
+// 回應完成的 Windows 通知; 不等它跑完, 避免拖慢回應結束
+async function sendToast($: EngineInterface, sessionTitle: string, reason: string, answer: string) {
+  const { title: toastTitle, body } = toastText(sessionTitle, await $.session.cwd(), reason, answer)
+  const tag = (await $.session.id()).slice(0, TAG_CHARS)
+  void $.process
+    .run(['powershell', '-NoProfile', '-NonInteractive', '-Command', '-'], {
+      stdin: TOAST_SCRIPT,
+      env: { CC_TOAST_TITLE: toastTitle, CC_TOAST_BODY: body, CC_TOAST_TAG: tag },
+      timeoutMs: 15_000,
+    })
+    .catch(() => {})
+}
+
 export const register: Register = on => {
   // 工作中才需要逐格重畫; 重載時重來無妨
   let isWorking = false
@@ -184,8 +250,30 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // 主對話與子代理的每一輪都算進本 session 的 token
+  on('classic.SessionStart', async ($, e, next) => {
+    const result = await next(e)
+    if (e.session_title) await update($, title, () => e.session_title!)
+    return result
+  })
+
+  // 送出訊息時: 有待寫入的新名稱就寫進 session; 否則同步 /rename 等方式改的名稱
+  on('classic.UserPromptSubmit', async ($, e, next) => {
+    const result = await next(e)
+    if (!(await read($, firstPrompt))) await update($, firstPrompt, () => e.prompt)
+    const pending = await read($, pendingTitle)
+    if (pending) {
+      await update($, pendingTitle, () => null)
+      return { ...result, sessionTitle: pending }
+    }
+    if (e.session_title && e.session_title !== (await read($, title))) {
+      await update($, title, () => e.session_title!)
+      await update($, isAutoTitle, () => false)
+    }
+    return result
+  })
+
   on('turn.complete', async ($, e, next) => {
+    // 主對話與子代理的每一輪都算進本 session 的 token
     const u = e.usage
     if (u) {
       await update($, tokens, t => ({
@@ -193,7 +281,13 @@ export const register: Register = on => {
         output: t.output + u.output_tokens,
       }))
     }
-    return next(e)
+    const result = await next(e)
+    if (e.agentId) return result
+
+    // 第一輪會先自動取名, 取好再發通知, 讓通知標題就是新名稱
+    const naming = e.reason === 'answer' ? await maybeAutoTitle($, e.answer) : { done: Promise.resolve() }
+    void naming.done.then(async () => sendToast($, await read($, title), e.reason, e.answer)).catch(() => {})
+    return result
   })
 
   on('session.measure', async ($, e, next) => {
@@ -212,7 +306,13 @@ export const register: Register = on => {
       return next(e)
     }
 
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
+    // 手機版沒有輸入框元件, 只顯示名稱不提供改名
+    const Input = e.surface === 'mobile' ? null : $.ui.resolve(e).Input
+    const sessionTitle = await read($, title)
+    const editing = await read($, isEditing)
+    const autoNamed = await read($, isAutoTitle)
+    const requestId = e.requestId
     const { bar, showReset, pad } = layout(list, e.props.bodyColumns, info)
     const now = Date.now()
     const ctx = list.find(g => g.label === 'ctx')
@@ -237,7 +337,8 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column">
         {name ? (
-          <Box key="model" flexDirection="row">
+          <Box key="model" flexDirection="row" gap={1}>
+            <Box key="model-name" flexDirection="row">
             {isWorking ? (
               <Text color={MODEL_SHINE}>{spinnerAt(now)} </Text>
             ) : (
@@ -251,6 +352,54 @@ export const register: Register = on => {
               ))
             ) : (
               <Text color={MODEL_BASE} bold>{name}</Text>
+            )}
+            </Box>
+            <Text dimColor>│</Text>
+            {editing && Input ? (
+              <Box key="title-edit" flexDirection="row" gap={1}>
+                <Input
+                  key="title-input"
+                  label="名稱 "
+                  placeholder="輸入 session 名稱, Enter 確定"
+                  value={sessionTitle}
+                  submitLabel="確定"
+                  autoFocus
+                  onSubmit={(value: string) => {
+                    const newTitle = value.trim()
+                    void (async () => {
+                      if (newTitle) {
+                        await update($, title, () => newTitle)
+                        await update($, isAutoTitle, () => false)
+                        await update($, pendingTitle, () => newTitle)
+                      }
+                      await update($, isEditing, () => false)
+                    })()
+                  }}
+                />
+                <Button key="title-cancel" label="取消" onPress={() => update($, isEditing, () => false)} />
+              </Box>
+            ) : (
+              <Box key="title-view" flexDirection="row" gap={1}>
+                {sessionTitle ? (
+                  <Text bold={!autoNamed} italic={autoNamed}>
+                    {sessionTitle}
+                  </Text>
+                ) : (
+                  <Text dimColor>未命名</Text>
+                )}
+                {Input ? (
+                <Button
+                  key="title-rename"
+                  label="改名"
+                  onPress={() => {
+                    void (async () => {
+                      await update($, isEditing, () => true)
+                      await $.ui.focus({ requestId, key: 'title-input' }).catch(() => {})
+                    })()
+                  }}
+                />
+                ) : null}
+              </Box>
             )}
           </Box>
         ) : null}

@@ -3,6 +3,17 @@ export type Tokens = { input: number; output: number }
 
 declare module 'claude-code' {
   interface PluginState {
-    dashboard: { gauges: Gauge[]; model: string; tokens: Tokens; cost: number | null }
+    dashboard: {
+      gauges: Gauge[]
+      model: string
+      tokens: Tokens
+      cost: number | null
+      title: string
+      pendingTitle: string | null
+      isEditing: boolean
+      firstPrompt: string
+      autoTried: boolean
+      isAutoTitle: boolean
+    }
   }
 }
