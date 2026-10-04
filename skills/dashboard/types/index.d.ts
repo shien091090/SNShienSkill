@@ -11,8 +11,7 @@ declare module 'claude-code' {
       title: string
       pendingTitle: string | null
       isEditing: boolean
-      firstPrompt: string
-      autoTried: boolean
+      transcriptPath: string
       isAutoTitle: boolean
     }
   }

@@ -12,24 +12,28 @@ const cost = atom({ plugin: 'dashboard', key: 'cost' } as const, null as number 
 const title = atom({ plugin: 'dashboard', key: 'title' } as const, '')
 const pendingTitle = atom({ plugin: 'dashboard', key: 'pendingTitle' } as const, null as string | null)
 const isEditing = atom({ plugin: 'dashboard', key: 'isEditing' } as const, false)
-// 自動命名: 記下第一則訊息, 第一輪回應完且還沒命名時請 haiku 取一個名字(只試一次)
-const firstPrompt = atom({ plugin: 'dashboard', key: 'firstPrompt' } as const, '')
-const autoTried = atom({ plugin: 'dashboard', key: 'autoTried' } as const, false)
+// 自動命名: Claude Code 本身會替 session 取 AI 標題並寫進對話紀錄檔, 還沒有名稱時讀那個來用
+const transcriptPath = atom({ plugin: 'dashboard', key: 'transcriptPath' } as const, '')
 const isAutoTitle = atom({ plugin: 'dashboard', key: 'isAutoTitle' } as const, false)
+// 第一輪結束時 AI 標題可能還沒寫好, 晚一點再讀一次
+const TITLE_RETRY_MS = 8_000
 
-const AUTO_TITLE_SYSTEM =
-  '你負責替 Claude Code 的一段對話取簡短標題。只輸出標題本身: 繁體中文, 6 到 16 個字, 不加引號、不加句尾標點、不要解釋。'
-const AUTO_TITLE_MAX = 24
-
-export function autoTitlePrompt(prompt: string, answer: string): string {
-  return `使用者的第一則訊息:\n${prompt.slice(0, 1000)}\n\n助理回覆的開頭:\n${answer.slice(0, 600)}`
-}
-
-// 模型回覆整理成一行標題: 取第一行、去掉引號與句尾標點、限制長度
-export function cleanTitle(text: string): string {
-  const line = text.split('\n').map(l => l.trim()).find(l => l.length > 0) ?? ''
-  const bare = line.replace(/^["'「『《]+|["'」』》]+$/g, '').replace(/[。．.!！?？]+$/, '').trim()
-  return bare.length > AUTO_TITLE_MAX ? bare.slice(0, AUTO_TITLE_MAX) : bare
+// 從對話紀錄找最新的名稱: 手動改的(custom-title)優先於 AI 取的(ai-title)
+export function latestTitle(jsonl: string): { title: string; isAuto: boolean } | null {
+  const lines = jsonl.split('\n')
+  let ai: string | null = null
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]!
+    if (!line.includes('-title"')) continue
+    try {
+      const row = JSON.parse(line) as { type?: string; customTitle?: string; aiTitle?: string }
+      if (row.type === 'custom-title' && row.customTitle) return { title: row.customTitle, isAuto: false }
+      if (row.type === 'ai-title' && row.aiTitle && ai === null) ai = row.aiTitle
+    } catch {
+      // 不是完整的一列就略過
+    }
+  }
+  return ai ? { title: ai, isAuto: true } : null
 }
 
 const LABELS: Record<string, string> = {
@@ -184,33 +188,16 @@ async function refreshModel($: EngineInterface) {
   await update($, model, () => name)
 }
 
-// 第一輪主對話回應完, 還沒有名稱就自動取一個; 回傳 { done } 包住取名的 promise, 呼叫端不必等它完成
-async function maybeAutoTitle($: EngineInterface, answer: string): Promise<{ done: Promise<void> }> {
-  const idle = { done: Promise.resolve() }
-  if ((await read($, title)) || (await read($, autoTried))) return idle
-  const prompt = await read($, firstPrompt)
-  if (!prompt) return idle
-
-  await update($, autoTried, () => true)
-  const done = $.model
-    .complete({
-      model: 'haiku',
-      system: AUTO_TITLE_SYSTEM,
-      prompt: autoTitlePrompt(prompt, answer),
-      maxTokens: 64,
-      effort: 'low',
-      timeoutMs: 20_000,
-    })
-    .then(async r => {
-      const name = r.isAnswered ? cleanTitle(r.text) : ''
-      // 等待期間使用者已手動命名就不覆蓋
-      if (!name || (await read($, title))) return
-      await update($, title, () => name)
-      await update($, isAutoTitle, () => true)
-      await update($, pendingTitle, () => name)
-    })
-    .catch(() => {})
-  return { done }
+// 還沒有名稱時從對話紀錄讀 Claude Code 取的標題; 有名稱後就不再讀, 免得每輪讀一次大檔案
+async function syncTitleFromTranscript($: EngineInterface): Promise<boolean> {
+  if (await read($, title)) return true
+  const path = await read($, transcriptPath)
+  if (!path || !(await $.fs.exists(path))) return false
+  const found = latestTitle(await $.fs.read(path))
+  if (!found) return false
+  await update($, title, () => found.title)
+  await update($, isAutoTitle, () => found.isAuto)
+  return true
 }
 
 // 回應完成的 Windows 通知; 不等它跑完, 避免拖慢回應結束
@@ -252,14 +239,16 @@ export const register: Register = on => {
 
   on('classic.SessionStart', async ($, e, next) => {
     const result = await next(e)
+    await update($, transcriptPath, () => e.transcript_path)
     if (e.session_title) await update($, title, () => e.session_title!)
+    else await syncTitleFromTranscript($)
     return result
   })
 
   // 送出訊息時: 有待寫入的新名稱就寫進 session; 否則同步 /rename 等方式改的名稱
   on('classic.UserPromptSubmit', async ($, e, next) => {
     const result = await next(e)
-    if (!(await read($, firstPrompt))) await update($, firstPrompt, () => e.prompt)
+    await update($, transcriptPath, () => e.transcript_path)
     const pending = await read($, pendingTitle)
     if (pending) {
       await update($, pendingTitle, () => null)
@@ -284,9 +273,11 @@ export const register: Register = on => {
     const result = await next(e)
     if (e.agentId) return result
 
-    // 第一輪會先自動取名, 取好再發通知, 讓通知標題就是新名稱
-    const naming = e.reason === 'answer' ? await maybeAutoTitle($, e.answer) : { done: Promise.resolve() }
-    void naming.done.then(async () => sendToast($, await read($, title), e.reason, e.answer)).catch(() => {})
+    // 先讀名稱再發通知, 讓第一輪的通知標題就是 Claude Code 取的名字
+    if (!(await syncTitleFromTranscript($))) {
+      $.clock.after(TITLE_RETRY_MS, () => void syncTitleFromTranscript($).catch(() => {}))
+    }
+    await sendToast($, await read($, title), e.reason, e.answer)
     return result
   })
 

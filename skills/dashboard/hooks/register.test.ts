@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { folderName, taskSummary, toastText } from './notify'
-import { autoTitlePrompt, cleanTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, resetText, SEP, shimmer, spinnerAt, toGauges } from './register'
+import { latestTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, resetText, SEP, shimmer, spinnerAt, toGauges } from './register'
 
 const sample = toGauges(
   [
@@ -132,17 +132,17 @@ test('改名按鈕: 按下出現輸入框, 送出後名稱顯示在模型旁邊'
   expect(await ui.find({ text: '資格賽修正' })).toBeDefined()
 })
 
-test('自動命名: 模型回覆整理成一行乾淨的標題', () => {
-  expect(cleanTitle('「儀表板改名按鈕」\n多餘說明')).toBe('儀表板改名按鈕')
-  expect(cleanTitle('\n  修正資格賽API。 ')).toBe('修正資格賽API')
-  expect(cleanTitle('一'.repeat(40)).length).toBe(24)
-  expect(cleanTitle('')).toBe('')
-})
-
-test('自動命名的提示包含第一則訊息與回覆開頭', () => {
-  const p = autoTitlePrompt('幫我修 bug', '好的, 先看一下')
-  expect(p).toContain('幫我修 bug')
-  expect(p).toContain('好的, 先看一下')
+test('從對話紀錄讀名稱: 手動改的優先, 其次是最新的 AI 標題', () => {
+  const ai = (t: string) => JSON.stringify({ type: 'ai-title', aiTitle: t })
+  const custom = (t: string) => JSON.stringify({ type: 'custom-title', customTitle: t })
+  const msg = JSON.stringify({ type: 'user', message: 'hi' })
+  expect(latestTitle([msg, ai('舊標題'), msg, ai('新標題')].join('\n'))).toEqual({ title: '新標題', isAuto: true })
+  expect(latestTitle([ai('AI 標題'), custom('我取的'), ai('之後的 AI 標題')].join('\n'))).toEqual({
+    title: '我取的',
+    isAuto: false,
+  })
+  expect(latestTitle(msg)).toBeNull()
+  expect(latestTitle('{"type":"ai-title","aiTi')).toBeNull()
 })
 
 test('通知內文: 回覆段落接成一段, 去掉 markdown 符號, 太長截斷', () => {
