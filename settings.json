@@ -2,7 +2,7 @@
   "permissions": {
     "defaultMode": "auto"
   },
-  "model": "claude-fable-5-1",
+  "model": "opus",
   "hooks": {
     "PreToolUse": [
       {
@@ -17,11 +17,6 @@
         ]
       }
     ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "node ~/.claude/statusline.js",
-    "padding": 2
   },
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
@@ -48,6 +43,7 @@
   "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
+  "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
   "allowedTools": [
     "Bash",
