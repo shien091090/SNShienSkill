@@ -49,7 +49,7 @@ r2 之後, 要改的東西若同時符合下列條件, 不退回、不重寫, �
 
 程序:
 1. `decisions.md` 搬 `archive/decisions.v<M>.md`, 改 decisions.md: 寫入你的裁決與採納的參數, 修訂紀錄加 `- v<M+1> <日期> 觸發: spec-review 第 N 版就地修正; 改了: ...; 原因: ...`。spec 版號不變, 不搬 spec / telemetry / guide
-2. SendMessage 給本回合的**企劃**(r1 / r2 那位, 已讀過全文), 給逐條修正清單(每條: 改哪個檔哪一段 / 改成什麼), 任務「照清單修改 spec.md、telemetry.md、guide.md, 清單外不動; 回報逐條改了哪裡」。企劃 session 失效就重 spawn, 清單給 decisions.md、spec.md、telemetry.md、guide.md
+2. SendMessage 給本回合的**企劃**(r1 / r2 那位, 已讀過全文), 給逐條修正清單(每條: 改哪個檔哪一段 / 改成什麼), 任務「照清單修改 spec.md、telemetry.md、guide.md, 清單外不動; 回報逐條改了哪裡」。企劃 session 失效就重 spawn, 清單給 decisions.md、spec.md、telemetry.md、guide.md。**game-planner 只有 Write、沒有 Edit**, spec / telemetry 動輒數萬 token, 整份覆寫會被截斷寫壞: 任務改成「小檔(guide.md)直接改; 大檔逐條給『找原句 → 換成』清單, 原句須對過原文」, 你把清單存成 scratchpad 檔, 再 spawn general-purpose(sonnet)照清單用 Edit 套用並 Grep 自查, 你再核 diff
 3. 你讀 diff 逐條核對, 再做一次上面「通過的條件」自讀(RD 能不能開工不用猜)。核對不過 → SendMessage 同一個企劃補
 4. 走下面「通過程序」, log 那行寫「spec v<N> 就地修正後通過, 進 build 完整實作; 就地修正: …; 容忍小洞: …」
 
