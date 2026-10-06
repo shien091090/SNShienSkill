@@ -168,6 +168,11 @@ def cmd_status(args) -> dict:
     return report(project, snap)
 
 
+def cmd_probe_models(args) -> dict:
+    from lab.runner import probe_models
+    return {"status": "done", "models": probe_models(Path.cwd()), "warnings": []}
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="lab")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -182,9 +187,11 @@ def main(argv=None) -> int:
     r.add_argument("--target")
     st = sub.add_parser("status")
     st.add_argument("project")
+    sub.add_parser("probe-models")
     args = p.parse_args(argv)
     try:
-        out = {"start": cmd_start, "resume": cmd_resume, "status": cmd_status}[args.cmd](args)
+        out = {"start": cmd_start, "resume": cmd_resume, "status": cmd_status,
+               "probe-models": cmd_probe_models}[args.cmd](args)
     except SetupError as e:
         out = {"status": "error", "error": str(e), "warnings": []}
     sys.stdout.reconfigure(encoding="utf-8")

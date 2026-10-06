@@ -27,6 +27,7 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 | `resume <專案> --choice <選擇> --feedback <檔> [--target <款>]` | 交回饋並接著跑 |
 | `resume <專案>` | 上次出錯停下, 修好後從失敗的節點接著跑 |
 | `status <專案>` | 查目前停在哪 |
+| `probe-models` | 每種節點用正式參數起一次極短 session, 回報實際用到的模型(改了模型設定或 managed settings 後用) |
 
 - `.venv` 不存在(新機器)→ 先 `python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`
 - `start` / `resume` 一輪要跑幾十分鐘: **一律用 Bash 的 run_in_background 執行**, 完成時會收到通知, 不要輪詢。等待期間告訴使用者大概要等多久即可

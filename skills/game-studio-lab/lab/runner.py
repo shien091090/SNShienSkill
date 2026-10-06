@@ -50,18 +50,36 @@ def render_prompt(kind: str, ctx: dict) -> str:
     return Template(common + "\n\n" + body).safe_substitute(values)
 
 
+def claude_cmd(kind: str) -> list[str]:
+    cmd = ["claude", "-p", "--output-format", "json", "--permission-mode", "acceptEdits",
+           "--add-dir", str(STUDIO_REFS),
+           "--allowedTools", *BASE_TOOLS, *EXTRA_TOOLS.get(kind, [])]
+    if kind in AGENTS:
+        cmd += ["--agent", AGENTS[kind]]
+    if kind in MODELS:
+        cmd += ["--model", MODELS[kind]]
+    return cmd
+
+
+def probe_models(cwd: Path) -> dict:
+    """每種任務用跟正式執行相同的參數起一次極短的 session, 回報實際用到的模型。"""
+    out = {}
+    for kind in ("design", "triage", "review", "art", "rd", "audio"):
+        r = subprocess.run(claude_cmd(kind), input="只回覆 OK 兩個字, 不要做任何其他事。", cwd=cwd,
+                           capture_output=True, text=True, encoding="utf-8", timeout=300)
+        try:
+            data = json.loads(r.stdout)
+            out[kind] = sorted((data.get("modelUsage") or {}).keys()) or data.get("model") or "?"
+        except json.JSONDecodeError:
+            out[kind] = f"失敗(exit {r.returncode}): {r.stderr.strip()[-300:]}"
+    return out
+
+
 class ClaudeRunner:
     def run(self, kind: str, ctx: dict) -> str:
         project = Path(ctx["project"])
         prompt = render_prompt(kind, ctx)
-        cmd = ["claude", "-p", "--output-format", "json",
-               "--permission-mode", "acceptEdits",
-               "--add-dir", str(STUDIO_REFS),
-               "--allowedTools", *BASE_TOOLS, *EXTRA_TOOLS.get(kind, [])]
-        if kind in AGENTS:
-            cmd += ["--agent", AGENTS[kind]]
-        if kind in MODELS:
-            cmd += ["--model", MODELS[kind]]
+        cmd = claude_cmd(kind)
         logs = project / ".lab" / "logs"
         logs.mkdir(parents=True, exist_ok=True)
         stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
