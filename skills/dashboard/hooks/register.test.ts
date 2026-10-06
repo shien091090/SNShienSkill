@@ -1,5 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 import { folderName, taskSummary, toastText } from './notify'
+import { addTodo, parseTodos, removeTodo, todayText } from './todo'
 import { isRemoteDisconnectRow, latestTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, QUICK_ACTIONS, resetText, SAVE_STATE_PROMPT, SEP, shimmer, spinnerAt, toGauges } from './register'
 
 const sample = toGauges(
@@ -276,4 +277,63 @@ test('面板裡斷開時指令沒回傳文字, 靠對話紀錄裡的指令輸出
   // 使用者或模型自己打出這句話不算
   expect(isRemoteDisconnectRow({ type: 'user', content: text('Remote Control disconnected 之後按鈕沒變') })).toBe(false)
   expect(isRemoteDisconnectRow({ type: 'assistant', content: text('<local-command-stdout>Remote Control disconnected.</local-command-stdout>') })).toBe(false)
+})
+
+test('待辦檔: 解析、新增、刪除, 其他行原樣保留', () => {
+  const md = '# TODO\n\n手寫備註\n- [ ] 問 PM 返水上限 (2026-10-05)\n- [x] 已勾的也算 (2026-10-01)\n'
+  expect(parseTodos(md)).toEqual(['問 PM 返水上限 (2026-10-05)', '已勾的也算 (2026-10-01)'])
+  const added = addTodo(md, '寫規格書', '2026-10-06')
+  expect(parseTodos(added)).toEqual(['問 PM 返水上限 (2026-10-05)', '已勾的也算 (2026-10-01)', '寫規格書 (2026-10-06)'])
+  const removed = removeTodo(added, '問 PM 返水上限 (2026-10-05)')
+  expect(parseTodos(removed)).toEqual(['已勾的也算 (2026-10-01)', '寫規格書 (2026-10-06)'])
+  expect(removed).toContain('手寫備註')
+  expect(removeTodo(md, '不存在')).toBe(md)
+})
+
+test('待辦檔還不存在時, 第一筆會補上標題', () => {
+  expect(addTodo('', '第一件事', '2026-10-06')).toBe('# TODO\n\n- [ ] 第一件事 (2026-10-06)\n')
+  expect(todayText(new Date(2026, 0, 5))).toBe('2026-01-05')
+})
+
+test('Todo 按鈕: 打開待辦面板, 可新增與刪除, 寫回 ~/.claude/TODO.md', async ($, on) => {
+  const files: Record<string, string> = { 'C:/Users/me/.claude/TODO.md': '# TODO\n\n- [ ] 舊的一件 (2026-10-01)\n' }
+  const opened: string[] = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.model', () => ({ value: 'claude-opus-5-5' }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: [] } }))
+  on('env.get', (_, e) => ({ value: e.name === 'USERPROFILE' ? 'C:\\Users\\me' : undefined }))
+  // 引擎會把路徑轉成反斜線, 比對前統一成正斜線
+  const slash = (p: string) => p.replace(/\\/g, '/')
+  on('fs.exists', (_, e) => ({ value: slash(e.path) in files }))
+  on('fs.read', (_, e) => ({ value: files[slash(e.path)]! }))
+  on('fs.write', (_, e) => {
+    files[slash(e.path)] = e.text
+    return { value: undefined }
+  })
+  on('ui.open', (_, e) => {
+    opened.push(e.id)
+    return { value: undefined } as never
+  })
+  await $.session.start({ cwd: 'C:\proj', surface: 'terminal', isInteractive: true })
+  const bar = await $.ui.mount({ plugin: 'dashboard', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
+  await bar.press({ key: 'quick-toggle' })
+  await bar.press({ key: 'quick-todo' })
+  expect(opened).toEqual(['dashboard-todo'])
+
+  const pane = await $.ui.mount({
+    plugin: 'dashboard',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'dashboard-todo',
+    props: { title: '待辦', isFocused: true, bodyColumns: 60, placement: 'inline', scroll: { offset: 0, bodyRows: 10 }, view: {} },
+  })
+  expect(await pane.find({ text: '1. 舊的一件 (2026-10-01)' })).toBeDefined()
+
+  await pane.input({ key: 'todo-input', text: '新的一件' })
+  expect(parseTodos(files['C:/Users/me/.claude/TODO.md']!).map(t => t.replace(/ \(.*\)$/, ''))).toEqual(['舊的一件', '新的一件'])
+  expect(await pane.find({ key: 'todo-del-1' })).toBeDefined()
+
+  await pane.press({ key: 'todo-del-0' })
+  expect(parseTodos(files['C:/Users/me/.claude/TODO.md']!).map(t => t.replace(/ \(.*\)$/, ''))).toEqual(['新的一件'])
+  expect(await pane.find({ key: 'todo-del-1' })).toBeUndefined()
 })

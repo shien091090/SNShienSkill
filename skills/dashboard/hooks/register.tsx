@@ -3,6 +3,7 @@ import type { EngineInterface, Register, SessionContextUsage, SessionRateLimit }
 
 import type { Gauge, Tokens } from '../types'
 import { TAG_CHARS, TOAST_SCRIPT, toastText } from './notify'
+import { addTodo, parseTodos, removeTodo, todayText } from './todo'
 
 const gauges = atom({ plugin: 'dashboard', key: 'gauges' } as const, [] as Gauge[])
 const model = atom({ plugin: 'dashboard', key: 'model' } as const, '')
@@ -20,6 +21,9 @@ const isMenuOpen = atom({ plugin: 'dashboard', key: 'isMenuOpen' } as const, fal
 // 這個 session 跑過 /remote-control 就當作已啟動; 外掛讀不到真正的連線狀態, 再跑一次只會開狀態面板(斷開也在那裡)
 // 在面板裡斷開時指令會印出 "Remote Control disconnected.", 看到就改回未啟動
 const isRemoteOn = atom({ plugin: 'dashboard', key: 'isRemoteOn' } as const, false)
+// 待辦面板顯示的清單; 檔案才是正本, 每次開面板與增刪後都重讀
+const todos = atom({ plugin: 'dashboard', key: 'todos' } as const, [] as string[])
+const TODO_PANE = 'dashboard-todo'
 export const isRemoteDisconnected = (text: string | undefined) => /disconnected/i.test(text ?? '')
 // 面板裡斷開時指令早已跑完, 那行字只會以指令輸出寫進對話紀錄, 要從那裡接
 export const isRemoteDisconnectRow = (message: { type: string; name?: string; content: readonly unknown[] }) => {
@@ -34,6 +38,7 @@ export const SAVE_STATE_PROMPT =
 export const QUICK_ACTIONS = [
   { key: 'quick-save-state', label: '記憶工作狀態', prompt: SAVE_STATE_PROMPT },
   { key: 'quick-remote-control', label: '啟動RemoteControl', onLabel: 'RemoteControl 狀態', command: 'remote-control' },
+  { key: 'quick-todo', label: 'Todo', pane: TODO_PANE },
 ] as const
 
 // 第一輪結束時 AI 標題可能還沒寫好, 晚一點再讀一次
@@ -210,13 +215,44 @@ async function runQuickAction($: EngineInterface, action: (typeof QUICK_ACTIONS)
   await update($, isMenuOpen, () => false)
   try {
     if ('prompt' in action) await $.prompt.submit({ text: action.prompt, asUser: true })
-    else {
+    else if ('pane' in action) {
+      await reloadTodos($)
+      await $.ui.open({ id: action.pane, title: '待辦' })
+    } else {
       const result = await $.command.run({ command: action.command })
       // 自己呼叫的指令不會經過自己的 command.run 鉤子, 這裡直接記下
       if (action.command === 'remote-control') await update($, isRemoteOn, () => !isRemoteDisconnected(result.text))
     }
   } catch (err) {
     $.ui.toast(`${action.label} 失敗: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
+// 待辦存在 ~/.claude/TODO.md, 跟著 ~/.claude 的 git 同步到各台裝置
+async function todoPath($: EngineInterface): Promise<string> {
+  const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME')) ?? ''
+  return `${home.replace(/\\/g, '/')}/.claude/TODO.md`
+}
+
+async function readTodoFile($: EngineInterface): Promise<string> {
+  const path = await todoPath($)
+  return (await $.fs.exists(path)) ? String(await $.fs.read(path)) : ''
+}
+
+async function reloadTodos($: EngineInterface) {
+  const list = parseTodos(await readTodoFile($))
+  await update($, todos, () => list)
+}
+
+// 增刪前先重讀檔案, 對話裡或手動改過的內容不會被面板蓋掉
+async function editTodos($: EngineInterface, label: string, edit: (md: string) => string) {
+  try {
+    const path = await todoPath($)
+    const md = edit(await readTodoFile($))
+    await $.fs.write(path, md)
+    await update($, todos, () => parseTodos(md))
+  } catch (err) {
+    $.ui.toast(`${label}失敗: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
 
@@ -346,6 +382,39 @@ export const register: Register = on => {
     await update($, cost, () => e.cost?.usd ?? null)
     await refreshModel($)
     return next(e)
+  })
+
+  on('ui.render', { component: 'Pane', requestId: TODO_PANE }, async ($, e) => {
+    const { Box, Text, Button } = $.ui.resolve(e)
+    // 手機版沒有輸入框元件, 只能看與刪除
+    const Input = e.surface === 'mobile' ? null : $.ui.resolve(e).Input
+    const list = await read($, todos)
+    return (
+      <Box flexDirection="column">
+        {Input ? (
+          <Input
+            key="todo-input"
+            label="新增 "
+            placeholder="輸入待辦, Enter 加入"
+            value=""
+            submitLabel="加入"
+            autoFocus
+            onSubmit={(value: string) => {
+              const text = value.trim()
+              if (text) void editTodos($, '新增待辦', md => addTodo(md, text, todayText(new Date())))
+            }}
+          />
+        ) : null}
+        {list.length === 0 ? <Text dimColor>目前沒有待辦</Text> : null}
+        {list.map((item, i) => (
+          <Box key={`todo-row-${i}`} flexDirection="row" gap={1}>
+            <Text>{`${i + 1}. ${item}`}</Text>
+            <Button key={`todo-del-${i}`} label="刪除" dimColor onPress={() => void editTodos($, '刪除待辦', md => removeTodo(md, item))} />
+          </Box>
+        ))}
+        <Button key="todo-close" label="關閉" dimColor onPress={() => void $.ui.close({ id: TODO_PANE })} />
+      </Box>
+    )
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {

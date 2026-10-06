@@ -15,6 +15,7 @@ declare module 'claude-code' {
       isAutoTitle: boolean
       isMenuOpen: boolean
       isRemoteOn: boolean
+      todos: string[]
     }
   }
 }
