@@ -71,6 +71,9 @@ def build_game_graph(deps: Deps):
         result = deps.checker.check(gdir(s) / "game", s["stage"])
         (gdir(s) / "check-report.json").write_text(
             json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
+        # 每次結果都留底: check-report.json 會被下一次覆蓋, 事後查錯誤判定有沒有判錯要看這份
+        with open(gdir(s) / "check-history.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"retries": s.get("retries", 0), **result}, ensure_ascii=False) + "\n")
         return {"check": result}
 
     def after_check(s: GameState):
