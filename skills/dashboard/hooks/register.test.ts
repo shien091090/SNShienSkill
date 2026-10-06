@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 import { folderName, taskSummary, toastText } from './notify'
-import { latestTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, resetText, SEP, shimmer, spinnerAt, toGauges } from './register'
+import { latestTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, QUICK_ACTIONS, resetText, SAVE_STATE_PROMPT, SEP, shimmer, spinnerAt, toGauges } from './register'
 
 const sample = toGauges(
   [
@@ -176,3 +176,35 @@ test('用 /model 換模型後, 不必送出訊息, 儀表板一秒內就換成�
   await clock.advance(1_000)
   expect(await ui.find({ text: 'Opus 5.5' })).toBeDefined()
 })
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`${surface}: 快捷按鈕展開後, 記憶工作狀態送出 prompt、啟動RemoteControl 執行指令`, async ($, on) => {
+    const prompts: string[] = []
+    const commands: string[] = []
+    on('session.start', (_, e) => ({ cwd: e.cwd }))
+    on('session.model', () => ({ value: 'claude-opus-5-5' }))
+    on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: [] } }))
+    on('prompt.submit', (_, e) => {
+      prompts.push(e.text)
+      return { text: e.text } as never
+    })
+    on('command.run', (_, e) => {
+      commands.push(e.command)
+      return { text: '' }
+    })
+    await $.session.start({ cwd: 'C:\proj', surface, isInteractive: true })
+    const ui = await $.ui.mount({ plugin: 'dashboard', surface, component: 'AbovePrompt', props: PROPS })
+
+    expect(await ui.find({ key: 'quick-save-state' })).toBeUndefined()
+    await ui.press({ key: 'quick-toggle' })
+    for (const a of QUICK_ACTIONS) expect(await ui.find({ key: a.key })).toBeDefined()
+
+    await ui.press({ key: 'quick-save-state' })
+    expect(prompts).toEqual([SAVE_STATE_PROMPT])
+    expect(await ui.find({ key: 'quick-save-state' })).toBeUndefined()
+
+    await ui.press({ key: 'quick-toggle' })
+    await ui.press({ key: 'quick-remote-control' })
+    expect(commands).toEqual(['remote-control'])
+  })
+}

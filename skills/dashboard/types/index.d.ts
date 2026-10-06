@@ -13,6 +13,7 @@ declare module 'claude-code' {
       isEditing: boolean
       transcriptPath: string
       isAutoTitle: boolean
+      isMenuOpen: boolean
     }
   }
 }

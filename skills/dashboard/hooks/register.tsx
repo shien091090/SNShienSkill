@@ -15,6 +15,16 @@ const isEditing = atom({ plugin: 'dashboard', key: 'isEditing' } as const, false
 // 自動命名: Claude Code 本身會替 session 取 AI 標題並寫進對話紀錄檔, 還沒有名稱時讀那個來用
 const transcriptPath = atom({ plugin: 'dashboard', key: 'transcriptPath' } as const, '')
 const isAutoTitle = atom({ plugin: 'dashboard', key: 'isAutoTitle' } as const, false)
+// 快捷按鈕列: 按「⋯ 快捷」展開, 選了其中一項就收起來
+const isMenuOpen = atom({ plugin: 'dashboard', key: 'isMenuOpen' } as const, false)
+// 快捷按鈕列的項目: 送出一段固定的 prompt, 或執行一個斜線指令
+export const SAVE_STATE_PROMPT =
+  '請記憶目前工作狀態,我要重開一個新的session再繼續,並給我重開session後要講什麼關鍵字才能繼續'
+export const QUICK_ACTIONS = [
+  { key: 'quick-save-state', label: '記憶工作狀態', prompt: SAVE_STATE_PROMPT },
+  { key: 'quick-remote-control', label: '啟動RemoteControl', command: 'remote-control' },
+] as const
+
 // 第一輪結束時 AI 標題可能還沒寫好, 晚一點再讀一次
 const TITLE_RETRY_MS = 8_000
 
@@ -185,6 +195,16 @@ export function layout(
 }
 
 // 名稱沒變就不寫, 免得每次輪詢都觸發重畫
+async function runQuickAction($: EngineInterface, action: (typeof QUICK_ACTIONS)[number]) {
+  await update($, isMenuOpen, () => false)
+  try {
+    if ('prompt' in action) await $.prompt.submit({ text: action.prompt, asUser: true })
+    else await $.command.run({ command: action.command })
+  } catch (err) {
+    $.ui.toast(`${action.label} 失敗: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
 async function refreshModel($: EngineInterface) {
   const name = prettyModel(await $.session.model())
   if (name !== (await read($, model))) await update($, model, () => name)
@@ -313,6 +333,7 @@ export const register: Register = on => {
     const sessionTitle = await read($, title)
     const editing = await read($, isEditing)
     const autoNamed = await read($, isAutoTitle)
+    const menuOpen = await read($, isMenuOpen)
     const requestId = e.requestId
     const { bar, showReset, pad } = layout(list, e.props.bodyColumns, info)
     const now = Date.now()
@@ -400,8 +421,21 @@ export const register: Register = on => {
                   }}
                 />
                 ) : null}
+                <Button
+                  key="quick-toggle"
+                  label={menuOpen ? '⋯ 收起' : '⋯ 快捷'}
+                  dimColor={!menuOpen}
+                  onPress={() => update($, isMenuOpen, open => !open)}
+                />
               </Box>
             )}
+          </Box>
+        ) : null}
+        {menuOpen ? (
+          <Box key="quick-row" flexDirection="row" gap={1}>
+            {QUICK_ACTIONS.map(action => (
+              <Button key={action.key} label={action.label} onPress={() => void runQuickAction($, action)} />
+            ))}
           </Box>
         ) : null}
         <Box key="ctx-row" flexDirection="row">
