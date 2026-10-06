@@ -235,4 +235,36 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await ui.press({ key: 'quick-toggle' })
     expect(await ui.find({ text: 'RemoteControl 狀態' })).toBeDefined()
   })
+
+  test(`${surface}: 按鈕進狀態面板斷開後, 按鈕改回啟動RemoteControl`, async ($, on) => {
+    on('session.start', (_, e) => ({ cwd: e.cwd }))
+    on('session.model', () => ({ value: 'claude-opus-5-5' }))
+    on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: [] } }))
+    const outputs = ['', 'Remote Control disconnected.']
+    on('command.run', () => ({ text: outputs.shift() ?? '' }))
+    await $.session.start({ cwd: 'C:\proj', surface, isInteractive: true })
+    const ui = await $.ui.mount({ plugin: 'dashboard', surface, component: 'AbovePrompt', props: PROPS })
+
+    await ui.press({ key: 'quick-toggle' })
+    await ui.press({ key: 'quick-remote-control' })
+    await ui.press({ key: 'quick-toggle' })
+    expect(await ui.find({ text: 'RemoteControl 狀態' })).toBeDefined()
+    await ui.press({ key: 'quick-remote-control' })
+    await ui.press({ key: 'quick-toggle' })
+    expect(await ui.find({ text: '啟動RemoteControl' })).toBeDefined()
+  })
+
+  test(`${surface}: 自己打 /remote-control 斷開後, 按鈕也改回啟動RemoteControl`, async ($, on) => {
+    on('session.start', (_, e) => ({ cwd: e.cwd }))
+    on('session.model', () => ({ value: 'claude-opus-5-5' }))
+    on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: [] } }))
+    const outputs = ['', 'Remote Control disconnected.']
+    on('command.run', () => ({ text: outputs.shift() ?? '' }))
+    await $.session.start({ cwd: 'C:\proj', surface, isInteractive: true })
+    await $.command.run({ command: 'remote-control' })
+    await $.command.run({ command: 'remote-control' })
+    const ui = await $.ui.mount({ plugin: 'dashboard', surface, component: 'AbovePrompt', props: PROPS })
+    await ui.press({ key: 'quick-toggle' })
+    expect(await ui.find({ text: '啟動RemoteControl' })).toBeDefined()
+  })
 }

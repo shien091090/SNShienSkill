@@ -18,7 +18,9 @@ const isAutoTitle = atom({ plugin: 'dashboard', key: 'isAutoTitle' } as const, f
 // 快捷按鈕列: 按「⋯ 快捷」展開, 選了其中一項就收起來
 const isMenuOpen = atom({ plugin: 'dashboard', key: 'isMenuOpen' } as const, false)
 // 這個 session 跑過 /remote-control 就當作已啟動; 外掛讀不到真正的連線狀態, 再跑一次只會開狀態面板(斷開也在那裡)
+// 在面板裡斷開時指令會印出 "Remote Control disconnected.", 看到就改回未啟動
 const isRemoteOn = atom({ plugin: 'dashboard', key: 'isRemoteOn' } as const, false)
+export const isRemoteDisconnected = (text: string | undefined) => /disconnected/i.test(text ?? '')
 // 快捷按鈕列的項目: 送出一段固定的 prompt, 或執行一個斜線指令
 export const SAVE_STATE_PROMPT =
   '請記憶目前工作狀態,我要重開一個新的session再繼續,並給我重開session後要講什麼關鍵字才能繼續'
@@ -202,9 +204,9 @@ async function runQuickAction($: EngineInterface, action: (typeof QUICK_ACTIONS)
   try {
     if ('prompt' in action) await $.prompt.submit({ text: action.prompt, asUser: true })
     else {
-      await $.command.run({ command: action.command })
+      const result = await $.command.run({ command: action.command })
       // 自己呼叫的指令不會經過自己的 command.run 鉤子, 這裡直接記下
-      if (action.command === 'remote-control') await update($, isRemoteOn, () => true)
+      if (action.command === 'remote-control') await update($, isRemoteOn, () => !isRemoteDisconnected(result.text))
     }
   } catch (err) {
     $.ui.toast(`${action.label} 失敗: ${err instanceof Error ? err.message : String(err)}`)
@@ -271,7 +273,7 @@ export const register: Register = on => {
   on('command.run', { command: 'remote-control' }, async ($, e, next) => {
     // 外掛呼叫的指令可能沒帶參數, 補空字串才傳得下去
     const result = await next({ ...e, args: e.args ?? '' })
-    await update($, isRemoteOn, () => true)
+    await update($, isRemoteOn, () => !isRemoteDisconnected(result.text))
     return result
   })
 
