@@ -312,7 +312,7 @@ test('Todo 按鈕: 打開待辦面板, 可新增與刪除, 寫回 ~/.claude/TODO
   })
   on('ui.open', (_, e) => {
     opened.push(e.id)
-    return { value: undefined } as never
+    return { value: { isPlaced: true } } as never
   })
   await $.session.start({ cwd: 'C:\proj', surface: 'terminal', isInteractive: true })
   const bar = await $.ui.mount({ plugin: 'dashboard', surface: 'terminal', component: 'AbovePrompt', props: PROPS })

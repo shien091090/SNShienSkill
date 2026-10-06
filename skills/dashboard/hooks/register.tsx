@@ -212,12 +212,16 @@ export function layout(
 
 // 名稱沒變就不寫, 免得每次輪詢都觸發重畫
 async function runQuickAction($: EngineInterface, action: (typeof QUICK_ACTIONS)[number]) {
+  // 開面板要在按下的當下、任何 await 之前呼叫, 引擎才算是使用者按出來的;
+  // 晚了會被當成外掛自己開的, 終端機不到 144 欄就不畫
+  const opening = 'pane' in action ? $.ui.open({ id: action.pane, title: '待辦', focus: true }) : null
   await update($, isMenuOpen, () => false)
   try {
     if ('prompt' in action) await $.prompt.submit({ text: action.prompt, asUser: true })
-    else if ('pane' in action) {
+    else if (opening) {
+      const opened = await opening
       await reloadTodos($)
-      await $.ui.open({ id: action.pane, title: '待辦' })
+      if (!opened.isPlaced) $.ui.toast(`待辦面板沒有開出來: ${opened.reason}`)
     } else {
       const result = await $.command.run({ command: action.command })
       // 自己呼叫的指令不會經過自己的 command.run 鉤子, 這裡直接記下
