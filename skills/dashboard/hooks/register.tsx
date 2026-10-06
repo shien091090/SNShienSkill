@@ -55,6 +55,7 @@ const MODEL_SHINE = '#ffe3d3'
 const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 const IDLE_MARK = '⠿'
 const FRAME_MS = 100
+const MODEL_POLL_MS = 1_000
 
 // 模型識別字轉成好讀的名字: claude-opus-5-5[1m] → Opus 5.5
 export function prettyModel(id: string): string {
@@ -183,9 +184,10 @@ export function layout(
   return { bar: clampBar(Math.min(row2(false), row3(false))), showReset: false, pad: 0 }
 }
 
+// 名稱沒變就不寫, 免得每次輪詢都觸發重畫
 async function refreshModel($: EngineInterface) {
   const name = prettyModel(await $.session.model())
-  await update($, model, () => name)
+  if (name !== (await read($, model))) await update($, model, () => name)
 }
 
 // 還沒有名稱時從對話紀錄讀 Claude Code 取的標題; 有名稱後就不再讀, 免得每輪讀一次大檔案
@@ -227,14 +229,22 @@ export const register: Register = on => {
     $.clock.every(FRAME_MS, () => {
       if (isWorking) $.ui.invalidate('ui.render')
     })
+    // 換模型沒有事件可接(/model 選單選完才生效), 定時檢查一次
+    $.clock.every(MODEL_POLL_MS, () => void refreshModel($).catch(() => {}))
 
     return result
   })
 
-  // 用 /model 換模型後, 下一次送出或量測時更新名字
   on('prompt.submit', async ($, e, next) => {
     await refreshModel($)
     return next(e)
+  })
+
+  // 直接帶參數的 /model opus 跑完就生效, 立刻更新不等輪詢
+  on('command.run', { command: 'model' }, async ($, e, next) => {
+    const result = await next(e)
+    await refreshModel($)
+    return result
   })
 
   on('classic.SessionStart', async ($, e, next) => {

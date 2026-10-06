@@ -1,4 +1,4 @@
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 import { folderName, taskSummary, toastText } from './notify'
 import { latestTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, resetText, SEP, shimmer, spinnerAt, toGauges } from './register'
 
@@ -161,4 +161,18 @@ test('通知內文依結束原因加上狀態', () => {
   expect(toastText('a', 'c', 'aborted', '').body).toBe('已中斷')
   expect(toastText('a', 'c', 'error', '連線失敗').body).toBe('出錯了: 連線失敗')
   expect(toastText('a', 'c', 'answer', '').body).toBe('回應完成')
+})
+
+test('用 /model 換模型後, 不必送出訊息, 儀表板一秒內就換成新名字', async ($, on) => {
+  const clock = mock.clock(on)
+  let current = 'claude-sonnet-5'
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.model', () => ({ value: current }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: [] } }))
+  await $.session.start({ cwd: 'C:\proj', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ plugin: 'dashboard', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
+  expect(await ui.find({ text: 'Sonnet 5' })).toBeDefined()
+  current = 'claude-opus-5-5'
+  await clock.advance(1_000)
+  expect(await ui.find({ text: 'Opus 5.5' })).toBeDefined()
 })
