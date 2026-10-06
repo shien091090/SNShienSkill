@@ -17,12 +17,14 @@ const transcriptPath = atom({ plugin: 'dashboard', key: 'transcriptPath' } as co
 const isAutoTitle = atom({ plugin: 'dashboard', key: 'isAutoTitle' } as const, false)
 // 快捷按鈕列: 按「⋯ 快捷」展開, 選了其中一項就收起來
 const isMenuOpen = atom({ plugin: 'dashboard', key: 'isMenuOpen' } as const, false)
+// 這個 session 跑過 /remote-control 就當作已啟動; 外掛讀不到真正的連線狀態, 再跑一次只會開狀態面板(斷開也在那裡)
+const isRemoteOn = atom({ plugin: 'dashboard', key: 'isRemoteOn' } as const, false)
 // 快捷按鈕列的項目: 送出一段固定的 prompt, 或執行一個斜線指令
 export const SAVE_STATE_PROMPT =
   '請記憶目前工作狀態,我要重開一個新的session再繼續,並給我重開session後要講什麼關鍵字才能繼續'
 export const QUICK_ACTIONS = [
   { key: 'quick-save-state', label: '記憶工作狀態', prompt: SAVE_STATE_PROMPT },
-  { key: 'quick-remote-control', label: '啟動RemoteControl', command: 'remote-control' },
+  { key: 'quick-remote-control', label: '啟動RemoteControl', onLabel: 'RemoteControl 狀態', command: 'remote-control' },
 ] as const
 
 // 第一輪結束時 AI 標題可能還沒寫好, 晚一點再讀一次
@@ -199,7 +201,11 @@ async function runQuickAction($: EngineInterface, action: (typeof QUICK_ACTIONS)
   await update($, isMenuOpen, () => false)
   try {
     if ('prompt' in action) await $.prompt.submit({ text: action.prompt, asUser: true })
-    else await $.command.run({ command: action.command })
+    else {
+      await $.command.run({ command: action.command })
+      // 自己呼叫的指令不會經過自己的 command.run 鉤子, 這裡直接記下
+      if (action.command === 'remote-control') await update($, isRemoteOn, () => true)
+    }
   } catch (err) {
     $.ui.toast(`${action.label} 失敗: ${err instanceof Error ? err.message : String(err)}`)
   }
@@ -261,8 +267,17 @@ export const register: Register = on => {
   })
 
   // 直接帶參數的 /model opus 跑完就生效, 立刻更新不等輪詢
+  // 手動打 /remote-control 也算啟動, 按鈕文字跟著換
+  on('command.run', { command: 'remote-control' }, async ($, e, next) => {
+    // 外掛呼叫的指令可能沒帶參數, 補空字串才傳得下去
+    const result = await next({ ...e, args: e.args ?? '' })
+    await update($, isRemoteOn, () => true)
+    return result
+  })
+
   on('command.run', { command: 'model' }, async ($, e, next) => {
-    const result = await next(e)
+    // 外掛呼叫的指令可能沒帶參數, 補空字串才傳得下去
+    const result = await next({ ...e, args: e.args ?? '' })
     await refreshModel($)
     return result
   })
@@ -334,6 +349,7 @@ export const register: Register = on => {
     const editing = await read($, isEditing)
     const autoNamed = await read($, isAutoTitle)
     const menuOpen = await read($, isMenuOpen)
+    const remoteOn = await read($, isRemoteOn)
     const requestId = e.requestId
     const { bar, showReset, pad } = layout(list, e.props.bodyColumns, info)
     const now = Date.now()
@@ -434,7 +450,11 @@ export const register: Register = on => {
         {menuOpen ? (
           <Box key="quick-row" flexDirection="row" gap={1}>
             {QUICK_ACTIONS.map(action => (
-              <Button key={action.key} label={action.label} onPress={() => void runQuickAction($, action)} />
+              <Button
+                key={action.key}
+                label={'onLabel' in action && remoteOn ? action.onLabel : action.label}
+                onPress={() => void runQuickAction($, action)}
+              />
             ))}
           </Box>
         ) : null}

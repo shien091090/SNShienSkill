@@ -207,4 +207,32 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await ui.press({ key: 'quick-remote-control' })
     expect(commands).toEqual(['remote-control'])
   })
+
+  test(`${surface}: 按啟動RemoteControl 後按鈕改成 RemoteControl 狀態`, async ($, on) => {
+    on('session.start', (_, e) => ({ cwd: e.cwd }))
+    on('session.model', () => ({ value: 'claude-opus-5-5' }))
+    on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: [] } }))
+    on('command.run', () => ({ text: '' }))
+    await $.session.start({ cwd: 'C:\proj', surface, isInteractive: true })
+    const ui = await $.ui.mount({ plugin: 'dashboard', surface, component: 'AbovePrompt', props: PROPS })
+
+    await ui.press({ key: 'quick-toggle' })
+    expect(await ui.find({ text: '啟動RemoteControl' })).toBeDefined()
+    await ui.press({ key: 'quick-remote-control' })
+    await ui.press({ key: 'quick-toggle' })
+    expect(await ui.find({ text: 'RemoteControl 狀態' })).toBeDefined()
+    expect(await ui.find({ text: '啟動RemoteControl' })).toBeUndefined()
+  })
+
+  test(`${surface}: 自己打 /remote-control 後按鈕也改成 RemoteControl 狀態`, async ($, on) => {
+    on('session.start', (_, e) => ({ cwd: e.cwd }))
+    on('session.model', () => ({ value: 'claude-opus-5-5' }))
+    on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: [] } }))
+    on('command.run', () => ({ text: '' }))
+    await $.session.start({ cwd: 'C:\proj', surface, isInteractive: true })
+    await $.command.run({ command: 'remote-control' })
+    const ui = await $.ui.mount({ plugin: 'dashboard', surface, component: 'AbovePrompt', props: PROPS })
+    await ui.press({ key: 'quick-toggle' })
+    expect(await ui.find({ text: 'RemoteControl 狀態' })).toBeDefined()
+  })
 }

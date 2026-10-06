@@ -14,6 +14,7 @@ declare module 'claude-code' {
       transcriptPath: string
       isAutoTitle: boolean
       isMenuOpen: boolean
+      isRemoteOn: boolean
     }
   }
 }
