@@ -21,6 +21,13 @@ const isMenuOpen = atom({ plugin: 'dashboard', key: 'isMenuOpen' } as const, fal
 // 在面板裡斷開時指令會印出 "Remote Control disconnected.", 看到就改回未啟動
 const isRemoteOn = atom({ plugin: 'dashboard', key: 'isRemoteOn' } as const, false)
 export const isRemoteDisconnected = (text: string | undefined) => /disconnected/i.test(text ?? '')
+// 面板裡斷開時指令早已跑完, 那行字只會以指令輸出寫進對話紀錄, 要從那裡接
+export const isRemoteDisconnectRow = (message: { type: string; name?: string; content: readonly unknown[] }) => {
+  if (message.type === 'assistant') return false
+  const text = JSON.stringify(message.content)
+  const isCommandOutput = message.name === 'local_command' || text.includes('<local-command-stdout>')
+  return isCommandOutput && /Remote Control disconnected/i.test(text)
+}
 // 快捷按鈕列的項目: 送出一段固定的 prompt, 或執行一個斜線指令
 export const SAVE_STATE_PROMPT =
   '請記憶目前工作狀態,我要重開一個新的session再繼續,並給我重開session後要講什麼關鍵字才能繼續'
@@ -276,6 +283,12 @@ export const register: Register = on => {
     await update($, isRemoteOn, () => !isRemoteDisconnected(result.text))
     return result
   })
+
+  on('session.append', async ($, e, next) => {
+    const result = await next(e)
+    if (!e.agentId && isRemoteDisconnectRow(e.message)) await update($, isRemoteOn, () => false)
+    return result
+  }).catch(($, e, next) => next(e))
 
   on('command.run', { command: 'model' }, async ($, e, next) => {
     // 外掛呼叫的指令可能沒帶參數, 補空字串才傳得下去

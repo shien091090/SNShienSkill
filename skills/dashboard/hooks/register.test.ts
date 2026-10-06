@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 import { folderName, taskSummary, toastText } from './notify'
-import { latestTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, QUICK_ACTIONS, resetText, SAVE_STATE_PROMPT, SEP, shimmer, spinnerAt, toGauges } from './register'
+import { isRemoteDisconnectRow, latestTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, QUICK_ACTIONS, resetText, SAVE_STATE_PROMPT, SEP, shimmer, spinnerAt, toGauges } from './register'
 
 const sample = toGauges(
   [
@@ -268,3 +268,12 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(await ui.find({ text: '啟動RemoteControl' })).toBeDefined()
   })
 }
+
+test('面板裡斷開時指令沒回傳文字, 靠對話紀錄裡的指令輸出那行判斷已斷開', () => {
+  const text = (t: string) => [{ type: 'text', text: t }]
+  expect(isRemoteDisconnectRow({ type: 'user', content: text('<local-command-stdout>Remote Control disconnected.</local-command-stdout>') })).toBe(true)
+  expect(isRemoteDisconnectRow({ type: 'system', name: 'local_command', content: text('Remote Control disconnected.') })).toBe(true)
+  // 使用者或模型自己打出這句話不算
+  expect(isRemoteDisconnectRow({ type: 'user', content: text('Remote Control disconnected 之後按鈕沒變') })).toBe(false)
+  expect(isRemoteDisconnectRow({ type: 'assistant', content: text('<local-command-stdout>Remote Control disconnected.</local-command-stdout>') })).toBe(false)
+})
