@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionContextUsage, SessionRateLimit } from 'claude-code'
 
-import type { Gauge, Tokens } from '../types'
+import type { Gauge, Tokens, UnityProject } from '../types'
 import { TAG_CHARS, TOAST_SCRIPT, toastText } from './notify'
 import { addTodo, parseTodos, removeTodo, todayText } from './todo'
 
@@ -9,6 +9,8 @@ const gauges = atom({ plugin: 'dashboard', key: 'gauges' } as const, [] as Gauge
 const model = atom({ plugin: 'dashboard', key: 'model' } as const, '')
 const tokens = atom({ plugin: 'dashboard', key: 'tokens' } as const, { input: 0, output: 0 } as Tokens)
 const cost = atom({ plugin: 'dashboard', key: 'cost' } as const, null as number | null)
+// 目前 Unity MCP 連接到的專案; 沒有 Unity Editor 連線時是 null
+const unityProject = atom({ plugin: 'dashboard', key: 'unityProject' } as const, null as UnityProject | null)
 // session 名稱: 改名後先顯示在儀表板, 下次送出訊息時才真正寫進 session
 const title = atom({ plugin: 'dashboard', key: 'title' } as const, '')
 const pendingTitle = atom({ plugin: 'dashboard', key: 'pendingTitle' } as const, null as string | null)
@@ -82,6 +84,7 @@ const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', 
 const IDLE_MARK = '⠿'
 const FRAME_MS = 100
 const MODEL_POLL_MS = 1_000
+const UNITY_POLL_MS = 10_000
 
 // 模型識別字轉成好讀的名字: claude-opus-5-5[1m] → Opus 5.5
 export function prettyModel(id: string): string {
@@ -265,6 +268,34 @@ async function refreshModel($: EngineInterface) {
   if (name !== (await read($, model))) await update($, model, () => name)
 }
 
+// Unity_ManageEditor GetProjectRoot 的文字內容轉成顯示用的專案名稱與路徑; 沒開專案或格式不對就回 null
+export function unityProjectFromText(text: string | undefined): UnityProject | null {
+  if (!text) return null
+  let parsed: { success?: boolean; data?: { projectRoot?: string } }
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return null
+  }
+  const root = parsed.success ? parsed.data?.projectRoot : undefined
+  if (!root) return null
+  const path = root.replace(/\\/g, '/')
+  return { name: path.split('/').filter(Boolean).pop() ?? path, path }
+}
+
+// Unity 沒有事件通知專案切換, 定時打一次 Unity MCP 問目前專案根目錄; 沒連線或沒開專案就清空, 不跳錯誤
+async function refreshUnityProject($: EngineInterface) {
+  let next: UnityProject | null = null
+  try {
+    const result = await $.mcp.call('unity-mcp', 'Unity_ManageEditor', { Action: 'GetProjectRoot' })
+    next = unityProjectFromText(result.content.find(b => b.type === 'text')?.text)
+  } catch {
+    // Unity MCP 沒設定或沒連線: 當作目前沒有專案
+  }
+  const current = await read($, unityProject)
+  if (next?.path !== current?.path) await update($, unityProject, () => next)
+}
+
 // 還沒有名稱時從對話紀錄讀 Claude Code 取的標題; 有名稱後就不再讀, 免得每輪讀一次大檔案
 async function syncTitleFromTranscript($: EngineInterface): Promise<boolean> {
   if (await read($, title)) return true
@@ -300,12 +331,15 @@ export const register: Register = on => {
     await update($, gauges, () => toGauges(u.rateLimits, u.context))
     await update($, cost, () => u.cost?.usd ?? null)
     await refreshModel($)
+    await refreshUnityProject($)
 
     $.clock.every(FRAME_MS, () => {
       if (isWorking) $.ui.invalidate('ui.render')
     })
     // 換模型沒有事件可接(/model 選單選完才生效), 定時檢查一次
     $.clock.every(MODEL_POLL_MS, () => void refreshModel($).catch(() => {}))
+    // Unity 開/關專案也沒有事件, 用較長的間隔定時問
+    $.clock.every(UNITY_POLL_MS, () => void refreshUnityProject($).catch(() => {}))
 
     return result
   })
@@ -438,6 +472,7 @@ export const register: Register = on => {
     const autoNamed = await read($, isAutoTitle)
     const menuOpen = await read($, isMenuOpen)
     const remoteOn = await read($, isRemoteOn)
+    const unity = await read($, unityProject)
     const requestId = e.requestId
     const { bar, showReset, pad } = layout(list, e.props.bodyColumns, info)
     const now = Date.now()
@@ -533,6 +568,13 @@ export const register: Register = on => {
                 />
               </Box>
             )}
+          </Box>
+        ) : null}
+        {unity ? (
+          <Box key="unity-row" flexDirection="row" gap={1}>
+            <Text dimColor>Unity</Text>
+            <Text bold>{unity.name}</Text>
+            <Text dimColor>{unity.path}</Text>
           </Box>
         ) : null}
         {menuOpen ? (
