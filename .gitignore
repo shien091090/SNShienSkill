@@ -32,6 +32,11 @@ settings.local.json
 # 進版控只會製造跨裝置衝突
 /skills/synced/
 
+# game-studio-lab 的 Python 環境與快取, 每台機器自己用 requirements.txt 建
+/skills/game-studio-lab/.venv/
+__pycache__/
+.pytest_cache/
+
 # commit 規範(每次 commit 前重讀)
 !/rules/
 !/rules/**

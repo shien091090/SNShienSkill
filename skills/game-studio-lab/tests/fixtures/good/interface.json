@@ -1,0 +1,12 @@
+{
+  "canvas": { "width": 480, "height": 640 },
+  "draw": [
+    { "name": "drawBackground", "state": [] },
+    { "name": "drawPlayer", "state": ["x", "y", "hit"], "size": [40, 40] },
+    { "name": "drawCoin", "state": ["x", "y"], "size": [20, 20] },
+    { "name": "drawHud", "state": ["score", "time"] }
+  ],
+  "guidePages": 2,
+  "sounds": ["coin"],
+  "music": ["main"]
+}
