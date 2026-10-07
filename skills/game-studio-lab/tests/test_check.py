@@ -65,6 +65,12 @@ def test_call_outside_interface(game):
     assert any("Art.drawStar" in e["message"] for e in r["errors"])
 
 
+def test_art_call_in_comment_is_ignored(game):
+    edit(game / "game/game.js", "(function () {",
+         "// 繪製一律呼叫 Art.drawXxx(ctx, state)\n/* 例: Art.drawStar */\n(function () {")
+    assert check(game)["ok"]
+
+
 def test_unknown_sound_in_polish(game):
     edit(game / "game/game.js", "Sound.play('coin')", "Sound.play('jump')")
     assert any("jump" in e["message"] for e in check(game)["errors"])

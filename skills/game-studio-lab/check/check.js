@@ -199,7 +199,10 @@ const allowed = new Set([...drawNames, 'drawGuidePage']);
 for (const src of scripts.filter((s) => !/art\/|audio\//.test(s))) {
   const p = path.join(gameDir, src);
   if (!fs.existsSync(p)) continue;
-  const code = fs.readFileSync(p, 'utf8');
+  // 去掉註解再掃: 註解裡寫「Art.drawXxx」這種說明不是呼叫(GhostEchoV2 deepen-1 因此誤判一次)
+  const code = fs.readFileSync(p, 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:"'`\\])\/\/.*$/gm, '$1');
   for (const m of code.matchAll(/\bArt\.(draw\w+)/g)) {
     if (!allowed.has(m[1])) fail('interface', `${src} 呼叫了介面沒有的 Art.${m[1]}`);
   }

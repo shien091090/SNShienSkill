@@ -55,6 +55,14 @@ def test_start_resume_end(env, capsys):
     assert ".lab/checkpoint.sqlite" in tracked and "sqlite-wal" not in tracked
 
 
+def test_commit_message_when_resuming_interrupted_build():
+    from pathlib import Path
+    state = {"stage": "deepen", "rounds": {"explore": 1, "deepen": 1, "polish": 0},
+             "round_dir": "deepen-1", "games": ["game-a", "game-b", "game-c"]}
+    msg = cli.commit_message(Path("proj"), state, state, "waiting_feedback", None)
+    assert msg == "[feat] [proj] 深掘第1輪產出3款試玩版"
+
+
 def test_start_refuses_non_empty_folder(env, capsys):
     env["project"].mkdir()
     (env["project"] / "x.txt").write_text("x")

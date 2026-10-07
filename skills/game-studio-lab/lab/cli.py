@@ -19,7 +19,9 @@ from lab.gitops import Git, SetupError
 from lab.graph import Deps, build_graph, round_label
 from lab.state import STAGE_NAMES
 
-CFG = {"configurable": {"thread_id": "main"}, "max_concurrency": 6}
+# 同時跑的 claude 上限; 記憶體吃緊時用 LAB_MAX_CONCURRENCY=1 改成一次一個
+CFG = {"configurable": {"thread_id": "main"},
+       "max_concurrency": int(os.environ.get("LAB_MAX_CONCURRENCY", "6"))}
 
 FEEDBACK_CHOICES = {
     "explore": {"continue", "next", "end", "fix"},
@@ -86,6 +88,13 @@ def commit_message(project: Path, before: dict, after: dict, status: str, choice
     new_round = after.get("round_dir") and after.get("round_dir") != before.get("round_dir")
     if new_round:
         parts.append(f"{round_label(after['stage'], after['rounds'])}產出{len(after.get('games') or [])}款試玩版")
+    if not parts:
+        # 中斷後不帶 choice 接續: 這次跑完的通常是本輪製作
+        if status == "waiting_feedback":
+            new_round = True
+            parts.append(f"{round_label(after['stage'], after['rounds'])}產出{len(after.get('games') or [])}款試玩版")
+        else:
+            parts.append("接續中斷的流程")
     prefix = "[feat]" if new_round or choice in FAILED_CHOICES else "[docs]"
     body = parts[0] if len(parts) == 1 else " ".join(f"{i}.{p}" for i, p in enumerate(parts, 1))
     return f"{prefix} [{name}] {body}"
