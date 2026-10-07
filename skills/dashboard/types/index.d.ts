@@ -1,5 +1,6 @@
 export type Gauge = { label: string; used: number; resetsAt?: string }
 export type Tokens = { input: number; output: number }
+export type UnityProject = { name: string; path: string }
 
 declare module 'claude-code' {
   interface PluginState {
@@ -14,8 +15,10 @@ declare module 'claude-code' {
       transcriptPath: string
       isAutoTitle: boolean
       isMenuOpen: boolean
+      isModelMenuOpen: boolean
       isRemoteOn: boolean
       todos: string[]
+      unityProject: UnityProject | null
     }
   }
 }

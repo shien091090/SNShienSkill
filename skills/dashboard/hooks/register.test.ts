@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import { folderName, taskSummary, toastText } from './notify'
 import { addTodo, parseTodos, removeTodo, todayText } from './todo'
-import { isRemoteDisconnectRow, latestTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, QUICK_ACTIONS, resetText, SAVE_STATE_PROMPT, SEP, shimmer, spinnerAt, toGauges } from './register'
+import { isRemoteDisconnectRow, isUnityRootNotification, latestTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, MODEL_OPTIONS, pctText, prettyModel, QUICK_ACTIONS, resetText, SAVE_STATE_PROMPT, SEP, shimmer, spinnerAt, toGauges, unityProjectFromText } from './register'
 
 const sample = toGauges(
   [
@@ -336,4 +336,69 @@ test('Todo 按鈕: 打開待辦面板, 可新增與刪除, 寫回 ~/.claude/TODO
   await pane.press({ key: 'todo-del-0' })
   expect(parseTodos(files['C:/Users/me/.claude/TODO.md']!).map(t => t.replace(/ \(.*\)$/, ''))).toEqual(['新的一件'])
   expect(await pane.find({ key: 'todo-del-1' })).toBeUndefined()
+})
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`${surface}: 點模型名稱旁的選單按鈕展開選單, 選擇後切換模型並收起選單`, async ($, on) => {
+    const commands: { command: string; args?: string }[] = []
+    let current = 'claude-sonnet-5-5'
+    on('session.start', (_, e) => ({ cwd: e.cwd }))
+    on('session.model', () => ({ value: current }))
+    on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: [] } }))
+    on('command.run', (_, e) => {
+      commands.push({ command: e.command, args: e.args })
+      if (e.command === 'model') current = 'claude-opus-5-5'
+      return { text: '' }
+    })
+    await $.session.start({ cwd: 'C:\proj', surface, isInteractive: true })
+    const ui = await $.ui.mount({ plugin: 'dashboard', surface, component: 'AbovePrompt', props: PROPS })
+
+    expect(await ui.find({ key: 'model-opus' })).toBeUndefined()
+    await ui.press({ key: 'model-switch' })
+    for (const opt of MODEL_OPTIONS) expect(await ui.find({ key: opt.key })).toBeDefined()
+
+    await ui.press({ key: 'model-opus' })
+    expect(commands).toEqual([{ command: 'model', args: 'opus' }])
+    expect(await ui.find({ key: 'model-opus' })).toBeUndefined()
+    expect(await ui.find({ text: 'Opus 5.5' })).toBeDefined()
+  })
+}
+
+test('問 Unity 專案的背景通知被擋下, 一般訊息照常送出', async ($, on) => {
+  const entered: string[] = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.model', () => ({ value: 'claude-opus-5-5' }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: [] } }))
+  on('prompt.submit', (_, e) => {
+    entered.push(e.text)
+    return { text: e.text }
+  })
+  await $.session.start({ cwd: 'C:\proj', surface: 'terminal', isInteractive: true })
+  const note = '<task-notification>MCP task (unity-mcp/Unity_ManageEditor) completed. {"data":{"projectRoot":"D:/x"}}</task-notification>'
+  const dropped = await $.prompt.submit({ text: note, origin: { kind: 'task-notification' } } as never)
+  expect('drop' in dropped).toBe(true)
+  await $.prompt.submit({ text: '你好' } as never)
+  expect(entered).toEqual(['你好'])
+})
+
+test('Unity 通知判斷: 只認 GetProjectRoot 的結果', () => {
+  expect(isUnityRootNotification('(unity-mcp/Unity_ManageEditor) {"projectRoot":"D:/x"}')).toBe(true)
+  expect(isUnityRootNotification('(unity-mcp/Unity_ManageScene) completed')).toBe(false)
+})
+
+test('Unity GetProjectRoot 回傳成功就取路徑最後一段當名稱', () => {
+  const text = JSON.stringify({ success: true, data: { projectRoot: 'D:/Git/MYS-808/Slot_Lobby' } })
+  expect(unityProjectFromText(text)).toEqual({ name: 'Slot_Lobby', path: 'D:/Git/MYS-808/Slot_Lobby' })
+})
+
+test('Unity 路徑用反斜線也能取出名稱', () => {
+  const text = JSON.stringify({ success: true, data: { projectRoot: 'D:\\Git\\MYS-808\\Slot_Lobby\\' } })
+  expect(unityProjectFromText(text)).toEqual({ name: 'Slot_Lobby', path: 'D:/Git/MYS-808/Slot_Lobby/' })
+})
+
+test('Unity 沒開專案、呼叫失敗、或格式不對都回 null', () => {
+  expect(unityProjectFromText(undefined)).toBeNull()
+  expect(unityProjectFromText(JSON.stringify({ success: false }))).toBeNull()
+  expect(unityProjectFromText(JSON.stringify({ success: true, data: {} }))).toBeNull()
+  expect(unityProjectFromText('不是 JSON')).toBeNull()
 })

@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionContextUsage, SessionRateLimit } from 'claude-code'
 
-import type { Gauge, Tokens } from '../types'
+import type { Gauge, Tokens, UnityProject } from '../types'
 import { TAG_CHARS, TOAST_SCRIPT, toastText } from './notify'
 import { addTodo, parseTodos, removeTodo, todayText } from './todo'
 
@@ -9,6 +9,8 @@ const gauges = atom({ plugin: 'dashboard', key: 'gauges' } as const, [] as Gauge
 const model = atom({ plugin: 'dashboard', key: 'model' } as const, '')
 const tokens = atom({ plugin: 'dashboard', key: 'tokens' } as const, { input: 0, output: 0 } as Tokens)
 const cost = atom({ plugin: 'dashboard', key: 'cost' } as const, null as number | null)
+// 目前 Unity MCP 連接到的專案; 沒有 Unity Editor 連線時是 null
+const unityProject = atom({ plugin: 'dashboard', key: 'unityProject' } as const, null as UnityProject | null)
 // session 名稱: 改名後先顯示在儀表板, 下次送出訊息時才真正寫進 session
 const title = atom({ plugin: 'dashboard', key: 'title' } as const, '')
 const pendingTitle = atom({ plugin: 'dashboard', key: 'pendingTitle' } as const, null as string | null)
@@ -18,6 +20,8 @@ const transcriptPath = atom({ plugin: 'dashboard', key: 'transcriptPath' } as co
 const isAutoTitle = atom({ plugin: 'dashboard', key: 'isAutoTitle' } as const, false)
 // 快捷按鈕列: 按「⋯ 快捷」展開, 選了其中一項就收起來
 const isMenuOpen = atom({ plugin: 'dashboard', key: 'isMenuOpen' } as const, false)
+// 點模型名稱展開的選單: 選了其中一個就收起來
+const isModelMenuOpen = atom({ plugin: 'dashboard', key: 'isModelMenuOpen' } as const, false)
 // 這個 session 跑過 /remote-control 就當作已啟動; 外掛讀不到真正的連線狀態, 再跑一次只會開狀態面板(斷開也在那裡)
 // 在面板裡斷開時指令會印出 "Remote Control disconnected.", 看到就改回未啟動
 const isRemoteOn = atom({ plugin: 'dashboard', key: 'isRemoteOn' } as const, false)
@@ -39,6 +43,14 @@ export const QUICK_ACTIONS = [
   { key: 'quick-save-state', label: '記憶工作狀態', prompt: SAVE_STATE_PROMPT },
   { key: 'quick-remote-control', label: '啟動RemoteControl', onLabel: 'RemoteControl 狀態', command: 'remote-control' },
   { key: 'quick-todo', label: 'Todo', pane: TODO_PANE },
+] as const
+
+// 點模型名稱展開的選單: label 要跟 prettyModel() 轉出來的名字一致, 才能標出目前選到哪個
+export const MODEL_OPTIONS = [
+  { key: 'model-sonnet', label: 'Sonnet 5.5', arg: 'sonnet' },
+  { key: 'model-opus', label: 'Opus 5.5', arg: 'opus' },
+  { key: 'model-haiku', label: 'Haiku 4.5', arg: 'haiku' },
+  { key: 'model-fable', label: 'Fable 5.1', arg: 'fable' },
 ] as const
 
 // 第一輪結束時 AI 標題可能還沒寫好, 晚一點再讀一次
@@ -232,6 +244,17 @@ async function runQuickAction($: EngineInterface, action: (typeof QUICK_ACTIONS)
   }
 }
 
+async function runModelSwitch($: EngineInterface, option: (typeof MODEL_OPTIONS)[number]) {
+  await update($, isModelMenuOpen, () => false)
+  try {
+    // 自己呼叫 /model 不會經過自己的 command.run 鉤子, 這裡直接重讀一次模型名稱
+    await $.command.run({ command: 'model', args: option.arg })
+    await refreshModel($)
+  } catch (err) {
+    $.ui.toast(`切換成 ${option.label} 失敗: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
 // 待辦存在 ~/.claude/TODO.md, 跟著 ~/.claude 的 git 同步到各台裝置
 async function todoPath($: EngineInterface): Promise<string> {
   const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME')) ?? ''
@@ -263,6 +286,37 @@ async function editTodos($: EngineInterface, label: string, edit: (md: string) =
 async function refreshModel($: EngineInterface) {
   const name = prettyModel(await $.session.model())
   if (name !== (await read($, model))) await update($, model, () => name)
+}
+
+// Unity_ManageEditor GetProjectRoot 的文字內容轉成顯示用的專案名稱與路徑; 沒開專案或格式不對就回 null
+export function unityProjectFromText(text: string | undefined): UnityProject | null {
+  if (!text) return null
+  let parsed: { success?: boolean; data?: { projectRoot?: string } }
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return null
+  }
+  const root = parsed.success ? parsed.data?.projectRoot : undefined
+  if (!root) return null
+  const path = root.replace(/\\/g, '/')
+  return { name: path.split('/').filter(Boolean).pop() ?? path, path }
+}
+
+export const isUnityRootNotification = (text: string) =>
+  text.includes('Unity_ManageEditor') && text.includes('projectRoot')
+
+// 問 Unity MCP 目前專案根目錄; 沒連線或沒開專案就清空, 不跳錯誤
+async function refreshUnityProject($: EngineInterface) {
+  let next: UnityProject | null = null
+  try {
+    const result = await $.mcp.call('unity-mcp', 'Unity_ManageEditor', { Action: 'GetProjectRoot' })
+    next = unityProjectFromText(result.content.find(b => b.type === 'text')?.text)
+  } catch {
+    // Unity MCP 沒設定或沒連線: 當作目前沒有專案
+  }
+  const current = await read($, unityProject)
+  if (next?.path !== current?.path) await update($, unityProject, () => next)
 }
 
 // 還沒有名稱時從對話紀錄讀 Claude Code 取的標題; 有名稱後就不再讀, 免得每輪讀一次大檔案
@@ -300,6 +354,7 @@ export const register: Register = on => {
     await update($, gauges, () => toGauges(u.rateLimits, u.context))
     await update($, cost, () => u.cost?.usd ?? null)
     await refreshModel($)
+    await refreshUnityProject($)
 
     $.clock.every(FRAME_MS, () => {
       if (isWorking) $.ui.invalidate('ui.render')
@@ -311,7 +366,11 @@ export const register: Register = on => {
   })
 
   on('prompt.submit', async ($, e, next) => {
+    // 問 Unity 專案的呼叫會被當成背景工作, 完成時送一則通知進對話; 擋下來, 不讓它喚醒模型
+    if (e.origin.kind === 'task-notification' && isUnityRootNotification(e.text)) return { drop: '' }
     await refreshModel($)
+    // Unity 開/關專案沒有事件可接, 改成使用者送訊息時順便問一次(不定時輪詢, 免得通知洗版)
+    if (e.origin.kind !== 'task-notification') void refreshUnityProject($).catch(() => {})
     return next(e)
   })
 
@@ -438,6 +497,8 @@ export const register: Register = on => {
     const autoNamed = await read($, isAutoTitle)
     const menuOpen = await read($, isMenuOpen)
     const remoteOn = await read($, isRemoteOn)
+    const modelMenuOpen = await read($, isModelMenuOpen)
+    const unity = await read($, unityProject)
     const requestId = e.requestId
     const { bar, showReset, pad } = layout(list, e.props.bodyColumns, info)
     const now = Date.now()
@@ -480,6 +541,13 @@ export const register: Register = on => {
               <Text color={MODEL_BASE} bold>{name}</Text>
             )}
             </Box>
+            <Button
+              key="model-switch"
+              label="▾"
+              plain
+              dimColor
+              onPress={() => update($, isModelMenuOpen, open => !open)}
+            />
             <Text dimColor>│</Text>
             {editing && Input ? (
               <Box key="title-edit" flexDirection="row" gap={1}>
@@ -533,6 +601,25 @@ export const register: Register = on => {
                 />
               </Box>
             )}
+          </Box>
+        ) : null}
+        {modelMenuOpen ? (
+          <Box key="model-menu-row" flexDirection="row" gap={1}>
+            {MODEL_OPTIONS.map(opt => (
+              <Button
+                key={opt.key}
+                label={opt.label}
+                dimColor={opt.label !== name}
+                onPress={() => void runModelSwitch($, opt)}
+              />
+            ))}
+          </Box>
+        ) : null}
+        {unity ? (
+          <Box key="unity-row" flexDirection="row" gap={1}>
+            <Text dimColor>Unity</Text>
+            <Text bold>{unity.name}</Text>
+            <Text dimColor>{unity.path}</Text>
           </Box>
         ) : null}
         {menuOpen ? (
