@@ -15,6 +15,7 @@ declare module 'claude-code' {
       transcriptPath: string
       isAutoTitle: boolean
       isMenuOpen: boolean
+      isModelMenuOpen: boolean
       isRemoteOn: boolean
       todos: string[]
       unityProject: UnityProject | null

@@ -20,6 +20,8 @@ const transcriptPath = atom({ plugin: 'dashboard', key: 'transcriptPath' } as co
 const isAutoTitle = atom({ plugin: 'dashboard', key: 'isAutoTitle' } as const, false)
 // 快捷按鈕列: 按「⋯ 快捷」展開, 選了其中一項就收起來
 const isMenuOpen = atom({ plugin: 'dashboard', key: 'isMenuOpen' } as const, false)
+// 點模型名稱展開的選單: 選了其中一個就收起來
+const isModelMenuOpen = atom({ plugin: 'dashboard', key: 'isModelMenuOpen' } as const, false)
 // 這個 session 跑過 /remote-control 就當作已啟動; 外掛讀不到真正的連線狀態, 再跑一次只會開狀態面板(斷開也在那裡)
 // 在面板裡斷開時指令會印出 "Remote Control disconnected.", 看到就改回未啟動
 const isRemoteOn = atom({ plugin: 'dashboard', key: 'isRemoteOn' } as const, false)
@@ -41,6 +43,14 @@ export const QUICK_ACTIONS = [
   { key: 'quick-save-state', label: '記憶工作狀態', prompt: SAVE_STATE_PROMPT },
   { key: 'quick-remote-control', label: '啟動RemoteControl', onLabel: 'RemoteControl 狀態', command: 'remote-control' },
   { key: 'quick-todo', label: 'Todo', pane: TODO_PANE },
+] as const
+
+// 點模型名稱展開的選單: label 要跟 prettyModel() 轉出來的名字一致, 才能標出目前選到哪個
+export const MODEL_OPTIONS = [
+  { key: 'model-sonnet', label: 'Sonnet 5.5', arg: 'sonnet' },
+  { key: 'model-opus', label: 'Opus 5.5', arg: 'opus' },
+  { key: 'model-haiku', label: 'Haiku 4.5', arg: 'haiku' },
+  { key: 'model-fable', label: 'Fable 5.1', arg: 'fable' },
 ] as const
 
 // 第一輪結束時 AI 標題可能還沒寫好, 晚一點再讀一次
@@ -232,6 +242,17 @@ async function runQuickAction($: EngineInterface, action: (typeof QUICK_ACTIONS)
     }
   } catch (err) {
     $.ui.toast(`${action.label} 失敗: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
+async function runModelSwitch($: EngineInterface, option: (typeof MODEL_OPTIONS)[number]) {
+  await update($, isModelMenuOpen, () => false)
+  try {
+    // 自己呼叫 /model 不會經過自己的 command.run 鉤子, 這裡直接重讀一次模型名稱
+    await $.command.run({ command: 'model', args: option.arg })
+    await refreshModel($)
+  } catch (err) {
+    $.ui.toast(`切換成 ${option.label} 失敗: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
 
@@ -472,6 +493,7 @@ export const register: Register = on => {
     const autoNamed = await read($, isAutoTitle)
     const menuOpen = await read($, isMenuOpen)
     const remoteOn = await read($, isRemoteOn)
+    const modelMenuOpen = await read($, isModelMenuOpen)
     const unity = await read($, unityProject)
     const requestId = e.requestId
     const { bar, showReset, pad } = layout(list, e.props.bodyColumns, info)
@@ -515,6 +537,13 @@ export const register: Register = on => {
               <Text color={MODEL_BASE} bold>{name}</Text>
             )}
             </Box>
+            <Button
+              key="model-switch"
+              label="▾"
+              plain
+              dimColor
+              onPress={() => update($, isModelMenuOpen, open => !open)}
+            />
             <Text dimColor>│</Text>
             {editing && Input ? (
               <Box key="title-edit" flexDirection="row" gap={1}>
@@ -568,6 +597,18 @@ export const register: Register = on => {
                 />
               </Box>
             )}
+          </Box>
+        ) : null}
+        {modelMenuOpen ? (
+          <Box key="model-menu-row" flexDirection="row" gap={1}>
+            {MODEL_OPTIONS.map(opt => (
+              <Button
+                key={opt.key}
+                label={opt.label}
+                dimColor={opt.label !== name}
+                onPress={() => void runModelSwitch($, opt)}
+              />
+            ))}
           </Box>
         ) : null}
         {unity ? (

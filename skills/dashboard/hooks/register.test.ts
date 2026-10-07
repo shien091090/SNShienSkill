@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import { folderName, taskSummary, toastText } from './notify'
 import { addTodo, parseTodos, removeTodo, todayText } from './todo'
-import { isRemoteDisconnectRow, latestTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, pctText, prettyModel, QUICK_ACTIONS, resetText, SAVE_STATE_PROMPT, SEP, shimmer, spinnerAt, toGauges, unityProjectFromText } from './register'
+import { isRemoteDisconnectRow, latestTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, MODEL_OPTIONS, pctText, prettyModel, QUICK_ACTIONS, resetText, SAVE_STATE_PROMPT, SEP, shimmer, spinnerAt, toGauges, unityProjectFromText } from './register'
 
 const sample = toGauges(
   [
@@ -337,6 +337,32 @@ test('Todo 按鈕: 打開待辦面板, 可新增與刪除, 寫回 ~/.claude/TODO
   expect(parseTodos(files['C:/Users/me/.claude/TODO.md']!).map(t => t.replace(/ \(.*\)$/, ''))).toEqual(['新的一件'])
   expect(await pane.find({ key: 'todo-del-1' })).toBeUndefined()
 })
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`${surface}: 點模型名稱旁的選單按鈕展開選單, 選擇後切換模型並收起選單`, async ($, on) => {
+    const commands: { command: string; args?: string }[] = []
+    let current = 'claude-sonnet-5-5'
+    on('session.start', (_, e) => ({ cwd: e.cwd }))
+    on('session.model', () => ({ value: current }))
+    on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: [] } }))
+    on('command.run', (_, e) => {
+      commands.push({ command: e.command, args: e.args })
+      if (e.command === 'model') current = 'claude-opus-5-5'
+      return { text: '' }
+    })
+    await $.session.start({ cwd: 'C:\proj', surface, isInteractive: true })
+    const ui = await $.ui.mount({ plugin: 'dashboard', surface, component: 'AbovePrompt', props: PROPS })
+
+    expect(await ui.find({ key: 'model-opus' })).toBeUndefined()
+    await ui.press({ key: 'model-switch' })
+    for (const opt of MODEL_OPTIONS) expect(await ui.find({ key: opt.key })).toBeDefined()
+
+    await ui.press({ key: 'model-opus' })
+    expect(commands).toEqual([{ command: 'model', args: 'opus' }])
+    expect(await ui.find({ key: 'model-opus' })).toBeUndefined()
+    expect(await ui.find({ text: 'Opus 5.5' })).toBeDefined()
+  })
+}
 
 test('Unity GetProjectRoot 回傳成功就取路徑最後一段當名稱', () => {
   const text = JSON.stringify({ success: true, data: { projectRoot: 'D:/Git/MYS-808/Slot_Lobby' } })
