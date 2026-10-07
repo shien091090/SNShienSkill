@@ -94,7 +94,6 @@ const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', 
 const IDLE_MARK = '⠿'
 const FRAME_MS = 100
 const MODEL_POLL_MS = 1_000
-const UNITY_POLL_MS = 10_000
 
 // 模型識別字轉成好讀的名字: claude-opus-5-5[1m] → Opus 5.5
 export function prettyModel(id: string): string {
@@ -304,7 +303,10 @@ export function unityProjectFromText(text: string | undefined): UnityProject | n
   return { name: path.split('/').filter(Boolean).pop() ?? path, path }
 }
 
-// Unity 沒有事件通知專案切換, 定時打一次 Unity MCP 問目前專案根目錄; 沒連線或沒開專案就清空, 不跳錯誤
+export const isUnityRootNotification = (text: string) =>
+  text.includes('Unity_ManageEditor') && text.includes('projectRoot')
+
+// 問 Unity MCP 目前專案根目錄; 沒連線或沒開專案就清空, 不跳錯誤
 async function refreshUnityProject($: EngineInterface) {
   let next: UnityProject | null = null
   try {
@@ -359,14 +361,16 @@ export const register: Register = on => {
     })
     // 換模型沒有事件可接(/model 選單選完才生效), 定時檢查一次
     $.clock.every(MODEL_POLL_MS, () => void refreshModel($).catch(() => {}))
-    // Unity 開/關專案也沒有事件, 用較長的間隔定時問
-    $.clock.every(UNITY_POLL_MS, () => void refreshUnityProject($).catch(() => {}))
 
     return result
   })
 
   on('prompt.submit', async ($, e, next) => {
+    // 問 Unity 專案的呼叫會被當成背景工作, 完成時送一則通知進對話; 擋下來, 不讓它喚醒模型
+    if (e.origin.kind === 'task-notification' && isUnityRootNotification(e.text)) return { drop: '' }
     await refreshModel($)
+    // Unity 開/關專案沒有事件可接, 改成使用者送訊息時順便問一次(不定時輪詢, 免得通知洗版)
+    if (e.origin.kind !== 'task-notification') void refreshUnityProject($).catch(() => {})
     return next(e)
   })
 

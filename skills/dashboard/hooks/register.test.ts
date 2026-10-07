@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import { folderName, taskSummary, toastText } from './notify'
 import { addTodo, parseTodos, removeTodo, todayText } from './todo'
-import { isRemoteDisconnectRow, latestTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, MODEL_OPTIONS, pctText, prettyModel, QUICK_ACTIONS, resetText, SAVE_STATE_PROMPT, SEP, shimmer, spinnerAt, toGauges, unityProjectFromText } from './register'
+import { isRemoteDisconnectRow, isUnityRootNotification, latestTitle, strWidth, fmtTokens, hp, hpColor, infoText, layout, MODEL_OPTIONS, pctText, prettyModel, QUICK_ACTIONS, resetText, SAVE_STATE_PROMPT, SEP, shimmer, spinnerAt, toGauges, unityProjectFromText } from './register'
 
 const sample = toGauges(
   [
@@ -363,6 +363,28 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(await ui.find({ text: 'Opus 5.5' })).toBeDefined()
   })
 }
+
+test('問 Unity 專案的背景通知被擋下, 一般訊息照常送出', async ($, on) => {
+  const entered: string[] = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.model', () => ({ value: 'claude-opus-5-5' }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: [] } }))
+  on('prompt.submit', (_, e) => {
+    entered.push(e.text)
+    return { text: e.text }
+  })
+  await $.session.start({ cwd: 'C:\proj', surface: 'terminal', isInteractive: true })
+  const note = '<task-notification>MCP task (unity-mcp/Unity_ManageEditor) completed. {"data":{"projectRoot":"D:/x"}}</task-notification>'
+  const dropped = await $.prompt.submit({ text: note, origin: { kind: 'task-notification' } } as never)
+  expect('drop' in dropped).toBe(true)
+  await $.prompt.submit({ text: '你好' } as never)
+  expect(entered).toEqual(['你好'])
+})
+
+test('Unity 通知判斷: 只認 GetProjectRoot 的結果', () => {
+  expect(isUnityRootNotification('(unity-mcp/Unity_ManageEditor) {"projectRoot":"D:/x"}')).toBe(true)
+  expect(isUnityRootNotification('(unity-mcp/Unity_ManageScene) completed')).toBe(false)
+})
 
 test('Unity GetProjectRoot 回傳成功就取路徑最後一段當名稱', () => {
   const text = JSON.stringify({ success: true, data: { projectRoot: 'D:/Git/MYS-808/Slot_Lobby' } })
