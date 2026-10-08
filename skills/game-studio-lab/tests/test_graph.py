@@ -85,9 +85,12 @@ def test_full_path_explore_deepen_polish_end(tmp_path):
     assert interrupt_of(snap)["round_dir"] == "deepen-1"
     snap, _ = lab.resume(choice="next", feedback=lab.feedback("deepen-1"))
     v = interrupt_of(snap)
-    assert v["round_dir"] == "polish-1" and [g["id"] for g in v["games"]] == ["game"]
-    assert count(lab.runner, "audio", "polish-1") == 1
-    snap, err = lab.resume(choice="end", feedback=lab.feedback("polish-1"))
+    assert v["round_dir"] == "polish" and [g["id"] for g in v["games"]] == ["game"]
+    assert count(lab.runner, "audio", "polish") == 1
+    # 進打磨後探索 / 深掘的資料夾都刪掉
+    assert sorted(p.name for p in lab.project.iterdir() if p.is_dir() and not p.name.startswith(".")) \
+        == ["archive", "polish"]
+    snap, err = lab.resume(choice="end", feedback=lab.feedback("polish"))
     assert err is None and snap.next == ()
     assert count(lab.runner, "review") == 4
     assert len(list((lab.project / "archive").glob("hypotheses.v*.md"))) == 4
@@ -99,9 +102,27 @@ def test_polish_can_go_back(tmp_path, choice, stage):
     lab.start()
     lab.resume(choice="next", feedback=lab.feedback("explore-1"))
     lab.resume(choice="next", feedback=lab.feedback("deepen-1"))
-    snap, _ = lab.resume(choice=choice, feedback=lab.feedback("polish-1"))
+    snap, _ = lab.resume(choice=choice, feedback=lab.feedback("polish"))
     rd = interrupt_of(snap)["round_dir"]
     assert rd == f"{stage}-2"
+
+
+def test_polish_iterates_in_same_folder(tmp_path):
+    lab = Lab(tmp_path, FakeRunner())
+    lab.start()
+    lab.resume(choice="next", feedback=lab.feedback("explore-1"))
+    lab.resume(choice="next", feedback=lab.feedback("deepen-1"))
+    logs = lab.project / "polish" / "logs"
+    logs.mkdir()
+    (logs / "gamelog-a.json").write_text("{}", encoding="utf-8")
+    snap, err = lab.resume(choice="continue", feedback=lab.feedback("polish"))
+    assert err is None and interrupt_of(snap)["round_dir"] == "polish"
+    # 同一個資料夾, 第二輪美術 / RD / 音效照樣重做(完成標記有清掉)
+    assert count(lab.runner, "art", "polish") == 2
+    assert count(lab.runner, "rd", "polish") == 2
+    assert count(lab.runner, "audio", "polish") == 2
+    # 用過的試玩紀錄收進 round-1
+    assert (logs / "round-1" / "gamelog-a.json").exists() and not (logs / "gamelog-a.json").exists()
 
 
 def test_bugfix_returns_to_interview(tmp_path):

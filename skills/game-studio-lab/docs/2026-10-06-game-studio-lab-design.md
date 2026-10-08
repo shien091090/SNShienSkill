@@ -108,6 +108,11 @@ game-studio 已禁止自測開瀏覽器(殘留的無頭行程會在背景播音�
   archive/         hypotheses.v<N>.md
 ```
 
+打磨階段(2026-10-09 修訂):
+- 固定在 `polish/game/` 一個資料夾迭代, 不再每輪開 `polish-<N>`。每輪開始前清掉上一輪的完成標記與檢查結果, 美術 / RD / 音效在既有產物上修改
+- 進入打磨、設計交稿後, 刪除所有 `explore-*`、`deepen-*`、`polish-<N>` 資料夾(git 留有紀錄); 驗證文件與 archive 保留
+- `polish/feedback.md`、`polish/difficulty.md` 每輪覆寫(每版都已 commit); 試玩紀錄在 review 用完後收進 `polish/logs/round-<N>/`
+
 ### git
 
 專案資料夾自動 commit + push(使用者授權, 只限本流程建立的專案資料夾)。commit 不在節點裡做, 由 CLI 在每次流程停下來(暫停點、完成、出錯)後統一做: 先關掉進度檔連線讓 WAL 寫回, commit 進去的才是完整進度。格式照 `~/.claude/rules/commit-format.md`, 系統名稱用專案資料夾名。push 失敗不 force, 狀態 JSON 帶 warning 回報使用者。

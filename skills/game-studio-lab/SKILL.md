@@ -57,6 +57,8 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 | 深掘 | 再深掘一輪 | 進打磨 | — | 結束 |
 | 打磨 | 再打磨一輪 | — | 退回深掘 / 探索 | 結束 |
 
+打磨階段固定在 `<專案>/polish/` 迭代(round_dir 永遠是 `polish`), 進入打磨後探索 / 深掘的資料夾會被流程刪除(git 有紀錄)。
+
 打磨階段 resume 之前: 到 `~/Downloads` 把本輪的 `gamelog-<專案資料夾名>-*.json` 搬到 `<round_dir>/logs/`(只搬不整理); 一個都沒有就在 feedback.md 註明。
 
 ### build_failed: 有款做不出來

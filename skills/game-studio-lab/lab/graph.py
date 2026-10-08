@@ -5,6 +5,8 @@ git commit 不在節點裡做, 由 CLI 在每次停下來後統一做, 確保進
 """
 import filecmp
 import json
+import re
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +18,38 @@ from lab.projectfiles import (archive_hypotheses, round_games, update_state_md,
 from lab.state import MAX_TRIAGE, NEXT_STAGE, STAGE_NAMES, GameOutput, GameState, LabState
 
 PROJECT_GITIGNORE = ".lab/logs/\n.lab/*.sqlite-wal\n.lab/*.sqlite-shm\n"
+POLISH_DIR = "polish"
+ROUND_DIR_RE = re.compile(r"^(explore|deepen|polish)-\d+$")
+
+
+def reset_build_marks(game_dir: Path) -> None:
+    """打磨在同一個資料夾迭代: 開新一輪前清掉上一輪的完成標記與檢查結果, 否則美術 / RD 會被跳過。"""
+    if not game_dir.exists():
+        return
+    for p in game_dir.glob(".done-*"):
+        p.unlink()
+    for name in ("check-report.json", "check-history.jsonl", "triage.json"):
+        (game_dir / name).unlink(missing_ok=True)
+
+
+def remove_round_dirs(project: Path) -> list[str]:
+    removed = []
+    for p in project.iterdir():
+        if p.is_dir() and ROUND_DIR_RE.match(p.name):
+            shutil.rmtree(p)
+            removed.append(p.name)
+    return sorted(removed)
+
+
+def archive_polish_logs(project: Path, round_no: int) -> None:
+    """打磨的試玩紀錄用完後收進 logs/round-<N>/, 下一輪 review 只讀 logs/ 底下新放進來的檔。"""
+    logs = project / POLISH_DIR / "logs"
+    files = list(logs.glob("*.json")) if logs.exists() else []
+    if files:
+        dest = logs / f"round-{round_no}"
+        dest.mkdir(exist_ok=True)
+        for f in files:
+            shutil.move(str(f), dest / f.name)
 
 
 class LabError(Exception):
@@ -137,8 +171,11 @@ def build_graph(deps: Deps, checkpointer=None):
         project, stage = project_of(s), s["stage"]
         rounds = dict(s["rounds"])
         rounds[stage] += 1
-        round_dir = f"{stage}-{rounds[stage]}"
+        # 打磨固定在同一個資料夾迭代; 探索 / 深掘每輪一個資料夾
+        round_dir = POLISH_DIR if stage == "polish" else f"{stage}-{rounds[stage]}"
         (project / round_dir).mkdir(parents=True, exist_ok=True)
+        if stage == "polish":
+            reset_build_marks(project / POLISH_DIR / "game")
         deps.runner.run("design", {"project": str(project), "stage": stage, "round_dir": round_dir,
                                    "round_no": rounds[stage], "prev_round": s.get("round_dir") or "無"})
         games = round_games(project, round_dir)
@@ -150,6 +187,9 @@ def build_graph(deps: Deps, checkpointer=None):
             for f in ("spec.md", "guide.md"):
                 if not (project / round_dir / g / f).exists():
                     raise LabError(f"{round_dir}/{g} 缺 {f}")
+        if stage == "polish":
+            # 底版已由設計搬進 polish/, 探索 / 深掘與舊版編號打磨的資料夾不再需要(git 留有紀錄)
+            remove_round_dirs(project)
         label = round_label(stage, rounds)
         update_state_md(project, {**s, "rounds": rounds, "round_dir": round_dir}, "製作中",
                         f"{label}設計完成, {len(games)} 款: {', '.join(games)}")
@@ -217,6 +257,8 @@ def build_graph(deps: Deps, checkpointer=None):
             archive_hypotheses(project)
         deps.runner.run("review", {"project": str(project), "stage": stage, "round_dir": s["round_dir"],
                                    "feedback": s["feedback"], "choice": choice})
+        if s["round_dir"] == POLISH_DIR:
+            archive_polish_logs(project, s["rounds"]["polish"])
         new_stage = {"continue": stage, "end": stage, "back-deepen": "deepen",
                      "back-explore": "explore"}.get(choice) or NEXT_STAGE[stage]
         label = round_label(stage, s["rounds"])

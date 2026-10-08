@@ -6,7 +6,7 @@
 - `$feedback` — 本輪訪談整理(使用者的原話與感受)
 - `$project/hypotheses.md` — 玩法驗證文件
 - `$project/$round_dir/*/spec.md` — 本輪各款規格, 了解每款實際做了哪些機制
-- 打磨階段另讀 `$project/$round_dir/logs/` 下的試玩紀錄 JSON(有的話)
+- 打磨階段另讀 `$project/$round_dir/logs/` 這一層的試玩紀錄 JSON(有的話; `round-*` 子資料夾是前幾輪用過的, 不讀)
 
 ## 要做的事
 

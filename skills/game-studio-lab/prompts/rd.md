@@ -8,6 +8,8 @@
 ## 要做的事
 實作 `$game_dir/game/index.html` 與 `$game_dir/game/game.js`(可加 `style.css`)。
 
+- **打磨的後續輪次**: `game/game.js` 已經存在時, 照 spec.md 的「本輪改動」在既有程式上修改, 不要整份重寫(上一輪修過的 bug 與手感會流失)
+
 - `index.html` 宣告 `<meta charset="utf-8">`; 傳統 `<script src>`, 不用 module; 載入順序 `art/art.js` →(打磨階段)`audio/sound.js` → `game.js`
 - 繪製一律呼叫 `Art.<函式>(ctx, state)`, 只用 interface.json 列的函式與 `Art.drawGuidePage`; state 的 key 照 interface.json
 - 畫布邏輯尺寸用 interface.json 的 canvas, 依 devicePixelRatio 放大實際像素
