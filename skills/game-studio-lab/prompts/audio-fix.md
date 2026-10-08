@@ -13,4 +13,4 @@
 只改 `game/audio/`, 讓 `window.Sound` 的 `init` / `play` / `playMusic` 存在且載入不拋錯, 事件名照 interface.json。換素材時照樣找免費授權並更新 credits.md。
 
 ## 回報
-改了什麼、回寫了哪條經驗(沒有就說無)。
+改了什麼、寫了哪條經驗提案(沒有就說無)。

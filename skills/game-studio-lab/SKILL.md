@@ -61,6 +61,11 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 
 打磨階段 resume 之前: 到 `~/Downloads` 把本輪的 `gamelog-<專案資料夾名>-*.json` 搬到 `<round_dir>/logs/`(只搬不整理); 一個都沒有就在 feedback.md 註明。
 
+### 每次流程停下來後: 經驗收件匣與規格同步
+
+- **經驗收件匣**: 無頭 `claude -p` 改不了 `~/.claude` 底下的檔(2026-10-09 GhostEchoV2 修 bug 時 RD 回報被權限擋下; 在那之前所有節點的回寫其實都沒寫進去), 所以節點把經驗提案寫到 `<專案>/.lab/lessons-inbox/<目標檔名>`。每次流程停下來, 你就審收件匣: 照目標經驗文件的規則(只收跨遊戲通則、先找同類合併、art-lessons 的理念升降規則)併進 `~/.claude/skills/game-studio/references/`, 不合格的丟掉; 處理完刪掉收件匣檔案, 照 commit 規範 commit `~/.claude`(系統名 `game-studio`)。在專案裡的收件匣檔不必另外 commit 刪除, 下一次流程跑完會一起 commit
+- **規格同步**: RD(含修 bug)不改 spec.md。回報裡若列出「規格要同步的內容」(例: 修 bug 加了關卡物件), 由你照它更新 `<round_dir>/<款>/spec.md`, 讓下一輪設計讀到的是實際狀態
+
 ### build_failed: 有款做不出來
 
 `failed` 列出每款的錯誤。轉述給使用者(用白話, 不貼原始 JSON), 讓他選:

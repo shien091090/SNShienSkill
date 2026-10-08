@@ -10,7 +10,7 @@
 - `$studio_refs/rd-lessons.md`
 
 ## 要做的事
-只改 `index.html` / `game.js` / `style.css`, 讓報告裡的錯誤消失, 不改規格行為。用 Node vm 載入 art.js 與 game.js 自測。踩到跨遊戲通用的坑就依經驗文件規則回寫(先重讀再改)。
+只改 `index.html` / `game.js` / `style.css`, 讓報告裡的錯誤消失, 不改規格行為。用 Node vm 載入 art.js 與 game.js 自測。踩到跨遊戲通用的坑就依經驗文件規則寫一條經驗提案到收件匣(見共同守則)。
 
 ## 回報
-改了什麼、自測結果、回寫了哪條經驗(沒有就說無)。
+改了什麼、自測結果、寫了哪條經驗提案(沒有就說無)。
