@@ -184,7 +184,8 @@ def build_graph(deps: Deps, checkpointer=None):
         if stage != "polish" and not 2 <= len(games) <= 3:
             raise LabError(f"{round_dir} 應有 2~3 款(含 interface.json), 實際: {games}")
         for g in games:
-            for f in ("spec.md", "guide.md"):
+            # 探索 / 深掘用說明頁(guide.md); 打磨改用開始畫面 + 嵌入式新手教學, 寫在 spec.md
+            for f in ("spec.md",) if stage == "polish" else ("spec.md", "guide.md"):
                 if not (project / round_dir / g / f).exists():
                     raise LabError(f"{round_dir}/{g} 缺 {f}")
         if stage == "polish":

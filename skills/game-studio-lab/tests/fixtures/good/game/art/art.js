@@ -26,7 +26,19 @@ window.Art = {
   },
   drawGuidePage(ctx, state) {
     ctx.save();
-    ctx.fillText('說明 ' + (state.page + 1), 10, 20);
+    ctx.strokeRect(state.x, state.y, state.w, state.h);
+    ctx.restore();
+  },
+  drawTitle(ctx, state) {
+    ctx.save();
+    ctx.fillText('樣本遊戲', 200, 200);
+    if (state.blink) ctx.fillText('點一下開始', 200, 400);
+    ctx.restore();
+  },
+  drawTutorial(ctx, state) {
+    ctx.save();
+    ctx.globalAlpha = state.done ? 1 - state.done : 1;
+    ctx.fillText(state.text, state.x, state.y);
     ctx.restore();
   },
 };

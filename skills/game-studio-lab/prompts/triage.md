@@ -8,7 +8,8 @@
 - `$game_dir/game/` 下全部程式: index.html、game.js、art/art.js(、audio/sound.js)
 
 ## 判定原則
-- `Art.drawGuidePage(ctx, state)` 是介面固定的一部分(畫說明頁), 不列在 interface.json 的 draw 清單裡, 但 game.js 呼叫它是**合法的**, 不要當成越界
+- 探索 / 深掘: `Art.drawGuidePage(ctx, state)` 是介面固定的一部分(畫說明頁), 不列在 interface.json 的 draw 清單裡, 但 game.js 呼叫它是**合法的**, 不要當成越界
+- 打磨: 沒有說明頁; 開始畫面與新手教學是 draw 清單裡的 `drawTitle`、`drawTutorial`, 教學文字與按鍵圖示屬美術
 - 誰沒照 interface.json 做, 就退給誰。例: Art 少了介面上的函式 → art; game.js 呼叫介面外的函式或傳錯欄位 → rd; Sound 少了事件 → audio
 - 錯誤發生在某方的程式裡, 但根因是另一方沒照介面 → 退給根因那方
 - 雙方都有問題 → 兩方都退, 各寫各的修改方向

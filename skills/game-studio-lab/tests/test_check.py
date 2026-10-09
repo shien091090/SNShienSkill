@@ -41,6 +41,20 @@ def test_missing_draw_function(game):
     assert any("Art.drawCoin 不存在" in e["message"] for e in r["errors"])
 
 
+def test_interface_must_have_title_and_tutorial(game):
+    edit(game / "interface.json", '"drawTitle"', '"drawTitleX"')
+    r = check(game)
+    assert any("缺 drawTitle" in e["message"] for e in r["errors"])
+
+
+def test_explore_requires_guide_page_but_not_title(game):
+    edit(game / "interface.json", '"drawTitle"', '"drawTitleX"')
+    assert not any("缺 drawTitle" in e["message"] for e in check(game, "explore")["errors"])
+    edit(game / "game/art/art.js", "drawGuidePage(ctx, state)", "drawGuideX(ctx, state)")
+    assert any("Art.drawGuidePage 不存在" in e["message"] for e in check(game, "explore")["errors"])
+    assert not any("drawGuidePage" in e["message"] for e in check(game, "polish")["errors"])
+
+
 def test_art_throws(game):
     edit(game / "game/art/art.js", "ctx.arc(", "undefinedThing.arc(")
     r = check(game)

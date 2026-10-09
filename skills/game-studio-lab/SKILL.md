@@ -43,7 +43,7 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 
 ### waiting_feedback: 請使用者試玩, 然後訪談
 
-1. 列出每款的 `index_html` 絕對路徑(可直接雙擊)。不重寫操作說明, 遊戲開場的說明畫面就是給他看的
+1. 列出每款的 `index_html` 絕對路徑(可直接雙擊)。不重寫操作說明: 探索 / 深掘的遊戲開場有說明頁, 打磨是開始畫面 + 嵌入在遊戲流程裡的新手教學(2026-10-09 起, 打磨沒有說明頁)
 2. 讀 `<專案>/<round_dir>/*/spec.md` 的概述與 `hypotheses.md` 的「各款對應」, 心裡有底每款在驗什麼; **不要把假設念給使用者聽**, 免得引導他的感受
 3. 照該階段的訪談指引進行: `references/interview-explore.md` / `interview-deepen.md` / `interview-polish.md`
 4. 訪談中使用者回報 bug(當掉、操作沒反應、說明與實際不符)→ 寫成 `<round_dir>/bugs-<款>-<n>.md`, `resume --choice fix --feedback <該檔> --target <款>`; 修完會再停在 waiting_feedback, 請他重玩那款再繼續訪談

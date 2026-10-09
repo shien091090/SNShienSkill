@@ -43,7 +43,8 @@ class FakeRunner:
             d.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(FIXTURE / "interface.json", d / "interface.json")
             (d / "spec.md").write_text(f"# {name} 規格\n", encoding="utf-8")
-            (d / "guide.md").write_text(f"# {name} 說明\n", encoding="utf-8")
+            if ctx["stage"] != "polish":
+                (d / "guide.md").write_text(f"# {name} 說明\n", encoding="utf-8")
         with open(project / "hypotheses.md", "a", encoding="utf-8") as f:
             f.write(f"- {ctx['round_dir']} 設計: 加入假設\n")
 

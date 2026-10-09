@@ -59,6 +59,15 @@ try {
 }
 const drawNames = (iface.draw || []).map((d) => d.name);
 const guidePages = Number(iface.guidePages || 0);
+// 探索 / 深掘: 說明頁(drawGuidePage 固定存在, 不列在 draw 清單);
+// 打磨: 沒有說明頁, 改為開始畫面 + 嵌入式新手教學, 兩個函式必須列在 draw 清單(2026-10-09 起)
+const usesGuide = stage !== 'polish';
+if (!usesGuide) {
+  for (const req of ['drawTitle', 'drawTutorial']) {
+    if (!drawNames.includes(req)) fail('interface', `interface.json 的 draw 清單缺 ${req}(開始畫面 / 新手教學提示)`);
+  }
+}
+const requiredDraws = usesGuide ? [...drawNames, 'drawGuidePage'] : drawNames;
 
 const indexPath = path.join(gameDir, 'index.html');
 if (!fs.existsSync(indexPath)) {
@@ -181,7 +190,7 @@ if (!Art) {
 if (Art.canvas && iface.canvas && (Art.canvas.width !== iface.canvas.width || Art.canvas.height !== iface.canvas.height)) {
   fail('art', `Art.canvas ${Art.canvas.width}x${Art.canvas.height} 與介面 ${iface.canvas.width}x${iface.canvas.height} 不符`);
 }
-for (const name of [...drawNames, 'drawGuidePage']) {
+for (const name of requiredDraws) {
   if (typeof Art[name] !== 'function') { fail('art', `Art.${name} 不存在`); continue; }
   if (name === 'drawGuidePage') {
     for (let p = 0; p < Math.max(guidePages, 1); p++) {
@@ -195,7 +204,7 @@ for (const name of [...drawNames, 'drawGuidePage']) {
 }
 
 // ---- 3. game.js 呼叫的 Art 函式都在介面內 ----
-const allowed = new Set([...drawNames, 'drawGuidePage']);
+const allowed = new Set(requiredDraws);
 for (const src of scripts.filter((s) => !/art\/|audio\//.test(s))) {
   const p = path.join(gameDir, src);
   if (!fs.existsSync(p)) continue;

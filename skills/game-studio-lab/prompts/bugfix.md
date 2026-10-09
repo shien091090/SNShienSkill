@@ -4,7 +4,7 @@
 
 ## 請讀取
 - `$bugs`
-- `$game_dir/spec.md`、`$game_dir/interface.json`、`$game_dir/guide.md`
+- `$game_dir/spec.md`、`$game_dir/interface.json`、`$game_dir/guide.md`(探索 / 深掘才有)
 - `$game_dir/game/` 下的程式; 美術交付 `game/art/style.md`
 - `$studio_refs/rd-lessons.md`
 

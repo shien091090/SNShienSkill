@@ -4,7 +4,9 @@
     { "name": "drawBackground", "state": [] },
     { "name": "drawPlayer", "state": ["x", "y", "hit"], "size": [40, 40] },
     { "name": "drawCoin", "state": ["x", "y"], "size": [20, 20] },
-    { "name": "drawHud", "state": ["score", "time"] }
+    { "name": "drawHud", "state": ["score", "time"] },
+    { "name": "drawTitle", "state": ["blink"] },
+    { "name": "drawTutorial", "state": ["stage", "text", "keys", "pressed", "done", "x", "y"] }
   ],
   "guidePages": 2,
   "sounds": ["coin"],
