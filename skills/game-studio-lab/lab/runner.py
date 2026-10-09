@@ -11,14 +11,15 @@ from string import Template
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 PROMPTS_DIR = SKILL_DIR / "prompts"
-STUDIO_REFS = Path.home() / ".claude" / "skills" / "game-studio" / "references"
+# 經驗文件(美術 / RD / 音效)與玩家說明寫法原則; 節點只讀, 回寫走專案的 .lab/lessons-inbox
+STUDIO_REFS = SKILL_DIR / "references"
 
 TIMEOUT_SEC = int(os.environ.get("LAB_CLAUDE_TIMEOUT", "2400"))
 
 BASE_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep",
               "Bash(node:*)", "Bash(ls:*)", "Bash(mkdir:*)", "Bash(cp:*)"]
 
-# 任務種類 → 沿用的 game-studio agent; 沒列的(design / triage / review)用一般 session
+# 任務種類 → 對應的 agent(~/.claude/agents/); 沒列的(design / triage / review)用一般 session
 AGENTS = {
     "art": "game-artist", "art-fix": "game-artist",
     "rd": "game-rd", "rd-fix": "game-rd", "bugfix": "game-rd",

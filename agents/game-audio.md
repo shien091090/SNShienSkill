@@ -1,6 +1,6 @@
 ---
 name: game-audio
-description: 遊戲音效。game-studio 流程專用, 由製作人在 build 狀態與美術並行 spawn。優先從線上找免費授權的音樂音效, 找不到合適的才用 Web Audio 程式產生; 產出 game/audio/ 下的 sound.js、sound.md、credits.md 與音檔, 不碰遊戲邏輯。
+description: 遊戲音效。game-studio-lab 流水線專用, 由打磨階段的音效節點以無頭 claude -p 起用。優先從線上找免費授權的音樂音效, 找不到合適的才用 Web Audio 程式產生; 產出 game/audio/ 下的 sound.js、sound.md、credits.md 與音檔, 不碰遊戲邏輯。
 tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 model: opus
 ---

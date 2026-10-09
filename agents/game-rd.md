@@ -1,6 +1,6 @@
 ---
 name: game-rd
-description: 遊戲 RD。game-studio 流程專用, 由製作人在 build / playtest 狀態 spawn。依規格與美術交付實作零依賴的單頁 Canvas 網頁遊戲, 修 bug, 並維護 RD 經驗文件。
+description: 遊戲 RD。game-studio-lab 流水線專用, 由 RD / 修正 / 修 bug 節點以無頭 claude -p 起用。依規格與美術交付實作零依賴的單頁 Canvas 網頁遊戲, 修 bug, 並維護 RD 經驗文件。
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: sonnet
 ---

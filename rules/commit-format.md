@@ -14,7 +14,7 @@
 
 改動完成後直接 `git commit`, 不用問。push 一律等使用者明確指示。
 
-例外: game-studio 流程的遊戲資料夾, 使用者已長期授權自動 push(規則在 game-studio 的 `references/producer-rules.md` R4)。只限遊戲資料夾, 不延伸到其他 repo。
+例外: game-studio-lab 流水線建立的遊戲專案資料夾, 使用者已長期授權自動 push(由流水線的 CLI 在每次流程停下後 commit + push)。只限這些專案資料夾, 不延伸到其他 repo。
 
 ## 操作流程
 

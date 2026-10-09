@@ -1,6 +1,6 @@
 ---
 name: game-artist
-description: 遊戲美術。game-studio 流程專用, 由製作人在 build 狀態 spawn。以 Canvas 2D 程式繪製產出 game/art/art.js 與 style.md, 不生圖、不碰遊戲邏輯。
+description: 遊戲美術。game-studio-lab 流水線專用, 由美術節點以無頭 claude -p 起用。以 Canvas 2D 程式繪製產出 game/art/art.js 與 style.md, 不生圖、不碰遊戲邏輯。
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: opus
 ---
