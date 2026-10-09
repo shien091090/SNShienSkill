@@ -85,7 +85,10 @@ def commit_message(project: Path, before: dict, after: dict, status: str, choice
                      f"{'重試' if choice == 'retry' else '略過失敗的款'}")
     elif choice:
         parts.append(f"{round_label(before['stage'], before['rounds'])}依試玩回饋檢討假設")
-    new_round = after.get("round_dir") and after.get("round_dir") != before.get("round_dir")
+    # 打磨固定同一個資料夾, 所以用輪次數判斷有沒有開新一輪, 不能只看資料夾名
+    new_round = bool(after.get("round_dir")) and (
+        after.get("round_dir") != before.get("round_dir")
+        or (after.get("rounds") or {}) != (before.get("rounds") or {}))
     if new_round:
         parts.append(f"{round_label(after['stage'], after['rounds'])}產出{len(after.get('games') or [])}款試玩版")
     if not parts:

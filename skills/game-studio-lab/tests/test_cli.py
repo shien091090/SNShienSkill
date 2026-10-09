@@ -63,6 +63,15 @@ def test_commit_message_when_resuming_interrupted_build():
     assert msg == "[feat] [proj] 深掘第1輪產出3款試玩版"
 
 
+def test_commit_message_for_next_polish_round_in_same_folder():
+    from pathlib import Path
+    before = {"stage": "polish", "rounds": {"explore": 1, "deepen": 2, "polish": 3},
+              "round_dir": "polish", "games": ["game"]}
+    after = {**before, "rounds": {"explore": 1, "deepen": 2, "polish": 4}}
+    msg = cli.commit_message(Path("proj"), before, after, "waiting_feedback", "continue")
+    assert msg == "[feat] [proj] 1.打磨第3輪依試玩回饋檢討假設 2.打磨第4輪產出1款試玩版"
+
+
 def test_start_refuses_non_empty_folder(env, capsys):
     env["project"].mkdir()
     (env["project"] / "x.txt").write_text("x")
