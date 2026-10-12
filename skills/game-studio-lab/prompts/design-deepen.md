@@ -25,7 +25,7 @@
 只做一關、不考慮難度、不做音效。
 
 ### interface.json
-`{"canvas": {...}, "draw": [{"name", "state", "size"}...], "guidePages": N}` — 物件清單每個物件一個 `draw<物件名>`, 另有 `drawBackground`(只收 ctx)與 `drawHud`; `drawGuidePage` 固定存在不列。有「經過時間 / 已過秒數」的狀態(預警、倒數、冷卻、蓄力、一次性特效), state 一律同時給總長欄位, 美術才畫得出「還剩多少」。美術與 RD 會同時照它開工, 寫完不能改。
+`{"canvas": {...}, "draw": [{"name", "state", "size"}...], "guidePages": N}` — 物件清單每個物件一個 `draw<物件名>`, 另有 `drawBackground`(只收 ctx)與 `drawHud`; `drawGuidePage` 固定存在不列。寫完逐項自查(美術與 RD 各自讀介面, 定義模糊就會各自解讀): (1) 有經過時間的狀態(預警、倒數、冷卻、蓄力、一次性特效)同時給總長欄位 (2) `size` 依種類 / 依畫的區域有不同大小時分開給, 不只照最常見的一種填 (3) 判定形狀有寬度(環、波、線)時寫明半徑指外緣、中線還是內緣 (4) 畫面上每段文字寫明歸美術畫還是 RD 畫。美術與 RD 會同時照它開工, 寫完不能改。
 
 ### guide.md
 照 guide-principles.md, 每頁寫文字與「圖要示意什麼」。
