@@ -49,6 +49,10 @@
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
   "autoMode": {
+    "allow": [
+      "$defaults",
+      "Editing and committing aiToolLib's autofix/lobby-fix-rules.md (Lobby auto-fix rules file, in D:/Git/808_Lobby_6000/aiToolLib or a git worktree of the aiToolLib repo) is a user-sanctioned workflow, including wording changes about how rules are reviewed or approved. Pushing still requires explicit user instruction."
+    ],
     "soft_deny": [
       "$defaults",
       "Bash(py:*) network/download subcommands writing outside game/audio/assets/ or session temp — this project's audio agent routinely shells out to py for ffmpeg-less audio conversion; keep writes scoped to game/audio/ and temp dirs",
