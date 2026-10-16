@@ -24,9 +24,22 @@
 
 ## 維護與發佈
 
-正本在維護者的 `~/.claude/skills/dashboard/`, lobby-agent-client 的 `plugins/dashboard/` 是發佈用的副本, 不要直接改副本。發佈步驟:
+正本在維護者的 `~/.claude/plugins-src/dashboard/`, lobby-agent-client 的 `plugins/dashboard/` 是發佈用的副本, 不要直接改副本。
 
-1. 在正本修改, 跑 `claude plugin test ~/.claude/skills/dashboard`, 並把 `.claude-plugin/plugin.json` 的 `version` 往上加
+正本不放 `~/.claude/skills/`: 那裡的 plugin 會被自動載入, 而 `~/.claude` 同步到維護者每台電腦, 會變成每台都跑正本。放在 `plugins-src/` 不會自動載入, 由各台電腦自己決定:
+
+- 公司電腦: 跟同事一樣照上面「安裝」用市集版, 不設環境變數
+- 自家電腦: 不裝市集版, 用使用者環境變數 `CLAUDE_CODE_PLUGIN_DIRS` 直接載入正本(環境變數不跟 git 同步, 只有設的那台會載入)。設定一次, 在 PowerShell 跑完後關掉終端機重開:
+
+  ```powershell
+  [Environment]::SetEnvironmentVariable('CLAUDE_CODE_PLUGIN_DIRS', "$HOME\.claude\plugins-src\dashboard", 'User')
+  ```
+
+  之後 `~/.claude` git pull 就是最新版, 改檔存檔會自動重新載入。
+
+發佈步驟:
+
+1. 在正本修改, 跑 `claude plugin test ~/.claude/plugins-src/dashboard`, 並把 `.claude-plugin/plugin.json` 的 `version` 往上加
 2. 正本 commit
 3. 把正本整個資料夾複製到 lobby-agent-client 的 `plugins/dashboard/`
 4. lobby-agent-client commit、push
