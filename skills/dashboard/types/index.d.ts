@@ -10,7 +10,6 @@ declare module 'claude-code' {
       tokens: Tokens
       cost: number | null
       title: string
-      pendingTitle: string | null
       isEditing: boolean
       transcriptPath: string
       isAutoTitle: boolean

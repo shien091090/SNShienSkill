@@ -11,9 +11,8 @@ const tokens = atom({ plugin: 'dashboard', key: 'tokens' } as const, { input: 0,
 const cost = atom({ plugin: 'dashboard', key: 'cost' } as const, null as number | null)
 // 目前 Unity MCP 連接到的專案; 沒有 Unity Editor 連線時是 null
 const unityProject = atom({ plugin: 'dashboard', key: 'unityProject' } as const, null as UnityProject | null)
-// session 名稱: 改名後先顯示在儀表板, 下次送出訊息時才真正寫進 session
+// session 名稱: 改名時直接跑 /rename 寫進 session, 遠端(Remote Control)也會跟著換
 const title = atom({ plugin: 'dashboard', key: 'title' } as const, '')
-const pendingTitle = atom({ plugin: 'dashboard', key: 'pendingTitle' } as const, null as string | null)
 const isEditing = atom({ plugin: 'dashboard', key: 'isEditing' } as const, false)
 // 自動命名: Claude Code 本身會替 session 取 AI 標題並寫進對話紀錄檔, 還沒有名稱時讀那個來用
 const transcriptPath = atom({ plugin: 'dashboard', key: 'transcriptPath' } as const, '')
@@ -404,15 +403,24 @@ export const register: Register = on => {
     return result
   })
 
-  // 送出訊息時: 有待寫入的新名稱就寫進 session; 否則同步 /rename 等方式改的名稱
+  // 自己打 /rename 改名: 儀表板立刻跟著換; 不帶參數時名稱是自動取的, 從對話紀錄讀回來
+  on('command.run', { command: 'rename' }, async ($, e, next) => {
+    const result = await next(e)
+    const name = (e.args ?? '').trim()
+    if (name) {
+      await update($, title, () => name)
+      await update($, isAutoTitle, () => false)
+    } else {
+      await update($, title, () => '')
+      await syncTitleFromTranscript($)
+    }
+    return result
+  })
+
+  // 送出訊息時: 同步其他方式改的名稱
   on('classic.UserPromptSubmit', async ($, e, next) => {
     const result = await next(e)
     await update($, transcriptPath, () => e.transcript_path)
-    const pending = await read($, pendingTitle)
-    if (pending) {
-      await update($, pendingTitle, () => null)
-      return { ...result, sessionTitle: pending }
-    }
     if (e.session_title && e.session_title !== (await read($, title))) {
       await update($, title, () => e.session_title!)
       await update($, isAutoTitle, () => false)
@@ -561,12 +569,14 @@ export const register: Register = on => {
                   onSubmit={(value: string) => {
                     const newTitle = value.trim()
                     void (async () => {
-                      if (newTitle) {
-                        await update($, title, () => newTitle)
-                        await update($, isAutoTitle, () => false)
-                        await update($, pendingTitle, () => newTitle)
-                      }
                       await update($, isEditing, () => false)
+                      if (!newTitle) return
+                      await update($, title, () => newTitle)
+                      await update($, isAutoTitle, () => false)
+                      // 自己呼叫的指令不會經過自己的 command.run 鉤子, 名稱上面已先更新
+                      await $.command.run({ command: 'rename', args: newTitle }).catch((err: unknown) => {
+                        $.ui.toast(`改名沒有寫進 session: ${err instanceof Error ? err.message : String(err)}`)
+                      })
                     })()
                   }}
                 />
