@@ -133,6 +133,36 @@ test('改名按鈕: 按下出現輸入框, 送出後名稱顯示在模型旁邊'
   expect(await ui.find({ text: '資格賽修正' })).toBeDefined()
 })
 
+test('改名按鈕送出後立刻跑 /rename 寫進 session, 不等下次送訊息', async ($, on) => {
+  const renames: (string | undefined)[] = []
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.model', () => ({ value: 'claude-opus-5-5' }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: [] } }))
+  on('command.run', (_, e) => {
+    if (e.command === 'rename') renames.push(e.args)
+    return { text: '' }
+  })
+  await $.session.start({ cwd: 'C:\proj', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ plugin: 'dashboard', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
+  await ui.press({ key: 'title-rename' })
+  await ui.input({ key: 'title-input', text: '  資格賽修正 ' })
+  expect(renames).toEqual(['資格賽修正'])
+})
+
+test('自己打 /rename 後儀表板名稱立刻跟著換', async ($, on) => {
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.model', () => ({ value: 'claude-opus-5-5' }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: [] } }))
+  on('command.run', () => ({ text: '' }))
+  await $.session.start({ cwd: 'C:\proj', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ plugin: 'dashboard', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
+  await ui.press({ key: 'title-rename' })
+  await ui.input({ key: 'title-input', text: '舊名稱' })
+  await $.command.run({ command: 'rename', args: '測試名稱' })
+  expect(await ui.find({ text: '測試名稱' })).toBeDefined()
+  expect(await ui.find({ text: '舊名稱' })).toBeUndefined()
+})
+
 test('從對話紀錄讀名稱: 手動改的優先, 其次是最新的 AI 標題', () => {
   const ai = (t: string) => JSON.stringify({ type: 'ai-title', aiTitle: t })
   const custom = (t: string) => JSON.stringify({ type: 'custom-title', customTitle: t })

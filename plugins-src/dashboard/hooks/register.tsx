@@ -1,8 +1,9 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionContextUsage, SessionRateLimit } from 'claude-code'
 
-import type { Gauge, Tokens, UnityProject } from '../types'
+import type { Gauge, ReleaseBoard, ReleaseEntry, Tokens, UnityProject } from '../types'
 import { TAG_CHARS, TOAST_SCRIPT, toastText } from './notify'
+import { buildBoard, daysUntil, isCompanyEdition, LOBBY_REPO, parseLsRemote, parseSheet, shortDate, SUBMISSION_CSV } from './release'
 import { addTodo, parseTodos, removeTodo, todayText } from './todo'
 
 const gauges = atom({ plugin: 'dashboard', key: 'gauges' } as const, [] as Gauge[])
@@ -11,9 +12,10 @@ const tokens = atom({ plugin: 'dashboard', key: 'tokens' } as const, { input: 0,
 const cost = atom({ plugin: 'dashboard', key: 'cost' } as const, null as number | null)
 // 目前 Unity MCP 連接到的專案; 沒有 Unity Editor 連線時是 null
 const unityProject = atom({ plugin: 'dashboard', key: 'unityProject' } as const, null as UnityProject | null)
-// session 名稱: 改名後先顯示在儀表板, 下次送出訊息時才真正寫進 session
+// 公司版才有: 進測中的版本與送審日; 還沒抓過是 null
+const release = atom({ plugin: 'dashboard', key: 'release' } as const, null as ReleaseBoard | null)
+// session 名稱: 改名時直接跑 /rename 寫進 session, 遠端(Remote Control)也會跟著換
 const title = atom({ plugin: 'dashboard', key: 'title' } as const, '')
-const pendingTitle = atom({ plugin: 'dashboard', key: 'pendingTitle' } as const, null as string | null)
 const isEditing = atom({ plugin: 'dashboard', key: 'isEditing' } as const, false)
 // 自動命名: Claude Code 本身會替 session 取 AI 標題並寫進對話紀錄檔, 還沒有名稱時讀那個來用
 const transcriptPath = atom({ plugin: 'dashboard', key: 'transcriptPath' } as const, '')
@@ -319,6 +321,52 @@ async function refreshUnityProject($: EngineInterface) {
   if (next?.path !== current?.path) await update($, unityProject, () => next)
 }
 
+// 進測版號: 開 session 時先顯示上次存下的結果, 再每 30 分鐘問一次 GitLab 與送審日表
+const RELEASE_POLL_MS = 30 * 60_000
+const RELEASE_KEY = 'release'
+// master 最新 commit 沒有 tag 時沿用的中版號
+const MASTER_MINOR_KEY = 'masterMinor'
+
+async function refreshRelease($: EngineInterface) {
+  try {
+    const [git, sheet] = await Promise.all([
+      $.process.run(['git', 'ls-remote', LOBBY_REPO, 'refs/heads/master', 'refs/tags/*'], {
+        env: { GIT_TERMINAL_PROMPT: '0' },
+        timeoutMs: 30_000,
+      }),
+      $.http.fetch(SUBMISSION_CSV),
+    ])
+    if (git.exitCode !== 0) throw new Error(git.stderr.trim() || `git ls-remote 結束碼 ${git.exitCode}`)
+    if (!sheet.ok) throw new Error(`送審日表 HTTP ${sheet.status}`)
+    const last = (await $.store.get(MASTER_MINOR_KEY)) as string | undefined
+    const board = buildBoard(parseLsRemote(git.stdout), parseSheet(sheet.text, new Date().getFullYear()), last ?? null)
+    if (board.masterMinor) await $.store.set(MASTER_MINOR_KEY, board.masterMinor)
+    const next: ReleaseBoard = { current: board.current, others: board.others, fetchedAt: Date.now(), isStale: false }
+    await $.store.set(RELEASE_KEY, next)
+    await update($, release, () => next)
+  } catch (err) {
+    // 沒開 VPN 等: 保留上次的資料, 畫面標出是多久前的
+    $.ui.log(`進測版號抓取失敗: ${err instanceof Error ? err.message : String(err)}`, { to: 'debug' })
+    await update($, release, b => ({ ...(b ?? { current: null, others: [], fetchedAt: 0 }), isStale: true }))
+  }
+}
+
+// 抓失敗時標在第一行後面: 12 分鐘前 / 3 小時前
+export function agoText(fetchedAt: number, now: number): string {
+  const min = Math.max(0, Math.floor((now - fetchedAt) / 60_000))
+  return min < 60 ? `${min} 分鐘前` : `${Math.floor(min / 60)} 小時前`
+}
+
+// 送審日與剩幾天; 已經過了用紅字
+export function dueText(date: string | null, now: Date): { text: string; isOverdue: boolean } {
+  if (!date) return { text: '未定', isOverdue: false }
+  const days = daysUntil(date, now)
+  const left = days > 0 ? `還有 ${days} 天` : days === 0 ? '今天' : `已過 ${-days} 天`
+  return { text: `${shortDate(date)}（${left}）`, isOverdue: days < 0 }
+}
+
+export const entryText = (e: ReleaseEntry) => `${e.minor} ${e.date ? shortDate(e.date) : '未定'} (${e.tag})`
+
 // 還沒有名稱時從對話紀錄讀 Claude Code 取的標題; 有名稱後就不再讀, 免得每輪讀一次大檔案
 async function syncTitleFromTranscript($: EngineInterface): Promise<boolean> {
   if (await read($, title)) return true
@@ -355,6 +403,13 @@ export const register: Register = on => {
     await update($, cost, () => u.cost?.usd ?? null)
     await refreshModel($)
     await refreshUnityProject($)
+
+    if (isCompanyEdition($.plugin.root)) {
+      const saved = (await $.store.get(RELEASE_KEY)) as ReleaseBoard | undefined
+      if (saved) await update($, release, () => saved)
+      void refreshRelease($)
+      $.clock.every(RELEASE_POLL_MS, () => void refreshRelease($))
+    }
 
     $.clock.every(FRAME_MS, () => {
       if (isWorking) $.ui.invalidate('ui.render')
@@ -404,15 +459,24 @@ export const register: Register = on => {
     return result
   })
 
-  // 送出訊息時: 有待寫入的新名稱就寫進 session; 否則同步 /rename 等方式改的名稱
+  // 自己打 /rename 改名: 儀表板立刻跟著換; 不帶參數時名稱是自動取的, 從對話紀錄讀回來
+  on('command.run', { command: 'rename' }, async ($, e, next) => {
+    const result = await next(e)
+    const name = (e.args ?? '').trim()
+    if (name) {
+      await update($, title, () => name)
+      await update($, isAutoTitle, () => false)
+    } else {
+      await update($, title, () => '')
+      await syncTitleFromTranscript($)
+    }
+    return result
+  })
+
+  // 送出訊息時: 同步其他方式改的名稱
   on('classic.UserPromptSubmit', async ($, e, next) => {
     const result = await next(e)
     await update($, transcriptPath, () => e.transcript_path)
-    const pending = await read($, pendingTitle)
-    if (pending) {
-      await update($, pendingTitle, () => null)
-      return { ...result, sessionTitle: pending }
-    }
     if (e.session_title && e.session_title !== (await read($, title))) {
       await update($, title, () => e.session_title!)
       await update($, isAutoTitle, () => false)
@@ -499,6 +563,7 @@ export const register: Register = on => {
     const remoteOn = await read($, isRemoteOn)
     const modelMenuOpen = await read($, isModelMenuOpen)
     const unity = await read($, unityProject)
+    const board = await read($, release)
     const requestId = e.requestId
     const { bar, showReset, pad } = layout(list, e.props.bodyColumns, info)
     const now = Date.now()
@@ -561,12 +626,14 @@ export const register: Register = on => {
                   onSubmit={(value: string) => {
                     const newTitle = value.trim()
                     void (async () => {
-                      if (newTitle) {
-                        await update($, title, () => newTitle)
-                        await update($, isAutoTitle, () => false)
-                        await update($, pendingTitle, () => newTitle)
-                      }
                       await update($, isEditing, () => false)
+                      if (!newTitle) return
+                      await update($, title, () => newTitle)
+                      await update($, isAutoTitle, () => false)
+                      // 自己呼叫的指令不會經過自己的 command.run 鉤子, 名稱上面已先更新
+                      await $.command.run({ command: 'rename', args: newTitle }).catch((err: unknown) => {
+                        $.ui.toast(`改名沒有寫進 session: ${err instanceof Error ? err.message : String(err)}`)
+                      })
                     })()
                   }}
                 />
@@ -620,6 +687,29 @@ export const register: Register = on => {
             <Text dimColor>Unity</Text>
             <Text bold>{unity.name}</Text>
             <Text dimColor>{unity.path}</Text>
+          </Box>
+        ) : null}
+        {board ? (
+          <Box key="release-row" flexDirection="row" gap={1}>
+            <Text dimColor>送審</Text>
+            {board.current ? (
+              <Box key="release-current" flexDirection="row" gap={1}>
+                <Text bold>{board.current.minor}</Text>
+                <Text color={dueText(board.current.date, new Date(now)).isOverdue ? 'red' : undefined}>
+                  {dueText(board.current.date, new Date(now)).text}
+                </Text>
+                <Text dimColor>({board.current.tag})</Text>
+              </Box>
+            ) : (
+              <Text dimColor>{board.fetchedAt === 0 && board.isStale ? '版號抓取失敗' : 'master 版號無法判定'}</Text>
+            )}
+            {board.isStale && board.fetchedAt > 0 ? <Text dimColor>{agoText(board.fetchedAt, now)}</Text> : null}
+          </Box>
+        ) : null}
+        {board?.current ? (
+          <Box key="testing-row" flexDirection="row" gap={1}>
+            <Text dimColor>進測</Text>
+            {board.others.length === 0 ? <Text dimColor>無</Text> : <Text>{board.others.map(entryText).join(SEP)}</Text>}
           </Box>
         ) : null}
         {menuOpen ? (
