@@ -7,6 +7,7 @@
 - 有連 Unity MCP 時顯示目前開著的 Unity 專案
 - 「Todo」按鈕: 讀寫 `~/.claude/TODO.md` 的個人待辦(一筆一行 `- [ ] 內容 (YYYY-MM-DD)`)
 - 回應完成時跳出 Windows 通知
+- (公司版)進測中的 Lobby 版本與送審日: 第一行是 master 的版本、送審日與剩幾天, 第二行是其他進測中的版本。版號用 `git ls-remote` 問 GitLab 上的 Lobby repo(要能連公司 GitLab), 送審日讀公開的送審日 Google Sheet, 只列表上有的版本; 每 30 分鐘更新一次
 
 ## 安裝
 
