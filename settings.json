@@ -45,7 +45,8 @@
         "source": "git",
         "url": "https://git-it.yile808.com/bu01/game-platform-team/lobby-agent-client.git",
         "ref": "develop"
-      }
+      },
+      "autoUpdate": true
     }
   },
   "syntaxHighlightingDisabled": false,
