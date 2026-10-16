@@ -24,7 +24,8 @@
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
     "skill-gate@skill-gate-local": true,
-    "unity@unity-agent-plugin": true
+    "unity@unity-agent-plugin": true,
+    "dashboard@lobby-agent-client": true
   },
   "extraKnownMarketplaces": {
     "skill-gate-local": {
@@ -37,6 +38,13 @@
       "source": {
         "source": "github",
         "repo": "Unity-Technologies/unity-agent-plugin"
+      }
+    },
+    "lobby-agent-client": {
+      "source": {
+        "source": "git",
+        "url": "https://git-it.yile808.com/bu01/game-platform-team/lobby-agent-client.git",
+        "ref": "develop"
       }
     }
   },
