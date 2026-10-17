@@ -52,3 +52,6 @@ __pycache__/
 # 自製 plugin 正本(skill-gate 等), 兩台電腦從這裡用本機路徑安裝; 發佈時複製到 lobby-agent-client
 !/plugins-src/
 !/plugins-src/**
+
+# dad-chat 的個人資料(家人文字、聊天記憶), 只留本機
+/skills/dad-chat/data/
