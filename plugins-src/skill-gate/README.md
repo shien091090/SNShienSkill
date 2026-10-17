@@ -29,7 +29,17 @@
 
 ## 維護與發佈
 
-正本在維護者的 `~/.claude/plugins-src/skill-gate/`, lobby-agent-client 的 `plugins/skill-gate/` 是發佈用的副本, 不要直接改副本。發佈步驟:
+正本在維護者的 `~/.claude/plugins-src/skill-gate/`, lobby-agent-client 的 `plugins/skill-gate/` 是發佈用的副本, 不要直接改副本。
+
+自家電腦(連不到公司 GitLab)不走市集, 跟儀表板一樣用使用者環境變數 `CLAUDE_CODE_PLUGIN_DIRS` 直接載入正本, 多個資料夾用分號隔開。設定一次, 在 PowerShell 跑完後關掉終端機重開:
+
+```powershell
+[Environment]::SetEnvironmentVariable('CLAUDE_CODE_PLUGIN_DIRS', "$HOME\.claude\plugins-src\dashboard;$HOME\.claude\plugins-src\skill-gate", 'User')
+```
+
+`settings.json` 裡的 `skill-gate-local` 市集路徑寫死公司電腦的使用者目錄, 在自家電腦找不到路徑、不會裝上, 所以不會跟環境變數載入的正本重複。
+
+發佈步驟:
 
 1. 在正本修改, 並把 `.claude-plugin/plugin.json` 的 `version` 往上加
 2. 正本 commit
