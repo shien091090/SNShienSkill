@@ -37,13 +37,14 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 
 1. 使用者給了專案資料夾且裡面有 `.lab/` → 跑 `status`, 依狀態接手(見下), 回報一句「目前在 X 階段第 N 輪, 狀態是 Y」
 2. 新專案 → 跟使用者要三樣東西(缺哪樣問哪樣): **遊戲想法**、**git repo 網址**(需是空的 repo)、**本地資料夾位置**(不存在或空資料夾)
-3. 把遊戲想法**原文照錄**寫到 scratchpad 的暫存檔, 用 `start` 啟動
+3. **啟動前先討論設計方向**: 從遊戲想法抽出「使用者沒定死、可自由發想的設計點」(例: 操作的代價、玩家角色定位、節奏壓力來源、資源來源), 條列給使用者; 再依這些點提 2~3 個探索方向, 每個方向一句話講它主打的體驗。先講明探索試玩只驗核心體驗, 跨關卡的外層系統(例: 大地圖、評價、解鎖)不做。請使用者表態哪些點照原設計固定、哪些放手、方向要不要調; 使用者沒意見就照提案走
+4. 把遊戲想法**原文照錄**寫到 scratchpad 的暫存檔, 後面接一段 `## 開場討論結論`(固定的設計點、放手的設計點、議定的探索方向), 用 `start` 啟動
 
 ## 依狀態處理
 
 ### waiting_feedback: 請使用者試玩, 然後訪談
 
-1. 列出每款的 `index_html` 絕對路徑(可直接雙擊)。不重寫操作說明: 探索 / 深掘的遊戲開場有說明頁, 打磨是開始畫面 + 嵌入在遊戲流程裡的新手教學(2026-10-09 起, 打磨沒有說明頁)
+1. 列出每款的 `index_html` 絕對路徑(可直接雙擊)。不重寫操作說明: 探索 / 深掘的遊戲開場有說明頁, 打磨是開始畫面 + 嵌入在遊戲流程裡的新手教學(打磨沒有說明頁)
 2. 讀 `<專案>/<round_dir>/*/spec.md` 的概述與 `hypotheses.md` 的「各款對應」, 心裡有底每款在驗什麼; **不要把假設念給使用者聽**, 免得引導他的感受
 3. 照該階段的訪談指引進行: `references/interview-explore.md` / `interview-deepen.md` / `interview-polish.md`
 4. 訪談中使用者回報 bug(當掉、操作沒反應、說明與實際不符)→ 寫成 `<round_dir>/bugs-<款>-<n>.md`, `resume --choice fix --feedback <該檔> --target <款>`; 修完會再停在 waiting_feedback, 請他重玩那款再繼續訪談
@@ -63,7 +64,7 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 
 ### 每次流程停下來後: 經驗收件匣與規格同步
 
-- **經驗收件匣**: 無頭 `claude -p` 改不了 `~/.claude` 底下的檔(2026-10-09 GhostEchoV2 修 bug 時 RD 回報被權限擋下; 在那之前所有節點的回寫其實都沒寫進去), 所以節點把經驗提案寫到 `<專案>/.lab/lessons-inbox/<目標檔名>`。每次流程停下來, 你就審收件匣: 照目標經驗文件的規則(只收跨遊戲通則、先找同類合併、art-lessons 的理念升降規則)併進本 skill 的 `references/`, 不合格的丟掉; 處理完刪掉收件匣檔案, 照 commit 規範 commit `~/.claude`(系統名 `game-studio-lab`)。在專案裡的收件匣檔不必另外 commit 刪除, 下一次流程跑完會一起 commit
+- **經驗收件匣**: 無頭 `claude -p` 改不了 `~/.claude` 底下的檔(會被權限擋下, 直接回寫的經驗都會遺失), 所以節點把經驗提案寫到 `<專案>/.lab/lessons-inbox/<目標檔名>`。每次流程停下來, 你就審收件匣: 照目標經驗文件的規則(只收跨遊戲通則、先找同類合併、art-lessons 的理念升降規則)併進本 skill 的 `references/`, 不合格的丟掉; 處理完刪掉收件匣檔案, 照 commit 規範 commit `~/.claude`(系統名 `game-studio-lab`)。在專案裡的收件匣檔不必另外 commit 刪除, 下一次流程跑完會一起 commit
 - **規格同步**: RD(含修 bug)不改 spec.md。回報裡若列出「規格要同步的內容」(例: 修 bug 加了關卡物件), 由你照它更新 `<round_dir>/<款>/spec.md`, 讓下一輪設計讀到的是實際狀態
 
 ### build_failed: 有款做不出來
@@ -80,7 +81,7 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 
 `status` 回 `paused` 表示流程沒停在暫停點也沒報錯, 是行程本身被終止(例: Claude Code 在記憶體不足時砍掉背景指令)。已完成的節點都在進度檔裡, 不會重做。被砍掉的背景指令不要自己重跑, 告訴使用者停在哪、為什麼, 等他說要繼續再 `resume <專案>`(不帶 choice)。重跑前可查有沒有殘留的 `claude -p` 行程。
 
-同時起 6 個 `claude -p` 吃記憶體; 2026-10-07 GhostEchoV2 深掘第 1 輪剛設計完、要開始製作時, 背景指令因記憶體不足被砍。
+最常見的原因是製作階段同時起多個 `claude -p`(美術、RD 等各款並行)吃光記憶體。
 
 ### done
 
