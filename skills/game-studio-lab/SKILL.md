@@ -48,10 +48,15 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 ### waiting_feedback: 請使用者試玩, 然後訪談
 
 1. 列出每款的 `index_html` 絕對路徑(可直接雙擊)。不重寫操作說明: 探索 / 深掘的遊戲開場有說明頁, 打磨是開始畫面 + 嵌入在遊戲流程裡的新手教學(打磨沒有說明頁)
-2. 讀 `<專案>/<round_dir>/*/spec.md` 的概述與 `hypotheses.md` 的「各款對應」, 心裡有底每款在驗什麼; **不要把假設念給使用者聽**, 免得引導他的感受
+2. 讀 `<專案>/<round_dir>/*/spec.md` 的概述與 `hypotheses.md` 的「各款對應」, 心裡有底每款在驗什麼; **不要把假設念給使用者聽**, 免得引導他的感受。同時記下假設表裡狀態「成立」的每條「機制 → 體驗」(好壞都算), 下一步要對照
 3. 照該階段的訪談指引進行: `references/interview-explore.md` / `interview-deepen.md` / `interview-polish.md`
-4. 訪談中使用者回報 bug(當掉、操作沒反應、說明與實際不符)→ 寫成 `<round_dir>/bugs-<款>-<n>.md`, `resume --choice fix --feedback <該檔> --target <款>`; 修完會再停在 waiting_feedback, 請他重玩那款再繼續訪談
-5. 訪談最後問繼續或往下一階段, 把訪談整理成 `<round_dir>/feedback.md`(格式見 `references/feedback-template.md`), 給使用者看一眼確認沒誤解, 然後 `resume --choice <選擇> --feedback <round_dir>/feedback.md`
+4. **對照已成立的假設**: 使用者的回饋若和任一條成立的「機制 → 體驗」相反(例: 已成立「限時拆裝 → 緊張刺激」, 這次卻說限時拆裝很煩), 當場提醒, 用白話講出那條是哪一輪、因為什麼回饋成立的, 並問屬於哪種:
+   - **改變想法**: 使用者現在不要 / 改要這個體驗了 → 該假設要翻案
+   - **情境不同**: 同一機制換了搭配(數值、節奏、其他機制)效果就變了 → 原假設保留, 補上成立的條件
+   - **其實不衝突**: 講的是別的機制或細節 → 照常記
+   提醒是為了不讓已驗證的結論被無聲推翻, 不是要說服使用者維持原判; 使用者怎麼答就怎麼記。答案寫進 feedback.md 的「與已成立假設的衝突」段
+5. 訪談中使用者回報 bug(當掉、操作沒反應、說明與實際不符)→ 寫成 `<round_dir>/bugs-<款>-<n>.md`, `resume --choice fix --feedback <該檔> --target <款>`; 修完會再停在 waiting_feedback, 請他重玩那款再繼續訪談
+6. 訪談最後問繼續或往下一階段, 把訪談整理成 `<round_dir>/feedback.md`(格式見 `references/feedback-template.md`), 給使用者看一眼確認沒誤解, 然後 `resume --choice <選擇> --feedback <round_dir>/feedback.md`
 
 可選的 `--choice`(狀態 JSON 的 `allowed_choices` 也會列):
 
