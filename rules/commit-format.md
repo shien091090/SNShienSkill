@@ -12,9 +12,15 @@
 
 ## 預設行為
 
-改動完成後直接 `git commit`, 不用問。push 一律等使用者明確指示。
+改動完成後直接 commit 並 push, 不用問。commit 前先做兩項檢查, 任一項卡住就停下來問, 不自己決定:
 
-例外: game-studio-lab 流水線建立的遊戲專案資料夾, 使用者已長期授權自動 push(由流水線的 CLI 在每次流程停下後 commit + push)。只限這些專案資料夾, 不延伸到其他 repo。
+1. **HEAD 在不在分支上**: `git symbolic-ref -q HEAD` 沒輸出就是 detached HEAD → 停下來問使用者要切到 `develop`, 還是請他給目標分支名稱。拿到分支後照下面「操作流程」第 2 步的做法接回去(確認是祖先 → checkout → `merge --ff-only` 原 SHA)
+2. **遠端有沒有別人的新 commit**: `git fetch` 後看 `git rev-list --count HEAD..@{u}`, 大於 0 就先 `git pull --rebase --autostash`。發生衝突 → 停下來列出衝突的檔案問使用者, 不自己解衝突, 也不自己 abort
+
+push 時:
+- 先確認 `git config --get branch.<name>.merge` 是 `refs/heads/<name>`(見 git-branching 規則), 不是就停下來, 不能推進別的分支
+- 還沒有 upstream 的新分支用 `git push -u origin <name>`
+- push 被拒(non-fast-forward)回到第 2 項重做, 不用 `--force`
 
 ## 操作流程
 
