@@ -6,6 +6,7 @@
     "defaultMode": "auto"
   },
   "model": "opus",
+  "promptCacheTtl": "1h",
   "hooks": {
     "PreToolUse": [
       {
