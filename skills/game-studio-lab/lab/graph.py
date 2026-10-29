@@ -1,6 +1,6 @@
 """LangGraph 流程: 設計 → 分岔製作(每款一個子圖)→ 試玩訪談 → 檢討假設 → 依選擇分支。
 
-只有兩個地方會停下來等人(interrupt): join(有款建置失敗)與 interview(試玩訪談)。
+只有三個地方會停下來等人(interrupt): join(有款建置失敗)、interview(試玩訪談)與發布子圖的挑選方案。
 git commit 不在節點裡做, 由 CLI 在每次停下來後統一做, 確保進度檔已寫完。
 """
 import filecmp
@@ -60,6 +60,7 @@ class LabError(Exception):
 class Deps:
     runner: object   # .run(kind, ctx) -> str
     checker: object  # .check(game_dir, stage) -> {"ok", "errors"}
+    renderer: object = None  # .render(html, out_png, (w, h)); None 時發布用本機 Chrome
 
 
 def round_label(stage: str, rounds: dict) -> str:
@@ -153,6 +154,7 @@ def build_game_graph(deps: Deps):
 
 
 def build_graph(deps: Deps, checkpointer=None):
+    from lab.release_graph import build_release_graph  # 發布子圖反過來用到本檔的 LabError
     game_graph = build_game_graph(deps)
 
     def project_of(s) -> Path:
@@ -228,7 +230,8 @@ def build_graph(deps: Deps, checkpointer=None):
                       for g in s["games"]],
         })
         update = {"choice": ans["choice"], "feedback": ans.get("feedback", ""), "target": ans.get("target", "")}
-        return Command(goto="bugfix" if ans["choice"] == "fix" else "review", update=update)
+        goto = {"fix": "bugfix", "release": "release"}.get(ans["choice"], "review")
+        return Command(goto=goto, update=update)
 
     def bugfix(s: LabState):
         project, game = project_of(s), s["target"]
@@ -279,6 +282,9 @@ def build_graph(deps: Deps, checkpointer=None):
     g.add_node("interview", interview)
     g.add_node("bugfix", bugfix)
     g.add_node("review", review)
+    # 發布不跑檢討假設; 定版後回到同一個打磨停點, 可再選繼續打磨 / 結束 / 再發布
+    g.add_node("release", build_release_graph(deps))
+    g.add_edge("release", "interview")
     g.add_edge(START, "setup")
     g.add_edge("setup", "design")
     g.add_conditional_edges("design", fanout, ["build_game"])

@@ -7,10 +7,13 @@ from lab.runner import render_prompt
 
 CTX = {"project": "P", "stage": "explore", "round_dir": "explore-1", "round_no": 1, "prev_round": "無",
        "game": "game-a", "game_dir": "P/explore-1/game-a", "fix": "F", "report": "R", "out": "O",
-       "roles": "art / rd", "bugs": "B", "feedback": "FB", "choice": "next"}
+       "roles": "art / rd", "bugs": "B", "feedback": "FB", "choice": "next",
+       "release_dir": "P/release", "src_dir": "P/polish/game", "logs": "P/polish/logs", "name": "N", "code": "c",
+       "intro": "I"}
 
 KINDS = [("design", s) for s in ("explore", "deepen", "polish")] + [
-    (k, "explore") for k in ("art", "art-fix", "rd", "rd-fix", "audio", "audio-fix", "triage", "bugfix", "review")]
+    (k, "explore") for k in ("art", "art-fix", "rd", "rd-fix", "audio", "audio-fix", "triage", "bugfix", "review")] + [
+    (k, "release") for k in ("release-game", "release-info", "release-art")]
 
 
 @pytest.mark.parametrize("kind,stage", KINDS)

@@ -27,11 +27,12 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 | `resume <專案> --choice <選擇> --feedback <檔> [--target <款>]` | 交回饋並接著跑 |
 | `resume <專案>` | 上次出錯停下, 修好後從失敗的節點接著跑 |
 | `status <專案>` | 查目前停在哪 |
+| `release <資料夾> --info <檔>` | 非 lab 專案(遊戲在 `<資料夾>/game/`, 例: 捕泡手)的發布; 停在挑選頁後用 `--choice pick --feedback <檔>` 或 `--choice redo`; 中途出錯修好後不帶參數接續 |
 | `probe-models` | 每種節點用正式參數起一次極短 session, 回報實際用到的模型(改了模型設定或 managed settings 後用) |
 
 - `.venv` 不存在(新機器)→ 先 `python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`
 - `start` / `resume` 一輪要跑幾十分鐘: **一律用 Bash 的 run_in_background 執行**, 完成時會收到通知, 不要輪詢。等待期間告訴使用者大概要等多久即可
-- stdout 最後一行是狀態 JSON, `status` 有四種: `waiting_feedback`、`build_failed`、`done`、`error`; `warnings` 非空(例如 push 失敗)要原文轉告使用者
+- stdout 最後一行是狀態 JSON, `status` 有五種: `waiting_feedback`、`build_failed`、`waiting_release_pick`、`done`、`error`; `warnings` 非空(例如 push 失敗)要原文轉告使用者
 
 ## 開場
 
@@ -66,6 +67,8 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 | 深掘 | 再深掘一輪 | 進打磨 | — | 結束 |
 | 打磨 | 再打磨一輪 | — | 退回深掘 / 探索 | 結束 |
 
+打磨另有 `release`(發布, 見下方「發布」), 訪談最後問「再打磨、退回、結束, 還是發布」。
+
 打磨階段固定在 `<專案>/polish/` 迭代(round_dir 永遠是 `polish`), 進入打磨後探索 / 深掘的資料夾會被流程刪除(git 有紀錄)。因為每輪共用同一個資料夾, 打磨第 N 輪(N ≥ 2)的回饋檔改叫 `feedback-N.md`, 免得蓋掉前幾輪的回饋。
 
 打磨階段 resume 之前: 到 `~/Downloads` 把本輪的 `gamelog-<專案資料夾名>-*.json` 搬到 `<round_dir>/logs/round-N/`(N = 打磨第幾輪, 只搬不整理); 一個都沒有就在回饋檔註明。
@@ -74,6 +77,20 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 
 - **經驗收件匣**: 無頭 `claude -p` 改不了 `~/.claude` 底下的檔(會被權限擋下, 直接回寫的經驗都會遺失), 所以節點把經驗提案寫到 `<專案>/.lab/lessons-inbox/<目標檔名>`。每次流程停下來, 你就審收件匣: 照目標經驗文件的規則(只收跨遊戲通則、先找同類合併、art-lessons 的理念升降規則)併進本 skill 的 `references/`, 不合格的丟掉; 處理完刪掉收件匣檔案, 照 commit 規範 commit `~/.claude`(系統名 `game-studio-lab`)。在專案裡的收件匣檔不必另外 commit 刪除, 下一次流程跑完會一起 commit
 - **規格同步**: RD(含修 bug)不改 spec.md。回報裡若列出「規格要同步的內容」(例: 修 bug 加了關卡物件), 由你照它更新 `<round_dir>/<款>/spec.md`, 讓下一輪設計讀到的是實際狀態
+
+### 發布: 產出網站用的遊戲與素材
+
+把定版遊戲與 PVD計畫網站要的素材做成 `<專案>/release/`(`game/` 網站版遊戲、`assets/` 定版素材、`options/` 方案與選擇頁)。設計見 `docs/2026-10-29-release-stage-design.md`, 兩個使用者檔的格式見 `references/release-guide.md`。
+
+1. **問使用者三樣**, 寫成發布資訊檔(lab 專案 `polish/release-info.md`; 非 lab 專案 `<資料夾>/release-info.md`):
+   - **遊戲名稱**: 使用者提供。名稱定了就全部統一, 流程會把遊戲開始畫面(打磨版與網站版都改)、預覽圖、素材資訊都換成這個名稱, 先先講明
+   - **遊戲介紹**: 使用者提供, 1–2 句、30–60 字; 超出或太短提醒使用者, 不代改
+   - **遊戲代號**(網址用, 上線後不改): 你帶預設給使用者確認, 依序取上次 `release/assets/素材資訊.md` 的代號 → PVD計畫網站 repo 的 `site/js/games.js` 裡該遊戲已定的 `code`(本機例: `E:\Project\PVDWebsite`; 找不到 repo 就跳過這項) → 由專案名轉英文小寫加連字號
+2. lab 專案: `resume <專案> --choice release --feedback <發布資訊檔>`; 非 lab 專案: `release <資料夾> --info <發布資訊檔>`。都要背景執行, 約十幾到三十分鐘。選發布不跑檢討假設: 這輪若有試玩回饋要進下一輪設計, 應選 continue
+3. 停在 `waiting_release_pick`: 把 `options_page`(選擇頁絕對路徑, 只能看不能操作)給使用者, 請使用者回代號(例「圖示 B、主色 2、預覽圖 A」)。寫成 `release-pick.md`(放發布資訊檔旁), `--choice pick --feedback <檔>`; 都不喜歡 → `--choice redo`(只重做美術方案, 可把使用者的意見寫進 `release/options/redo-notes.md` 給美術看)
+4. 定版完: lab 專案回到同一個打磨停點(`waiting_feedback`, 遊戲不重做), 可再選 continue / back-* / end / release; 非 lab 專案流程結束。回報 `release/` 路徑與 `warnings`(例: 檔案超過網站 25MB 上限)
+
+不做: 手機版、鍵名格式、網站暫停 / 繼續訊息、改 PVDWebsite repo(網站另外更新)。
 
 ### build_failed: 有款做不出來
 

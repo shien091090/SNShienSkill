@@ -30,6 +30,7 @@ class LabState(TypedDict, total=False):
     feedback: str
     target: str
     warnings: list
+    release_warnings: list  # 發布定版時的提醒(例: 檔案超過網站上限)
 
 
 class GameState(TypedDict, total=False):

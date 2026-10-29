@@ -9,6 +9,7 @@ from langgraph.types import Command
 from lab.checker import NodeChecker
 from lab.fake import FakeRunner
 from lab.graph import Deps, build_graph
+from lab.renderer import FakeRenderer
 
 CFG = {"configurable": {"thread_id": "main"}, "max_concurrency": 6}
 
@@ -25,7 +26,7 @@ class Lab:
         self.runner = runner
 
     def _graph(self, conn):
-        return build_graph(Deps(self.runner, NodeChecker()), SqliteSaver(conn))
+        return build_graph(Deps(self.runner, NodeChecker(), FakeRenderer()), SqliteSaver(conn))
 
     def call(self, inp):
         conn = sqlite3.connect(self.project / ".lab" / "checkpoint.sqlite", check_same_thread=False)
@@ -198,3 +199,29 @@ def test_design_must_produce_two_or_three_games(tmp_path):
     lab = Lab(tmp_path, FakeRunner(games_per_round=1))
     snap, err = lab.start()
     assert err is not None and "2~3" in str(err)
+
+
+def test_polish_release_then_back_to_interview(tmp_path):
+    lab = Lab(tmp_path, FakeRunner())
+    lab.start()
+    lab.resume(choice="next", feedback=lab.feedback("explore-1"))
+    lab.resume(choice="next", feedback=lab.feedback("deepen-1"))
+    info = lab.project / "polish" / "release-info.md"
+    info.write_text("名稱: 金幣雨\n代號: coin-rain\n介紹: 點擊收集掉落的金幣。\n", encoding="utf-8")
+    snap, err = lab.resume(choice="release", feedback=str(info))
+    assert err is None, err
+    assert interrupt_of(snap)["kind"] == "waiting_release_pick"
+    pick = lab.project / "polish" / "release-pick.md"
+    pick.write_text("圖示: C\n主色: 1\n預覽圖: B", encoding="utf-8")
+    snap, err = lab.resume(choice="pick", feedback=str(pick))
+    assert err is None, err
+    v = interrupt_of(snap)
+    assert v["kind"] == "waiting_feedback" and v["round_dir"] == "polish"
+    assert snap.values["rounds"]["polish"] == 1 and count(lab.runner, "review", "polish") == 0
+    release = lab.project / "release"
+    assert (release / "assets" / "icon.png").exists() and (release / "game" / "index.html").exists()
+    # 打磨版沒被改成網站版, 埋點留著
+    assert "// release" not in (lab.project / "polish" / "game" / "game" / "game.js").read_text(encoding="utf-8")
+    # 再打磨一輪, release/ 不會被當成舊輪次資料夾刪掉
+    snap, err = lab.resume(choice="continue", feedback=lab.feedback("polish"))
+    assert err is None and snap.values["rounds"]["polish"] == 2 and (release / "assets" / "icon.png").exists()

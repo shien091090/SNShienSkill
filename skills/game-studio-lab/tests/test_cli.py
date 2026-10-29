@@ -83,3 +83,106 @@ def test_status(env, capsys):
     call(capsys, "start", env["project"], "--idea-file", env["idea"], "--repo", env["remote"])
     code, out = call(capsys, "status", env["project"])
     assert out["status"] == "waiting_feedback" and "fix" in out["allowed_choices"]
+
+
+INFO = "名稱: 金幣雨\n代號: coin-rain\n介紹: 點擊收集掉落的金幣。\n"
+PICK = "圖示: A\n主色: 3\n預覽圖: B\n"
+
+
+def to_polish(env, capsys):
+    call(capsys, "start", env["project"], "--idea-file", env["idea"], "--repo", env["remote"])
+    for rd in ("explore-1", "deepen-1"):
+        fb = env["project"] / rd / "feedback.md"
+        fb.write_text("# 回饋", encoding="utf-8")
+        call(capsys, "resume", env["project"], "--choice", "next", "--feedback", fb)
+
+
+def write(path, text):
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_release_choice_validation(env, capsys):
+    call(capsys, "start", env["project"], "--idea-file", env["idea"], "--repo", env["remote"])
+    info = write(env["tmp"] / "info.md", INFO)
+    code, out = call(capsys, "resume", env["project"], "--choice", "release", "--feedback", info)
+    assert code == 1 and "只能選" in out["error"]
+    fb = write(env["project"] / "explore-1" / "feedback.md", "# 回饋")
+    call(capsys, "resume", env["project"], "--choice", "next", "--feedback", fb)
+    fb = write(env["project"] / "deepen-1" / "feedback.md", "# 回饋")
+    call(capsys, "resume", env["project"], "--choice", "next", "--feedback", fb)
+    bad = write(env["tmp"] / "bad.md", "名稱: 金幣雨\n代號: coin-rain\n")
+    code, out = call(capsys, "resume", env["project"], "--choice", "release", "--feedback", bad)
+    assert code == 1 and "介紹" in out["error"]
+    code, out = call(capsys, "resume", env["project"], "--choice", "release", "--feedback", info)
+    assert out["status"] == "waiting_release_pick"
+    code, out = call(capsys, "resume", env["project"], "--choice", "continue", "--feedback", info)
+    assert code == 1 and "pick" in out["error"]
+    badpick = write(env["tmp"] / "badpick.md", "圖示: A\n主色: 9\n預覽圖: B\n")
+    code, out = call(capsys, "resume", env["project"], "--choice", "pick", "--feedback", badpick)
+    assert code == 1 and "主色" in out["error"]
+
+
+def test_release_commits(env, capsys):
+    to_polish(env, capsys)
+    info = write(env["project"] / "polish" / "release-info.md", INFO)
+    code, out = call(capsys, "resume", env["project"], "--choice", "release", "--feedback", info)
+    assert out["status"] == "waiting_release_pick" and out["options_page"].endswith("index.html")
+    assert out["allowed_choices"] == ["pick", "redo"]
+    assert remote_log(env["remote"])[0] == "[feat] [proj] 產出發布用遊戲與素材方案"
+    call(capsys, "resume", env["project"], "--choice", "redo")
+    assert remote_log(env["remote"])[0] == "[feat] [proj] 重做發布素材方案"
+    pick = write(env["project"] / "polish" / "release-pick.md", PICK)
+    code, out = call(capsys, "resume", env["project"], "--choice", "pick", "--feedback", pick)
+    assert out["status"] == "waiting_feedback" and out["warnings"] == []
+    assert remote_log(env["remote"])[0] == "[feat] [proj] 發布素材定版"
+    tracked = subprocess.run(["git", "ls-files"], cwd=env["project"], capture_output=True, text=True,
+                             encoding="utf-8").stdout
+    assert "release/assets/icon.png" in tracked
+
+
+@pytest.fixture
+def bubble(tmp_path, monkeypatch):
+    import shutil
+    from pathlib import Path
+    monkeypatch.setenv("LAB_FAKE_CLAUDE", "1")
+    remote = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+    proj = tmp_path / "WebGame_Bubble"
+    shutil.copytree(Path(__file__).resolve().parent / "fixtures" / "good" / "game", proj / "game")
+    for args in (["init", "-b", "main"], ["remote", "add", "origin", str(remote)], ["add", "-A"],
+                 ["commit", "-m", "init"]):
+        subprocess.run(["git", *args], cwd=proj, check=True, capture_output=True)
+    return {"project": proj, "remote": str(remote), "tmp": tmp_path}
+
+
+def test_standalone_release_flow(bubble, capsys):
+    info = write(bubble["project"] / "release-info.md", INFO)
+    code, out = call(capsys, "release", bubble["project"], "--info", info)
+    assert out["status"] == "waiting_release_pick", out
+    assert remote_log(bubble["remote"])[0] == "[feat] [WebGame_Bubble] 產出發布用遊戲與素材方案"
+    code, out = call(capsys, "release", bubble["project"], "--info", info)
+    assert code == 1 and "pick" in out["error"]
+    pick = write(bubble["project"] / "release-pick.md", PICK)
+    code, out = call(capsys, "release", bubble["project"], "--choice", "pick", "--feedback", pick)
+    assert out["status"] == "done", out
+    assets = bubble["project"] / "release" / "assets"
+    assert (assets / "icon.png").exists() and (assets / "素材資訊.md").exists()
+    assert remote_log(bubble["remote"])[0] == "[feat] [WebGame_Bubble] 發布素材定版"
+    # 再發布一次: 停在挑選頁時舊的定版素材還在
+    code, out = call(capsys, "release", bubble["project"], "--info", info)
+    assert out["status"] == "waiting_release_pick" and (assets / "icon.png").exists()
+    tracked = subprocess.run(["git", "ls-files"], cwd=bubble["project"], capture_output=True, text=True,
+                             encoding="utf-8").stdout
+    assert ".lab/release.sqlite" in tracked and ".lab/logs" not in tracked
+
+
+def test_standalone_rejects_lab_project(env, capsys):
+    call(capsys, "start", env["project"], "--idea-file", env["idea"], "--repo", env["remote"])
+    code, out = call(capsys, "release", env["project"], "--info", write(env["tmp"] / "i.md", INFO))
+    assert code == 1 and "resume --choice release" in out["error"]
+
+
+def test_standalone_requires_game(tmp_path, capsys):
+    code, out = call(capsys, "release", tmp_path, "--info", write(tmp_path / "i.md", INFO))
+    assert code == 1 and "game/index.html" in out["error"]

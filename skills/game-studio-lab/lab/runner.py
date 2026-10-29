@@ -24,11 +24,12 @@ AGENTS = {
     "art": "game-artist", "art-fix": "game-artist",
     "rd": "game-rd", "rd-fix": "game-rd", "bugfix": "game-rd",
     "audio": "game-audio", "audio-fix": "game-audio",
+    "release-game": "game-rd", "release-art": "game-artist",
 }
 
 # 沒有 agent 的任務明確指定模型, 不吃 CLI 預設(預設可能被 managed settings 改掉)。
 # 有 agent 的任務用 agent 定義檔 frontmatter 的 model(美術 / 音效 opus、RD sonnet)
-MODELS = {"design": "opus", "review": "opus", "triage": "sonnet"}
+MODELS = {"design": "opus", "review": "opus", "triage": "sonnet", "release-info": "sonnet"}
 
 _AUDIO_TOOLS = ["WebSearch", "WebFetch", "Bash(curl:*)", "Bash(ffmpeg:*)", "Bash(ffprobe:*)"]
 EXTRA_TOOLS = {"audio": _AUDIO_TOOLS, "audio-fix": _AUDIO_TOOLS}

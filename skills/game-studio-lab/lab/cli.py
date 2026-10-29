@@ -3,6 +3,7 @@
   python -m lab start  <專案> --idea-file <檔> --repo <url>
   python -m lab resume <專案> [--choice ...] [--feedback <檔>] [--target <款>]
   python -m lab status <專案>
+  python -m lab release <資料夾> [--info <檔>] [--choice pick|redo] [--feedback <檔>]  (非 lab 專案的發布)
 """
 import argparse
 import json
@@ -17,6 +18,8 @@ from langgraph.types import Command
 from lab.checker import NodeChecker
 from lab.gitops import Git, SetupError
 from lab.graph import Deps, build_graph, round_label
+from lab.release import parse_release_info, parse_release_pick
+from lab.release_graph import build_release_graph
 from lab.state import STAGE_NAMES
 
 # 同時跑的 claude 上限; 記憶體吃緊時用 LAB_MAX_CONCURRENCY=1 改成一次一個
@@ -26,26 +29,34 @@ CFG = {"configurable": {"thread_id": "main"},
 FEEDBACK_CHOICES = {
     "explore": {"continue", "next", "end", "fix"},
     "deepen": {"continue", "next", "end", "fix"},
-    "polish": {"continue", "end", "fix", "back-deepen", "back-explore"},
+    "polish": {"continue", "end", "fix", "back-deepen", "back-explore", "release"},
 }
 FAILED_CHOICES = {"retry", "skip"}
+PICK_CHOICES = {"pick", "redo"}
+RELEASE_CFG = {"configurable": {"thread_id": "release"}}
 
 
 def make_deps() -> Deps:
     if os.environ.get("LAB_FAKE_CLAUDE") == "1":
         from lab.fake import FakeRunner
-        return Deps(FakeRunner(), NodeChecker())
+        from lab.renderer import FakeRenderer
+        return Deps(FakeRunner(), NodeChecker(), FakeRenderer())
     from lab.runner import ClaudeRunner
     return Deps(ClaudeRunner(), NodeChecker())
 
 
 class Session:
-    def __init__(self, project: Path, deps: Deps):
-        self.conn = sqlite3.connect(project / ".lab" / "checkpoint.sqlite", check_same_thread=False)
-        self.graph = build_graph(deps, SqliteSaver(self.conn))
+    """release=True: 非 lab 專案的單獨發布, 進度檔另存 .lab/release.sqlite, 只跑發布子圖。"""
+
+    def __init__(self, project: Path, deps: Deps, release: bool = False):
+        db = "release.sqlite" if release else "checkpoint.sqlite"
+        self.conn = sqlite3.connect(project / ".lab" / db, check_same_thread=False)
+        builder = build_release_graph if release else build_graph
+        self.graph = builder(deps, SqliteSaver(self.conn))
+        self.cfg = RELEASE_CFG if release else CFG
 
     def snapshot(self):
-        return self.graph.get_state(CFG)
+        return self.graph.get_state(self.cfg)
 
     def close(self):
         self.conn.close()
@@ -63,6 +74,9 @@ def report(project: Path, snap, error: str | None = None, warnings: list | None 
         if v["kind"] == "waiting_feedback":
             out["games"] = v["games"]
             out["allowed_choices"] = sorted(FEEDBACK_CHOICES[v["stage"]])
+        elif v["kind"] == "waiting_release_pick":
+            out["options_page"] = v["options_page"]
+            out["allowed_choices"] = sorted(PICK_CHOICES)
         else:
             out["failed"] = v["failed"]
             out["allowed_choices"] = sorted(FAILED_CHOICES)
@@ -77,6 +91,10 @@ def commit_message(project: Path, before: dict, after: dict, status: str, choice
         return f"[other] [{name}] 流程中途停止, 保留目前進度"
     if choice == "fix":
         return f"[fix] [{name}] 修正{round_label(after['stage'], after['rounds'])}{after.get('target', '')}試玩回報的問題"
+    release_msg = {"release": "產出發布用遊戲與素材方案", "redo": "重做發布素材方案", "pick": "發布素材定版",
+                   "release-resume": "接續中斷的發布流程"}
+    if choice in release_msg:
+        return f"[feat] [{name}] {release_msg[choice]}"
     parts = []
     if not before.get("round_dir"):
         parts.append("建立專案")
@@ -103,17 +121,19 @@ def commit_message(project: Path, before: dict, after: dict, status: str, choice
     return f"{prefix} [{name}] {body}"
 
 
-def run(project: Path, inp, choice: str | None = None) -> dict:
-    session = Session(project, make_deps())
+def run(project: Path, inp, choice: str | None = None, release: bool = False) -> dict:
+    session = Session(project, make_deps(), release)
     before = dict(session.snapshot().values or {})
     error = None
     try:
-        session.graph.invoke(inp, CFG)
+        session.graph.invoke(inp, session.cfg)
     except Exception as e:  # noqa: BLE001 — 錯誤原文交給使用者
         error = f"{type(e).__name__}: {e}"
     snap = session.snapshot()
     session.close()  # 關掉連線才會把 WAL 寫回 sqlite, 之後 commit 的才是完整進度
     out = report(project, snap, error)
+    if choice == "pick" and not error:
+        out["warnings"].extend((snap.values or {}).get("release_warnings") or [])
     msg = commit_message(project, before, dict(snap.values or {}), out["status"], choice)
     try:
         warn = Git().commit_push(project, msg)
@@ -136,6 +156,23 @@ def cmd_start(args) -> dict:
     (project / ".lab").mkdir(parents=True, exist_ok=True)
     Git().init(project, args.repo)
     return run(project, {"project": str(project), "repo": args.repo, "idea_file": str(idea)})
+
+
+def check_user_file(path: str | None, parse) -> None:
+    """發布資訊 / 挑選結果檔先在這裡驗, 格式錯就不進流程。"""
+    if not path or not Path(path).exists():
+        raise SetupError(f"找不到檔案 {path}")
+    try:
+        parse(Path(path).read_text(encoding="utf-8"))
+    except ValueError as e:
+        raise SetupError(str(e)) from e
+
+
+def check_pick(args) -> None:
+    if args.choice not in PICK_CHOICES:
+        raise SetupError("停在挑選發布方案, 只能選 pick(交挑選結果)或 redo(重做方案)")
+    if args.choice == "pick":
+        check_user_file(args.feedback, parse_release_pick)
 
 
 def cmd_resume(args) -> dict:
@@ -162,6 +199,10 @@ def cmd_resume(args) -> dict:
             raise SetupError("需要 --feedback 指向已寫好的回饋檔(fix 時是 bug 清單)")
         if args.choice == "fix" and args.target not in [g["id"] for g in v["games"]]:
             raise SetupError(f"fix 需要 --target, 可選: {', '.join(g['id'] for g in v['games'])}")
+        if args.choice == "release":
+            check_user_file(args.feedback, parse_release_info)
+    elif v["kind"] == "waiting_release_pick":
+        check_pick(args)
     elif args.choice not in FAILED_CHOICES:
         raise SetupError("建置失敗時只能選 retry 或 skip")
     ans = {"choice": args.choice}
@@ -170,6 +211,43 @@ def cmd_resume(args) -> dict:
     if args.target:
         ans["target"] = args.target
     return run(project, Command(resume=ans), args.choice)
+
+
+STANDALONE_GITIGNORE = "logs/\n*.sqlite-wal\n*.sqlite-shm\n"
+
+
+def cmd_release(args) -> dict:
+    """非 lab 專案(遊戲在 <資料夾>/game/)的單獨發布; lab 專案改在打磨停點選 release。"""
+    project = Path(args.project).resolve()
+    if (project / ".lab" / "checkpoint.sqlite").exists():
+        raise SetupError(f"{project} 是 game-studio-lab 專案, 請在打磨停點用 resume --choice release")
+    if not (project / "game" / "index.html").exists():
+        raise SetupError(f"{project} 底下沒有 game/index.html")
+    if not (project / ".git").exists():
+        raise SetupError(f"{project} 不是 git repo, 發布結果無法 commit")
+    (project / ".lab").mkdir(exist_ok=True)
+    if not (project / ".lab" / ".gitignore").exists():
+        (project / ".lab" / ".gitignore").write_text(STANDALONE_GITIGNORE, encoding="utf-8")
+    session = Session(project, make_deps(), release=True)
+    snap = session.snapshot()
+    session.close()
+    if snap.interrupts:
+        if args.info:
+            raise SetupError("目前停在挑選發布方案, 請先 --choice pick 或 redo")
+        check_pick(args)
+        ans = {"choice": args.choice}
+        if args.feedback:
+            ans["feedback"] = str(Path(args.feedback).resolve())
+        return run(project, Command(resume=ans), args.choice, release=True)
+    if args.choice:
+        raise SetupError("目前沒有停在挑選發布方案, 不需要 --choice")
+    if args.info:
+        check_user_file(args.info, parse_release_info)
+        return run(project, {"project": str(project), "round_dir": "", "standalone": True,
+                             "feedback": str(Path(args.info).resolve())}, "release", release=True)
+    if snap.next:
+        return run(project, None, "release-resume", release=True)
+    raise SetupError("需要 --info 指向發布資訊檔")
 
 
 def cmd_status(args) -> dict:
@@ -200,9 +278,14 @@ def main(argv=None) -> int:
     st = sub.add_parser("status")
     st.add_argument("project")
     sub.add_parser("probe-models")
+    rl = sub.add_parser("release")
+    rl.add_argument("project")
+    rl.add_argument("--info")
+    rl.add_argument("--choice")
+    rl.add_argument("--feedback")
     args = p.parse_args(argv)
     try:
-        out = {"start": cmd_start, "resume": cmd_resume, "status": cmd_status,
+        out = {"start": cmd_start, "resume": cmd_resume, "status": cmd_status, "release": cmd_release,
                "probe-models": cmd_probe_models}[args.cmd](args)
     except SetupError as e:
         out = {"status": "error", "error": str(e), "warnings": []}

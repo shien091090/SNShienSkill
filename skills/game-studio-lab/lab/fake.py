@@ -13,7 +13,8 @@ FIXTURE = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "good"
 
 
 class FakeRunner:
-    def __init__(self, break_once=None, fail_once=None, games_per_round=2):
+    def __init__(self, break_once=None, fail_once=None, games_per_round=2, drop_option=None):
+        self.drop_option = drop_option  # 發布美術少寫的那張繪製頁(例 "share-c.html")
         self.break_once = set(break_once or ())
         self.fail_once = set(fail_once or ())
         self.games_per_round = games_per_round
@@ -98,3 +99,25 @@ class FakeRunner:
     def _review(self, ctx, broken):
         with open(Path(ctx["project"]) / "hypotheses.md", "a", encoding="utf-8") as f:
             f.write(f"- {ctx['round_dir']} 檢討: 選擇 {ctx['choice']}\n")
+
+    # ---- 發布 ----
+    def _release_game(self, ctx, broken):
+        release = Path(ctx["release_dir"])
+        p = release / "game" / "game.js"
+        p.write_text(p.read_text(encoding="utf-8") + "\n// release\n", encoding="utf-8")
+        if not (release / "interface.json").exists():
+            shutil.copyfile(FIXTURE / "interface.json", release / "interface.json")
+
+    def _release_info(self, ctx, broken):
+        out = Path(ctx["release_dir"]) / "options" / "info.json"
+        out.write_text(json.dumps({"time": "5–10 分鐘", "time_estimated": True, "controls": "點擊收集金幣"},
+                                  ensure_ascii=False), encoding="utf-8")
+
+    def _release_art(self, ctx, broken):
+        opts = Path(ctx["release_dir"]) / "options"
+        for n in ("icon-a", "icon-b", "icon-c", "share-a", "share-b", "share-c"):
+            if f"{n}.html" != self.drop_option:
+                (opts / f"{n}.html").write_text(f"<!doctype html><title>{n}</title>", encoding="utf-8")
+        colors = [{"id": str(i), "bg": bg, "fg": "#2d2144", "note": "假"}
+                  for i, bg in enumerate(("#f29cac", "#aaefd5", "#e0c64f"), 1)]
+        (opts / "colors.json").write_text(json.dumps(colors), encoding="utf-8")
