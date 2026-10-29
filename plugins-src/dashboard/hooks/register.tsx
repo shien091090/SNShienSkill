@@ -324,8 +324,8 @@ async function refreshUnityProject($: EngineInterface) {
 // 進測版號: 開 session 時先顯示上次存下的結果, 再每 30 分鐘問一次 GitLab 與送審日表
 const RELEASE_POLL_MS = 30 * 60_000
 const RELEASE_KEY = 'release'
-// master 最新 commit 沒有 tag 時沿用的中版號
-const MASTER_MINOR_KEY = 'masterMinor'
+// master 最新 commit 沒有 tag 時沿用的 tag
+const MASTER_TAG_KEY = 'masterTag'
 
 async function refreshRelease($: EngineInterface) {
   try {
@@ -338,9 +338,9 @@ async function refreshRelease($: EngineInterface) {
     ])
     if (git.exitCode !== 0) throw new Error(git.stderr.trim() || `git ls-remote 結束碼 ${git.exitCode}`)
     if (!sheet.ok) throw new Error(`送審日表 HTTP ${sheet.status}`)
-    const last = (await $.store.get(MASTER_MINOR_KEY)) as string | undefined
+    const last = (await $.store.get(MASTER_TAG_KEY)) as string | undefined
     const board = buildBoard(parseLsRemote(git.stdout), parseSheet(sheet.text, new Date().getFullYear()), last ?? null)
-    if (board.masterMinor) await $.store.set(MASTER_MINOR_KEY, board.masterMinor)
+    if (board.masterTag) await $.store.set(MASTER_TAG_KEY, board.masterTag)
     const next: ReleaseBoard = { current: board.current, others: board.others, fetchedAt: Date.now(), isStale: false }
     await $.store.set(RELEASE_KEY, next)
     await update($, release, () => next)

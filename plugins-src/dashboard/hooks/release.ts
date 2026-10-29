@@ -66,22 +66,23 @@ export function parseSheet(csv: string, year: number): Record<string, string | n
   return result
 }
 
-// master 的中版號(master 最新 commit 上的 tag, 沒有就沿用上次的), 加上比它新、打過 tag 且在送審日表上的版本
+// master 最新 commit 上的 tag(沒有就沿用上次的), 加上比它新、打過 tag 且在送審日表上的版本
 export function buildBoard(
   ls: LsRemote,
   sheet: Record<string, string | null>,
-  lastMasterMinor: string | null,
-): { masterMinor: string | null; current: ReleaseEntry | null; others: ReleaseEntry[] } {
+  lastMasterTag: string | null,
+): { masterTag: string | null; current: ReleaseEntry | null; others: ReleaseEntry[] } {
   const latest = new Map<string, string>()
   for (const { name } of ls.tags) {
     const minor = minorOf(name)
     const prev = latest.get(minor)
     if (!prev || compareNums(tagRank(name), tagRank(prev)) > 0) latest.set(minor, name)
   }
-  const onMaster = ls.tags.filter(t => t.sha === ls.masterSha).map(t => minorOf(t.name))
-  onMaster.sort((a, b) => compareNums(minorRank(b), minorRank(a)))
-  const masterMinor = onMaster[0] ?? lastMasterMinor
-  if (!masterMinor) return { masterMinor: null, current: null, others: [] }
+  const onMaster = ls.tags.filter(t => t.sha === ls.masterSha).map(t => t.name)
+  onMaster.sort((a, b) => compareNums([...minorRank(minorOf(b)), ...tagRank(b)], [...minorRank(minorOf(a)), ...tagRank(a)]))
+  const masterTag = onMaster[0] ?? lastMasterTag
+  if (!masterTag) return { masterTag: null, current: null, others: [] }
+  const masterMinor = minorOf(masterTag)
 
   const entry = (minor: string): ReleaseEntry => ({ minor, tag: latest.get(minor) ?? '', date: sheet[minor] ?? null })
   const others = [...latest.keys()]
@@ -89,7 +90,8 @@ export function buildBoard(
     .filter(minor => minor in sheet && compareNums(minorRank(minor), minorRank(masterMinor)) > 0)
     .sort((a, b) => compareNums(minorRank(a), minorRank(b)))
     .map(entry)
-  return { masterMinor, current: entry(masterMinor), others }
+  // 同一個中版號底下 patch 更大的 tag 可能還沒進 master, 第一行要顯示 master 上那個
+  return { masterTag, current: { ...entry(masterMinor), tag: masterTag }, others }
 }
 
 // 距離送審日還有幾天(以當地日期計算); 負數是已經過了

@@ -31,10 +31,10 @@ test('送審日: 沒有年份補今年, N/A 當作未定, 個位數月日也讀�
   expect(sheet['3.130']).toBe(null)
 })
 
-test('master 最新 commit 有 tag: 用它的中版號, 括號是該版最新的 tag', () => {
+test('master 最新 commit 有 tag: 第一行就是那個 tag, 同中版號 patch 更大但沒進 master 的不算', () => {
   const board = buildBoard(parseLsRemote(LS), parseSheet(CSV, 2026), null)
-  expect(board.masterMinor).toBe('3.140')
-  expect(board.current).toEqual({ minor: '3.140', tag: '3.140.10_Rev1_Hotfix1', date: '2026-10-27' })
+  expect(board.masterTag).toBe('3.140.7_Rev2')
+  expect(board.current).toEqual({ minor: '3.140', tag: '3.140.7_Rev2', date: '2026-10-27' })
   expect(board.others).toEqual([{ minor: '3.141', tag: '3.141.4_Rev1', date: '2026-11-16' }])
 })
 
@@ -48,9 +48,9 @@ test('送審日表上沒有的版本不算進測: 德撲或打錯的 tag', () =>
   expect(buildBoard(ls, parseSheet(CSV, 2026), null).others.map(o => o.minor)).toEqual(['3.141'])
 })
 
-test('master 最新 commit 沒有 tag: 沿用上次的中版號; 從沒判斷過就是無法判定', () => {
+test('master 最新 commit 沒有 tag: 沿用上次的 tag; 從沒判斷過就是無法判定', () => {
   const ls = parseLsRemote(LS.replace(/^b66ee4f6\w+\trefs\/heads\/master/m, `${'9'.repeat(40)}\trefs/heads/master`))
-  expect(buildBoard(ls, {}, '3.140').current?.minor).toBe('3.140')
+  expect(buildBoard(ls, {}, '3.140.7_Rev2').current).toEqual({ minor: '3.140', tag: '3.140.7_Rev2', date: null })
   const unknown = buildBoard(ls, {}, null)
   expect(unknown.current).toBe(null)
   expect(unknown.others).toEqual([])
@@ -61,8 +61,8 @@ test('表上沒有的版本送審日是未定', () => {
 })
 
 test('patch 依數字比大小, 不是字串', () => {
-  const ls = parseLsRemote(['a\trefs/heads/master', 'a\trefs/tags/3.150.9_Rev1', 'b\trefs/tags/3.150.10_Rev1'].join('\n'))
-  expect(buildBoard(ls, {}, null).current?.tag).toBe('3.150.10_Rev1')
+  const onMaster = parseLsRemote(['a\trefs/heads/master', 'a\trefs/tags/3.150.9_Rev1', 'a\trefs/tags/3.150.10_Rev1'].join('\n'))
+  expect(buildBoard(onMaster, {}, null).current?.tag).toBe('3.150.10_Rev1')
 })
 
 test('剩幾天以當地日期計算, 日期顯示成 月/日', () => {
