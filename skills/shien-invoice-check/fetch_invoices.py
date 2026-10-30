@@ -69,6 +69,13 @@ def login(page, phone, pwd):
     return False
 
 
+def browser_gone(page, ex):
+    try:
+        return page.is_closed() or "closed" in str(ex).lower()
+    except Exception:
+        return True  # 連驅動程式都斷了
+
+
 def download_range(page, start, end, out_dir, prefix):
     rng = {"start": to_utc_iso(start, False), "end": to_utc_iso(end, True)}
 
@@ -150,29 +157,38 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     os.makedirs(PROFILE_DIR, exist_ok=True)
 
-    failed = []
-    with sync_playwright() as p:
-        ctx = p.chromium.launch_persistent_context(PROFILE_DIR, channel="msedge", headless=False, accept_downloads=True)
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
-        for n in accounts:
-            phone, pwd = user_env(f"INVOICE_ACC{n}_PHONE"), user_env(f"INVOICE_ACC{n}_PWD")
-            if not phone or not pwd:
-                print(f"帳號{n}: 環境變數 INVOICE_ACC{n}_PHONE / INVOICE_ACC{n}_PWD 未設定, 略過")
-                failed.append(n)
-                continue
-            print(f"帳號{n} ({phone[-3:]}):")
-            ctx.clear_cookies()  # 確保不沿用上一組帳號的登入狀態
-            if not login(page, phone, pwd):
-                print(f"  登入逾時, 略過帳號{n}")
-                failed.append(n)
-                continue
-            for s, e in month_chunks(start, end):
-                download_range(page, s, e, args.out, f"acc{n}")
-        try:
-            ctx.close()
-        except Exception:
-            pass  # 使用者先手動關掉 Edge 視窗時會丟例外, 檔案已存好不影響
+    done = []
+    try:
+        with sync_playwright() as p:
+            ctx = p.chromium.launch_persistent_context(PROFILE_DIR, channel="msedge", headless=False, accept_downloads=True)
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
+            for n in accounts:
+                phone, pwd = user_env(f"INVOICE_ACC{n}_PHONE"), user_env(f"INVOICE_ACC{n}_PWD")
+                if not phone or not pwd:
+                    print(f"帳號{n}: 環境變數 INVOICE_ACC{n}_PHONE / INVOICE_ACC{n}_PWD 未設定, 略過")
+                    continue
+                print(f"帳號{n} ({phone[-3:]}):")
+                try:
+                    ctx.clear_cookies()  # 確保不沿用上一組帳號的登入狀態
+                    if not login(page, phone, pwd):
+                        print(f"  登入逾時, 略過帳號{n}")
+                        continue
+                    for s, e in month_chunks(start, end):
+                        download_range(page, s, e, args.out, f"acc{n}")
+                    done.append(n)
+                except Exception as ex:
+                    if browser_gone(page, ex):
+                        print("  Edge 視窗已關閉, 停止下載")
+                        break
+                    print(f"  帳號{n} 下載失敗: {ex}")
+            try:
+                ctx.close()
+            except Exception:
+                pass  # 使用者先手動關掉 Edge 視窗時會丟例外, 檔案已存好不影響
+    except Exception as ex:
+        print(f"瀏覽器異常結束: {ex}")  # 例如視窗關閉後 Playwright 驅動程式跟著結束
 
+    failed = [n for n in accounts if n not in done]
     print("完成" if not failed else f"完成, 但帳號 {','.join(failed)} 未下載")
     sys.exit(1 if failed else 0)
 
