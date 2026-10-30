@@ -4,17 +4,20 @@
 
 結果 JSON 欄位: start, end, invoiceCount, missing[], matched[]
 每張發票: invoiceNo, date (yyyy/MM/dd), storeName, netAmount, items[{name, qty, amount}],
-matched 另有 matchedBy (exact / subset)、discount ({rate, amount} 或 null)、records (命中的記帳項目)。
+matched 另有 matchedBy (exact / subset / group)、discount ({rate, amount} 或 null)、records (命中的記帳項目),
+group 另有 groupTotal (同店合計金額)。
 
-比對邏輯 (兩段式 ± 1 日), 逐日處理有發票的日子, 候選記帳池 = 當日與前一日、尚未被用掉的記帳:
+比對邏輯 (三段式 ± 1 日), 逐日處理有發票的日子, 候選記帳池 = 當日與前一日、尚未被用掉的記帳:
 1. 單筆精確匹配: 找一筆記帳金額恰好等於發票淨額
 2. subset sum 補配: 剩下的發票依淨額由大到小, 找一組記帳金額加總恰好等於淨額
-折扣商家同時嘗試原金額與折扣後金額。
+3. 同店合記: 仍未對到、同日同一家店的多張發票, 加總恰好等於一筆記帳
+折扣商家在第 1、2 段同時嘗試原金額與折扣後金額。
 """
 import argparse
 import csv
 import glob
 import io
+import itertools
 import json
 import math
 import os
@@ -147,6 +150,12 @@ def find_subset(pool, target):
     return walk(0, target, [])
 
 
+def group_subsets(group):
+    # 兩張以上的組合, 張數多的先試; 同店同日未比對的發票通常只有幾張, 組合數很小
+    for size in range(len(group), 1, -1):
+        yield from itertools.combinations(group, size)
+
+
 def reconcile(invoices, records):
     remaining = {r["_id"]: r for r in records}
     matched, missing = [], []
@@ -174,6 +183,7 @@ def reconcile(invoices, records):
             if not hit:
                 left.append(inv)
 
+        day_missing = []
         for inv in sorted(left, key=lambda x: -x["netAmount"]):
             for amount, rate in targets(inv):
                 recs = find_subset(pool(), amount)
@@ -181,7 +191,25 @@ def reconcile(invoices, records):
                     mark(inv, "subset", rate, amount, recs)
                     break
             else:
-                missing.append(inv)
+                day_missing.append(inv)
+
+        # 同店多張發票合記成一筆: 只在同一家店內湊, 跨店湊容易把不相干的帳配在一起
+        by_store = {}
+        for inv in day_missing:
+            by_store.setdefault(inv["storeName"], []).append(inv)
+        for group in by_store.values():
+            for invs in group_subsets(group):
+                total = sum(i["netAmount"] for i in invs)
+                hit = next((r for r in pool() if r["prize"] == total), None)
+                if hit:
+                    del remaining[hit["_id"]]
+                    for inv in invs:
+                        inv.update(matchedBy="group", discount=None, groupTotal=total,
+                                   records=[{k: v for k, v in hit.items() if k != "_id"}])
+                        matched.append(inv)
+                        day_missing.remove(inv)
+                    break
+        missing.extend(day_missing)
 
     key = lambda x: (x["date"], x["invoiceNo"])
     return sorted(matched, key=key), sorted(missing, key=key)

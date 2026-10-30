@@ -51,7 +51,7 @@ python "{skill 目錄}/reconcile.py" --csv-dir "{資料資料夾}" --out "{資�
 腳本負責: 讀資料夾內所有 CSV(依發票號碼合併明細、跨檔去重、略過淨額 ≤ 0)、從 `$SNSHIEN_ROOT\linebot_liveManagerIntegration\settings.py` 讀 GAS 網址、抓發票期間(含起始日前一天)的記帳、執行比對。比對規則與折扣商家清單寫在腳本開頭的說明與 `DISCOUNT_VENDORS`, 要調整規則就改腳本, 不要在對話裡手算。
 
 - 輸出以「錯誤:」開頭 → 照訊息回報使用者並停止(找不到 CSV、`SNSHIEN_ROOT` 未設定、GAS 呼叫失敗等)
-- 成功時印出摘要與可能漏記清單, 完整結果在 `--out` 的 JSON: `start`、`end`、`invoiceCount`、`missing[]`、`matched[]`; 每張發票有 `invoiceNo`、`date`、`storeName`、`netAmount`、`items[]`, `matched` 另有 `matchedBy`、`discount`(`{rate, amount}` 或 null)、`records`
+- 成功時印出摘要與可能漏記清單, 完整結果在 `--out` 的 JSON: `start`、`end`、`invoiceCount`、`missing[]`、`matched[]`; 每張發票有 `invoiceNo`、`date`、`storeName`、`netAmount`、`items[]`, `matched` 另有 `matchedBy`(`exact` / `subset` / `group`)、`discount`(`{rate, amount}` 或 null)、`records`, 同店合記(`group`)另有 `groupTotal`
 
 ### 2. 產生對帳報告並以 Artifact 連結呈現
 
