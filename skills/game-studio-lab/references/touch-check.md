@@ -20,7 +20,7 @@ chrome --headless=new --user-data-dir=<暫存資料夾> --disable-gpu --hide-scr
        --virtual-time-budget=3000 --screenshot=<輸出.png> "file:///<harness>.html?s=<畫面>&touch=1"
 ```
 
-Chrome 路徑用 `lab.renderer.find_chrome()`。每個玩家會操作的畫面都截一張(開始畫面、各選單、遊戲主畫面的左右兩端、結算、教學 / 引導卡出現時)。用 Read 看過每張, 找被按鈕蓋住的文字、數值、可選項目。
+Chrome 路徑用 `lab.renderer.find_chrome()`。每個玩家會操作的畫面都截一張(開始畫面、各選單、遊戲主畫面的左右兩端、結算、教學 / 引導卡出現時)。用 Read 看過每張, 找被按鈕蓋住的文字、數值、可選項目, 也確認畫面要求按的鍵(例: 引導卡的「A 繼續」)真的有畫出來——疊在不能操作的場景上的引導最容易漏(例: 見習表演的引導卡, 表演場整組不畫, 卡片要按 A 卻沒有 A 鈕)。
 
 ## 給使用者看與調整
 
