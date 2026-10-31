@@ -10,11 +10,13 @@ import threading
 from pathlib import Path
 
 FIXTURE = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "good"
+STUDIO_REFS = Path(__file__).resolve().parent.parent / "references"
 
 
 class FakeRunner:
-    def __init__(self, break_once=None, fail_once=None, games_per_round=2, drop_option=None):
+    def __init__(self, break_once=None, fail_once=None, games_per_round=2, drop_option=None, touch="none"):
         self.drop_option = drop_option  # 發布美術少寫的那張繪製頁(例 "banner-c.html")
+        self.touch = touch  # 發布 RD 寫進 touch.js 的 CONFIG.mode; None = 沒加觸控層
         self.break_once = set(break_once or ())
         self.fail_once = set(fail_once or ())
         self.games_per_round = games_per_round
@@ -105,6 +107,12 @@ class FakeRunner:
         release = Path(ctx["release_dir"])
         p = release / "game" / "game.js"
         p.write_text(p.read_text(encoding="utf-8") + "\n// release\n", encoding="utf-8")
+        if self.touch:  # 照發布任務: 範本複製成 touch.js、改 CONFIG.mode、index.html 在 game.js 之後載入
+            tpl = (STUDIO_REFS / "touch-template.js").read_text(encoding="utf-8")
+            (release / "game" / "touch.js").write_text(tpl.replace("mode: 'keys',", f"mode: '{self.touch}',", 1), encoding="utf-8")
+            idx = release / "game" / "index.html"
+            idx.write_text(idx.read_text(encoding="utf-8").replace(
+                '<script src="game.js"></script>', '<script src="game.js"></script>\n<script src="touch.js"></script>'), encoding="utf-8")
         if not (release / "interface.json").exists():
             shutil.copyfile(FIXTURE / "interface.json", release / "interface.json")
 

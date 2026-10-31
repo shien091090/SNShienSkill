@@ -15,7 +15,7 @@ from lab.release_graph import build_release_graph
 from lab.renderer import ChromeRenderer, FakeRenderer, find_chrome
 from lab.release import (aspect_ratio, build_options_page, parse_release_info, parse_release_pick,
                          png_size, write_asset_info, write_png, prune_release_game,
-                         write_site_info)
+                         write_site_info, touch_mode)
 
 INFO = {"name": "幽影接力", "code": "ghost-echo", "intro": "和過去的自己接力闖關。", "time": "5–10 分鐘",
         "time_estimated": True, "ratio": "9:16", "ratio_site": False, "mobile": False}
@@ -210,3 +210,20 @@ def test_chrome_renderer_real(tmp_path):
     page.write_text('<!doctype html><body style="margin:0;background:#4776c3"></body>', encoding="utf-8")
     ChromeRenderer().render(page, tmp_path / "p.png", (200, 100))
     assert png_size(tmp_path / "p.png") == (200, 100)
+
+
+def test_touch_mode_reads_config_and_script_tag(tmp_path):
+    g = tmp_path / "game"
+    g.mkdir()
+    assert touch_mode(g) is None
+    (g / "touch.js").write_text("var CONFIG = {\n    mode: 'mouse',\n};", encoding="utf-8")
+    (g / "index.html").write_text('<script src="game.js"></script>', encoding="utf-8")
+    assert touch_mode(g) is None  # index.html 沒載入 touch.js
+    (g / "index.html").write_text('<script src="game.js"></script>\n<script src="touch.js"></script>', encoding="utf-8")
+    assert touch_mode(g) == "mouse"
+
+
+def test_release_without_touch_layer_fails(tmp_path):
+    rel = Rel(tmp_path, runner=FakeRunner(touch=None))
+    _, err = rel.start()
+    assert isinstance(err, LabError) and "觸控層" in str(err)

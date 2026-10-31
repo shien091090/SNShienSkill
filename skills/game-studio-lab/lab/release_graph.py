@@ -13,7 +13,7 @@ from langgraph.types import Command, interrupt
 
 from lab.graph import LabError
 from lab.release import (ICON, ICON_IDS, MAX_FILE_MB, BANNER, aspect_ratio, build_options_page,
-                         parse_release_info, parse_release_pick, png_size, prune_release_game, write_asset_info,
+                         parse_release_info, parse_release_pick, png_size, prune_release_game, touch_mode, write_asset_info,
                          write_site_info)
 from lab.renderer import ChromeRenderer
 
@@ -60,6 +60,8 @@ def build_release_graph(deps, checkpointer=None):
             shutil.copyfile(src / "interface.json", release / "interface.json")
         deps.runner.run("release-game", ctx(s))
         prune_release_game(release / "game")
+        if touch_mode(release / "game") is None:
+            raise LabError("網站版遊戲沒有觸控層: release/game/touch.js 不存在、index.html 沒載入它, 或 CONFIG.mode 不是 keys / mouse / none")
         targets = [release / "game"] + ([] if s.get("standalone") else [src / "game"])
         for t in targets:
             result = deps.checker.check(t, "polish")
@@ -81,7 +83,8 @@ def build_release_graph(deps, checkpointer=None):
         iface = json.loads(iface_path.read_text(encoding="utf-8")) if iface_path.exists() else {}
         ratio, is_site = aspect_ratio(iface)
         data.update({k: c[k] for k in ("name", "code", "intro")})
-        data.update({"ratio": ratio, "ratio_site": is_site, "mobile": False})  # 手機支援待使用者實測後再設計
+        # 手機能玩 = 21:9 橫式且觸控層有做觸控(直式遊戲 mode 是 none, 網站在手機直拿時本來就不開遊戲)
+        data.update({"ratio": ratio, "ratio_site": is_site, "mobile": is_site and touch_mode(release / "game") in ("keys", "mouse")})
         out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         return {}
 

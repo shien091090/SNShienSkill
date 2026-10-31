@@ -88,12 +88,15 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
    - **遊戲代號**(網址用, 上線後不改): 你帶預設給使用者確認, 依序取上次 `release/assets/素材資訊.md` 的代號 → PVD計畫網站 repo 的 `site/js/games.js` 裡該遊戲已定的 `code`(本機例: `E:\Project\PVDWebsite`; 找不到 repo 就跳過這項) → 由專案名轉英文小寫加連字號
 2. lab 專案: `resume <專案> --choice release --feedback <發布資訊檔>`; 非 lab 專案: `release <資料夾> --info <發布資訊檔>`。都要背景執行, 約十幾到三十分鐘。選發布不跑檢討假設: 這輪若有試玩回饋要進下一輪設計, 應選 continue
 3. 停在 `waiting_release_pick`: 把 `options_page`(選擇頁絕對路徑, 只能看不能操作)給使用者, 請使用者回代號(例「圖示 B、主色 2、橫幅 A」)。寫成 `release-pick.md`(放發布資訊檔旁), `--choice pick --feedback <檔>`; 都不喜歡 → `--choice redo`(只重做美術方案, 可把使用者的意見寫進 `release/options/redo-notes.md` 給美術看)
+   - 網站版有觸控按鈕時(`touch.js` 的 `mode` 是 `keys`), 同時照 `references/touch-check.md` 逐畫面截觸控模式給使用者看, 有蓋到畫面資訊就調整後再 `pick`
    - 選定了但要微調某張(例: 橫幅換字型、某個字特別設計): 不用 redo(會整批重畫), 由你改該張繪製頁(`release/options/<方案>.html`)。變體繪製頁與 PNG 一律放 scratchpad, 不放進專案(繪製頁裡的 `../game/art/art.js` 改成 `release/game/art/art.js` 的絕對 `file:///` 路徑), 用 `lab.renderer.ChromeRenderer` 畫成 PNG; 比較頁用 Artifact 發布(PNG 以 `files` 帶上, 每張標方案代號與一句說明), 把連結給使用者挑, 可多輪來回。定案後把選中的繪製頁與 PNG 蓋回 `release/options/<方案>.html` / `.png`(繪製頁的美術路徑改回 `../game/art/art.js`), 刪掉 Artifact(Artifact 的 delete, 使用者會確認)與 scratchpad 的變體, 再 `pick`。外加字型: 用 Google Fonts 的 OFL 字型, 以 base64 data URI 內嵌在繪製頁(無頭 Chrome 從 file:// 用相對路徑載入字型會靜默失敗, 退回系統字), 繪製包在 `document.fonts.load(...).then()` 裡; 日文字型常缺繁中字(例: Dela Gothic One 缺「點」), 重畫後要看圖確認沒有缺字方塊
 4. 定版完: lab 專案回到同一個打磨停點(`waiting_feedback`, 遊戲不重做), 可再選 continue / back-* / end / release; 非 lab 專案流程結束。回報 `release/` 路徑與 `warnings`(例: 檔案超過網站 25MB 上限)
 
 網站遊玩框是 21:9: 新遊戲設計時畫布就固定 1680×720; 舊遊戲比例不同的, 發布時 RD 會把網站版與打磨版都改成 21:9(直式不改, 會出現在 `warnings`)。網站版會自動清掉開發文件與沒載入的程式(網站同步工具會擋)。
 
-不做: 手機版(支援裝置一律只支援電腦)、鍵名格式、網站暫停 / 繼續訊息、改 PVDWebsite repo(網站另外更新)。
+手機與網站訊息: 發布時 RD 從 `references/touch-template.js` 加觸控層 `touch.js`(網站版與打磨版兩份): 鍵盤遊戲疊虛擬按鈕、滑鼠遊戲點擊即觸控、直式遊戲不做觸控; 直拿手機自動暫停; 接網站的暫停 / 繼續與玩完一局訊息; 遊戲沒有 Esc 暫停時由它提供。手機不放任何聲音或暫停按鈕(交給手機本身)。之後再打磨時設計與 RD 不管手機, 只是不能弄壞 `touch.js`; 下次發布 RD 會補新畫面的按鈕設定。21:9 且有觸控 → `info.json` 的 `mobile` 為 true。設計見 `docs/2026-10-31-release-mobile-design.md`。
+
+不做: 存檔鍵名改格式、改 PVDWebsite repo(網站另外更新)。
 
 ### build_failed: 有款做不出來
 
@@ -118,6 +121,10 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 ## 權限
 
 流程會起無頭 `claude -p`, 工具限縮在讀寫檔與少數指令(見 `lab/runner.py`), 不用 bypassPermissions。若 Claude Code 擋下 `python -m lab` 的執行, 請使用者在 settings 加允許規則, 不要繞過。
+
+## 專案資料夾改名
+
+專案資料夾一律叫 `WebGame_<英文名>`(與 repo 同名)。`.lab/checkpoint.sqlite` 存的是專案絕對路徑, 直接改名後接續會寫回舊路徑。改名後要就地改最新 checkpoint 的 `project` / `feedback` 與停點裡的 `index_html`(用 `SqliteSaver.serde` 讀寫 `checkpoints` 與 `writes` 表同一筆), 不能用 `update_state`——它會產生新 checkpoint, 等訪談的停點會消失。另把遊戲裡試玩紀錄檔名(`gamelog-<資料夾名>-`)與 spec.md 同步改掉, 改完跑 `status` 確認停點與路徑。
 
 ## 維護
 

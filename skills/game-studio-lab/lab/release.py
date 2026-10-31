@@ -145,6 +145,19 @@ def prune_release_game(game: Path) -> list[str]:
     return removed
 
 
+TOUCH_MODE_RE = re.compile(r"""\bmode:\s*['"](keys|mouse|none)['"]""")
+
+
+def touch_mode(game: Path) -> str | None:
+    """網站版遊戲的觸控層設定(touch.js 的 CONFIG.mode); 沒有 touch.js 或 index.html 沒載入它 → None。"""
+    game = Path(game)
+    touch, index = game / "touch.js", game / "index.html"
+    if not touch.exists() or not index.exists() or not re.search(r"<script[^>]+src=[\"'](\./)?touch\.js[\"']", index.read_text(encoding="utf-8")):
+        return None
+    m = TOUCH_MODE_RE.search(touch.read_text(encoding="utf-8"))
+    return m.group(1) if m else None
+
+
 def _hex6(c: str) -> str:
     c = c.strip().lower()
     return "#" + "".join(ch * 2 for ch in c[1:]) if re.fullmatch(r"#[0-9a-f]{3}", c) else c

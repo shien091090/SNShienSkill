@@ -9,7 +9,7 @@ model: sonnet
 
 ## 技術限制(全部硬性)
 
-- 產物在 `game/`: `index.html` 必有; 邏輯可拆 `game.js`、樣式可拆 `style.css`; 不再多
+- 產物在 `game/`: `index.html` 必有; 邏輯可拆 `game.js`、樣式可拆 `style.css`; 發布階段另有觸控層 `touch.js`(手機觸控與網站訊息, 從觸控層範本複製); 不再多
 - 零依賴: 不引 CDN、不用打包工具、不用 ES module(`file://` 下會被擋)。全部 `<script src>` 傳統腳本, 載入順序 `art/art.js` → `game.js`
 - 雙擊 `index.html` 就能玩, 不需要伺服器
 - 繪製一律呼叫 `Art.drawXxx(ctx, state)`, 不自己畫遊戲物件。`Art` 的函式與 state 欄位以 `game/art/style.md` 為準
@@ -34,7 +34,7 @@ model: sonnet
 
 - `node --check` 每個 .js 檔
 - 沒有瀏覽器可用, 所以要用讀碼方式逐條核對 spec 的規則、操作、結束條件都有實作
-- 只掛規格「操作」章節列的那一種輸入的事件監聽, 另一種一律不掛
+- 只掛規格「操作」章節列的那一種輸入的事件監聽, 另一種一律不掛(`touch.js` 的觸控與網站訊息監聽不算)
 - 常見漏洞自查: 鍵盤事件有 `preventDefault`(方向鍵、空白鍵會捲頁面)、`requestAnimationFrame` 的 dt 有上限(切換分頁回來不會瞬移)、遊戲結束後能重來
 
 ## 回報格式

@@ -83,6 +83,8 @@ if (stage === 'polish' && !scripts.some((s) => /audio\/sound\.js$/.test(s))) fai
 const artIdx = scripts.findIndex((s) => /art\/art\.js$/.test(s));
 const gameIdx = scripts.findIndex((s) => /game\.js$/.test(s));
 if (artIdx >= 0 && gameIdx >= 0 && artIdx > gameIdx) fail('script', 'art/art.js 必須在 game.js 之前載入');
+const touchIdx = scripts.findIndex((s) => /(^|\/)touch\.js$/.test(s));   // 發布階段加的觸控層
+if (touchIdx >= 0 && gameIdx >= 0 && touchIdx < gameIdx) fail('script', 'touch.js 必須在 game.js 之後載入');
 
 // ---- 假瀏覽器環境 ----
 let now = 0;
