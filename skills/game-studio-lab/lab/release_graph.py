@@ -12,7 +12,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
 from lab.graph import LabError
-from lab.release import (ICON, ICON_IDS, MAX_FILE_MB, SHARE, aspect_ratio, build_options_page, detect_mobile,
+from lab.release import (ICON, ICON_IDS, MAX_FILE_MB, SHARE, aspect_ratio, build_options_page,
                          parse_release_info, parse_release_pick, png_size, prune_release_game, write_asset_info,
                          write_site_info)
 from lab.renderer import ChromeRenderer
@@ -81,7 +81,7 @@ def build_release_graph(deps, checkpointer=None):
         iface = json.loads(iface_path.read_text(encoding="utf-8")) if iface_path.exists() else {}
         ratio, is_16_9 = aspect_ratio(iface)
         data.update({k: c[k] for k in ("name", "code", "intro")})
-        data.update({"ratio": ratio, "ratio_16_9": is_16_9, "mobile": detect_mobile(release / "game")})
+        data.update({"ratio": ratio, "ratio_16_9": is_16_9, "mobile": False})  # 手機支援待使用者實測後再設計
         out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         return {}
 

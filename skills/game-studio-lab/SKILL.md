@@ -91,9 +91,9 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
    - 選定了但要微調某張(例: 預覽圖換字型、某個字特別設計): 不用 redo(會整批重畫), 由你改該張繪製頁(`release/options/<方案>.html`)。變體繪製頁與 PNG 一律放 scratchpad, 不放進專案(繪製頁裡的 `../game/art/art.js` 改成 `release/game/art/art.js` 的絕對 `file:///` 路徑), 用 `lab.renderer.ChromeRenderer` 畫成 PNG; 比較頁用 Artifact 發布(PNG 以 `files` 帶上, 每張標方案代號與一句說明), 把連結給使用者挑, 可多輪來回。定案後把選中的繪製頁與 PNG 蓋回 `release/options/<方案>.html` / `.png`(繪製頁的美術路徑改回 `../game/art/art.js`), 刪掉 Artifact(Artifact 的 delete, 使用者會確認)與 scratchpad 的變體, 再 `pick`。外加字型: 用 Google Fonts 的 OFL 字型, 以 base64 data URI 內嵌在繪製頁(無頭 Chrome 從 file:// 用相對路徑載入字型會靜默失敗, 退回系統字), 繪製包在 `document.fonts.load(...).then()` 裡; 日文字型常缺繁中字(例: Dela Gothic One 缺「點」), 重畫後要看圖確認沒有缺字方塊
 4. 定版完: lab 專案回到同一個打磨停點(`waiting_feedback`, 遊戲不重做), 可再選 continue / back-* / end / release; 非 lab 專案流程結束。回報 `release/` 路徑與 `warnings`(例: 檔案超過網站 25MB 上限)
 
-支援裝置由程式依遊戲有沒有觸控操作自動判斷, 不用問。網站版會自動清掉開發文件與沒載入的程式(網站同步工具會擋)。
+網站版會自動清掉開發文件與沒載入的程式(網站同步工具會擋)。
 
-不做: 把遊戲改成手機版、鍵名格式、網站暫停 / 繼續訊息、改 PVDWebsite repo(網站另外更新)。
+不做: 手機版(支援裝置一律只支援電腦)、鍵名格式、網站暫停 / 繼續訊息、改 PVDWebsite repo(網站另外更新)。
 
 ### build_failed: 有款做不出來
 

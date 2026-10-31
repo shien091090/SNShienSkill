@@ -137,13 +137,6 @@ def prune_release_game(game: Path) -> list[str]:
     return removed
 
 
-def detect_mobile(game: Path) -> bool:
-    """手機能玩 = 有觸控操作, 且宣告 touch-action: none 讓遊戲區內拖曳不捲動頁面(網站《遊戲接入規範》第四節)。"""
-    text = "".join(p.read_text(encoding="utf-8", errors="ignore")
-                   for p in Path(game).rglob("*") if p.suffix in (".js", ".html", ".css"))
-    return bool(re.search(r"touchstart|pointerdown", text)) and bool(re.search(r"touch-action\s*:\s*none", text))
-
-
 def _hex6(c: str) -> str:
     c = c.strip().lower()
     return "#" + "".join(ch * 2 for ch in c[1:]) if re.fullmatch(r"#[0-9a-f]{3}", c) else c

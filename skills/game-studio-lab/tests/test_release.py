@@ -14,7 +14,7 @@ from lab.graph import Deps, LabError
 from lab.release_graph import build_release_graph
 from lab.renderer import ChromeRenderer, FakeRenderer, find_chrome
 from lab.release import (aspect_ratio, build_options_page, parse_release_info, parse_release_pick,
-                         png_size, write_asset_info, write_png, prune_release_game, detect_mobile,
+                         png_size, write_asset_info, write_png, prune_release_game,
                          write_site_info)
 
 INFO = {"name": "幽影接力", "code": "ghost-echo", "intro": "和過去的自己接力闖關。", "time": "5–10 分鐘",
@@ -93,16 +93,6 @@ def test_prune_release_game_keeps_only_runtime_files(tmp_path):
     assert sorted(prune_release_game(g)) == ["art/ref-objects.js", "art/style.md", "audio/sound.md"]
     assert sorted(p.relative_to(g).as_posix() for p in g.rglob("*") if p.is_file()) == [
         "art/art.js", "audio/credits.md", "audio/sound.js", "game.js", "index.html"]
-
-
-@pytest.mark.parametrize("js,want", [
-    ("addEventListener('touchstart', f); el.style.touchAction; css='canvas{touch-action: none}'", True),
-    ("addEventListener('touchstart', f)", False),
-    ("addEventListener('keydown', f); css='touch-action:none'", False),
-])
-def test_detect_mobile(tmp_path, js, want):
-    (tmp_path / "game.js").write_text(js, encoding="utf-8")
-    assert detect_mobile(tmp_path) is want
 
 
 # ---- 發布子圖(單獨模式) ----
