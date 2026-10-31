@@ -140,7 +140,7 @@ const sandbox = {
   Error, TypeError, RangeError, parseInt, parseFloat, isNaN, isFinite, Infinity, NaN,
   Float32Array, Float64Array, Uint8Array, Uint8ClampedArray, Int32Array, Uint32Array, ArrayBuffer,
   document: documentObj,
-  innerWidth: 1280, innerHeight: 720, devicePixelRatio: 1,
+  innerWidth: 1680, innerHeight: 720, devicePixelRatio: 1,
   performance: { now: () => now },
   requestAnimationFrame(cb) { rafQueue.push(cb); return rafQueue.length; },
   cancelAnimationFrame() {},

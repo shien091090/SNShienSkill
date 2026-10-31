@@ -12,7 +12,7 @@
 
 - `index.html` 宣告 `<meta charset="utf-8">`; 傳統 `<script src>`, 不用 module; 載入順序 `art/art.js` →(打磨階段)`audio/sound.js` → `game.js`
 - 繪製一律呼叫 `Art.<函式>(ctx, state)`, 只用 interface.json 列的函式(探索 / 深掘另加 `Art.drawGuidePage`); state 的 key 照 interface.json
-- 畫布邏輯尺寸用 interface.json 的 canvas, 依 devicePixelRatio 放大實際像素
+- 畫布邏輯尺寸用 interface.json 的 canvas, 依 devicePixelRatio 放大實際像素。畫布要跟著容器(網站 iframe 或瀏覽器視窗)等比縮放: CSS 依容器寬高算出最大的等比尺寸並置中(多出的地方留黑邊, 不裁切、不拉伸), resize 與 orientationchange 時重算實際像素; 不假設視窗大小, 不寫死畫布的 CSS 像素尺寸; 滑鼠 / 觸控座標用 `getBoundingClientRect` 換回邏輯座標
 - **美術還沒交付**: `game/art/art.js` 可能還不存在或還在改, 不要等也不要碰它。自測時在 Node vm 裡自己造一個照 interface.json 的假 Art(只在測試腳本裡, 不要寫進 game/)
 - **探索 / 深掘的玩家說明(說明頁)**: 開場先顯示、可**前後**翻頁(要能回上一頁, 玩家漏看才回得去)、遊戲中可再叫出。**分工**: 頁標題、說明文字(照 guide.md)、頁碼、翻頁提示由你畫; 示意圖呼叫 `Art.drawGuidePage(ctx, {page, x, y, w, h})`, `(x, y, w, h)` 是你替示意圖留的框, 必須與你畫文字的區域不重疊。美術只畫框內的圖, 不畫標題與說明文字
 - **打磨的玩家說明(開始畫面 + 嵌入式新手教學, 沒有說明頁)**: 開場是開始畫面(`Art.drawTitle`), 玩家用 spec 指定的輸入開始後直接進遊戲。照 spec「新手教學」表實作教學狀態: 每個階段在「出現時機」到了才出現, 玩家達成「完成條件」就播完成特效、進下一階段; 已完成的階段不再出現, 整關重來(R)與失敗重來都不重置。教學提示一律呼叫 `Art.drawTutorial(ctx, state)` 傳 state(階段、文字、按鍵、已按過哪些鍵、完成特效進度、位置), **你不自己畫教學文字或按鍵圖示**。上一版有說明頁就整個拿掉。教學的每個階段都要記進埋點(出現、完成), 才看得出新手卡在哪一步

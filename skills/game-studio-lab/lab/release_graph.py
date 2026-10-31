@@ -79,9 +79,9 @@ def build_release_graph(deps, checkpointer=None):
         data = json.loads(out.read_text(encoding="utf-8"))
         iface_path = release / "interface.json"
         iface = json.loads(iface_path.read_text(encoding="utf-8")) if iface_path.exists() else {}
-        ratio, is_16_9 = aspect_ratio(iface)
+        ratio, is_site = aspect_ratio(iface)
         data.update({k: c[k] for k in ("name", "code", "intro")})
-        data.update({"ratio": ratio, "ratio_16_9": is_16_9, "mobile": False})  # 手機支援待使用者實測後再設計
+        data.update({"ratio": ratio, "ratio_site": is_site, "mobile": False})  # 手機支援待使用者實測後再設計
         out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         return {}
 
@@ -140,7 +140,9 @@ def build_release_graph(deps, checkpointer=None):
         color = next(c for c in colors if str(c["id"]) == chosen["color"])
         write_asset_info(release, info_data, color)
         write_site_info(release, info_data, color)
-        warnings = [f"{p.relative_to(release)} 有 {p.stat().st_size / 1024 / 1024:.1f}MB, 超過網站上限 {MAX_FILE_MB}MB"
+        warnings = [] if info_data.get("ratio_site") else [
+            f"遊戲畫面是 {info_data.get('ratio', '未知')}, 不是網站的 21:9, 網站會加邊(直式要改橫式需另外討論)"]
+        warnings += [f"{p.relative_to(release)} 有 {p.stat().st_size / 1024 / 1024:.1f}MB, 超過網站上限 {MAX_FILE_MB}MB"
                     for d in (release / "game", assets) for p in d.rglob("*")
                     if p.is_file() and p.stat().st_size > MAX_FILE_MB * 1024 * 1024]
         return {"release_warnings": warnings}

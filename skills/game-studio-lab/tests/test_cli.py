@@ -134,7 +134,7 @@ def test_release_commits(env, capsys):
     assert remote_log(env["remote"])[0] == "[feat] [proj] 重做發布素材方案"
     pick = write(env["project"] / "polish" / "release-pick.md", PICK)
     code, out = call(capsys, "resume", env["project"], "--choice", "pick", "--feedback", pick)
-    assert out["status"] == "waiting_feedback" and out["warnings"] == []
+    assert out["status"] == "waiting_feedback" and [w for w in out["warnings"] if "21:9" not in w] == []  # 測試用的遊戲是直式 3:4
     assert remote_log(env["remote"])[0] == "[feat] [proj] 發布素材定版"
     tracked = subprocess.run(["git", "ls-files"], cwd=env["project"], capture_output=True, text=True,
                              encoding="utf-8").stdout

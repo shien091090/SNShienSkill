@@ -53,13 +53,19 @@ def parse_release_pick(text: str) -> dict:
     return out
 
 
+SITE_RATIO = "21:9"  # PVD計畫網站遊玩框的比例(《遊戲接入規範》第四節), 建議尺寸 1680×720
+
+
 def aspect_ratio(iface: dict) -> tuple[str, bool]:
+    """回傳 (比例文字, 是否符合網站的 21:9)。1680×720 約分是 7:3, 照網站慣用寫法回 "21:9"。"""
     c = iface.get("canvas") or {}
     w, h = int(c.get("width") or 0), int(c.get("height") or 0)
     if not w or not h:
         return "未知", False
+    if w * 9 == h * 21:
+        return SITE_RATIO, True
     g = math.gcd(w, h)
-    return f"{w // g}:{h // g}", w * 9 == h * 16
+    return f"{w // g}:{h // g}", False
 
 
 def png_size(path: Path) -> tuple[int, int]:
@@ -158,7 +164,7 @@ def write_site_info(release: Path, info: dict, color: dict) -> Path:
 def write_asset_info(release: Path, info: dict, color: dict) -> Path:
     time = info.get("time", "") + ("(估計)" if info.get("time_estimated") else "")
     ratio = info.get("ratio", "未知")
-    ratio_text = ratio + ("" if info.get("ratio_16_9") else "(不是 16:9, 網站會加邊)")
+    ratio_text = ratio + ("" if info.get("ratio_site") else f"(不是 {SITE_RATIO}, 網站會加邊)")
     fg = "白色字" if color["fg"].lower() in ("#fff", "#ffffff") else "深色字"
     rows = [("遊戲代號", f"`{info['code']}`"), ("遊戲名稱", info["name"]), ("遊戲圖示", "`icon.png`(512×512)"),
             ("遊戲介紹", info["intro"]), ("遊玩時長", time), ("支援裝置", DEVICE_MOBILE if info.get("mobile") else DEVICE_PC),

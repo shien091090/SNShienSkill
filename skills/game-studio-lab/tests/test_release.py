@@ -18,7 +18,7 @@ from lab.release import (aspect_ratio, build_options_page, parse_release_info, p
                          write_site_info)
 
 INFO = {"name": "幽影接力", "code": "ghost-echo", "intro": "和過去的自己接力闖關。", "time": "5–10 分鐘",
-        "time_estimated": True, "ratio": "9:16", "ratio_16_9": False, "mobile": False}
+        "time_estimated": True, "ratio": "9:16", "ratio_site": False, "mobile": False}
 COLORS = [{"id": "1", "bg": "#f29cac", "fg": "#2d2144", "note": "粉"},
           {"id": "2", "bg": "#4776c3", "fg": "#ffffff", "note": "藍"},
           {"id": "3", "bg": "#e0c64f", "fg": "#2d2144", "note": "金"}]
@@ -44,7 +44,7 @@ def test_parse_release_pick():
         parse_release_pick("圖示: B\n主色: 4\n預覽圖: A")
 
 
-@pytest.mark.parametrize("w,h,want", [(1280, 720, ("16:9", True)), (720, 1280, ("9:16", False)),
+@pytest.mark.parametrize("w,h,want", [(1680, 720, ("21:9", True)), (1280, 720, ("16:9", False)), (720, 1280, ("9:16", False)),
                                       (480, 640, ("3:4", False))])
 def test_aspect_ratio(w, h, want):
     assert aspect_ratio({"canvas": {"width": w, "height": h}}) == want
@@ -69,7 +69,7 @@ def test_asset_info_fields(tmp_path):
     text = write_asset_info(tmp_path, INFO, COLORS[1]).read_text(encoding="utf-8")
     for s in ["遊戲代號", "遊戲名稱", "遊戲介紹", "遊玩時長", "支援裝置", "遊戲主色", "遊戲畫面比例",
               "ghost-echo", "5–10 分鐘(估計)", "只支援電腦", "#4776c3", "#ffffff", "白色字",
-              "不是 16:9"]:
+              "不是 21:9"]:
         assert s in text
     assert "操作方式說明" not in text
 
@@ -150,7 +150,7 @@ def test_release_pauses_with_options_page(tmp_path):
         assert png_size(opts / f"{n}.png") == (1200, 630)
     info = json.loads((opts / "info.json").read_text(encoding="utf-8"))
     assert info["name"] == "捕泡手" and info["code"] == "bubble-catcher" and info["mobile"] is False
-    assert info["ratio"] == "3:4" and info["ratio_16_9"] is False
+    assert info["ratio"] == "3:4" and info["ratio_site"] is False
 
 
 def test_release_pick_finalizes_assets(tmp_path):
@@ -163,7 +163,8 @@ def test_release_pick_finalizes_assets(tmp_path):
     assert "#aaefd5" in (assets / "素材資訊.md").read_text(encoding="utf-8")
     site = json.loads((assets / "info.json").read_text(encoding="utf-8"))
     assert site["code"] == "bubble-catcher" and site["color"] == "#aaefd5" and site["mobile"] is False
-    assert snap.values["release_warnings"] == []
+    w = snap.values["release_warnings"]  # 測試用的遊戲是直式 3:4, 只會有比例提醒
+    assert len(w) == 1 and "3:4" in w[0] and "21:9" in w[0]
 
 
 def test_release_redo_only_reruns_art(tmp_path):

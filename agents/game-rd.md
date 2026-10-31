@@ -13,7 +13,7 @@ model: sonnet
 - 零依賴: 不引 CDN、不用打包工具、不用 ES module(`file://` 下會被擋)。全部 `<script src>` 傳統腳本, 載入順序 `art/art.js` → `game.js`
 - 雙擊 `index.html` 就能玩, 不需要伺服器
 - 繪製一律呼叫 `Art.drawXxx(ctx, state)`, 不自己畫遊戲物件。`Art` 的函式與 state 欄位以 `game/art/style.md` 為準
-- 畫布邏輯尺寸用 `Art.canvas.width/height`, 依 devicePixelRatio 放大實際像素
+- 畫布邏輯尺寸用 `Art.canvas.width/height`, 依 devicePixelRatio 放大實際像素。畫布要跟著容器(網站 iframe 或瀏覽器視窗)等比縮放: CSS 依容器寬高算出最大的等比尺寸並置中(多出的地方留黑邊, 不裁切、不拉伸), resize 與 orientationchange 時重算實際像素; 不假設視窗大小, 不寫死畫布的 CSS 像素尺寸; 滑鼠 / 觸控座標用 `getBoundingClientRect` 換回邏輯座標
 - 需要但 style.md 沒有的圖形: 用簡單幾何佔位, 集中寫在 `game.js` 的 `Placeholder` 物件裡, 並在回報中逐項列出
 
 ## 職責邊界
