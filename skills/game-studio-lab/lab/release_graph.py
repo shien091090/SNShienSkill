@@ -13,7 +13,8 @@ from langgraph.types import Command, interrupt
 
 from lab.graph import LabError
 from lab.release import (ICON, ICON_IDS, MAX_FILE_MB, BANNER, aspect_ratio, build_options_page,
-                         parse_release_info, parse_release_pick, png_size, prune_release_game, touch_mode, write_asset_info,
+                         parse_release_info, parse_release_pick, png_size, prune_release_game, site_rule_warnings,
+                         touch_mode, write_asset_info,
                          write_site_info)
 from lab.renderer import ChromeRenderer
 
@@ -149,6 +150,7 @@ def build_release_graph(deps, checkpointer=None):
         warnings += [f"{p.relative_to(release)} 有 {p.stat().st_size / 1024 / 1024:.1f}MB, 超過網站上限 {MAX_FILE_MB}MB"
                     for d in (release / "game", assets) for p in d.rglob("*")
                     if p.is_file() and p.stat().st_size > MAX_FILE_MB * 1024 * 1024]
+        warnings += site_rule_warnings(release / "game", info_data["code"])
         return {"release_warnings": warnings}
 
     g = StateGraph(ReleaseState, output_schema=ReleaseOutput)

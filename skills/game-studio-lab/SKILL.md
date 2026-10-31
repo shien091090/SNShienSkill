@@ -83,7 +83,7 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 把定版遊戲與 PVD計畫網站要的素材做成 `<專案>/release/`(`game/` 網站版遊戲、`assets/` 定版素材與網站讀的 `info.json`、`options/` 方案與選擇頁)。設計見 `docs/2026-10-29-release-stage-design.md`, 兩個使用者檔的格式見 `references/release-guide.md`。
 
 1. **問使用者三樣**, 寫成發布資訊檔(lab 專案 `polish/release-info.md`; 非 lab 專案 `<資料夾>/release-info.md`):
-   - **遊戲名稱**: 使用者提供。名稱定了就全部統一, 流程會把遊戲開始畫面(打磨版與網站版都改)、橫幅、素材資訊都換成這個名稱, 先先講明
+   - **遊戲名稱**: 使用者提供。名稱定了就全部統一, 流程會把遊戲開始畫面(打磨版與網站版都改)、橫幅、素材資訊都換成這個名稱, 先先講明。超過 8 字時提醒網站建議 8 字以內(清單卡片寬度有限), 只提醒不強制, 使用者決定
    - **遊戲介紹**: 使用者提供, 1–2 句、30–60 字; 超出或太短提醒使用者, 不代改
    - **遊戲代號**(網址用, 上線後不改): 你帶預設給使用者確認, 依序取上次 `release/assets/素材資訊.md` 的代號 → PVD計畫網站 repo 的 `site/js/games.js` 裡該遊戲已定的 `code`(本機例: `E:\Project\PVDWebsite`; 找不到 repo 就跳過這項) → 由專案名轉英文小寫加連字號
 2. lab 專案: `resume <專案> --choice release --feedback <發布資訊檔>`; 非 lab 專案: `release <資料夾> --info <發布資訊檔>`。都要背景執行, 約十幾到三十分鐘。選發布不跑檢討假設: 這輪若有試玩回饋要進下一輪設計, 應選 continue
@@ -96,7 +96,9 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 
 手機與網站訊息: 發布時 RD 從 `references/touch-template.js` 加觸控層 `touch.js`(網站版與打磨版兩份): 鍵盤遊戲疊虛擬按鈕、滑鼠遊戲點擊即觸控、直式遊戲不做觸控; 直拿手機自動暫停; 接網站的暫停 / 繼續與玩完一局訊息; 遊戲沒有 Esc 暫停時由它提供。手機不放任何聲音或暫停按鈕(交給手機本身)。之後再打磨時設計與 RD 不管手機, 只是不能弄壞 `touch.js`; 下次發布 RD 會補新畫面的按鈕設定。比例符合且有觸控 → `info.json` 的 `mobile` 為 true。設計見 `docs/2026-10-31-release-mobile-design.md`。
 
-不做: 存檔鍵名改格式、改 PVDWebsite repo(網站另外更新)。
+儲存與上層頁面: 發布時 RD 把兩份的儲存鍵名改成「遊戲代號:用途」(搬舊值)、拿掉清空儲存與碰上層頁面 / 開新視窗 / 改網址的寫法; 定版時再掃一次網站版, 字面上看得出來的違規列進 `warnings`。
+
+不做: 改 PVDWebsite repo(網站另外更新)。
 
 ### build_failed: 有款做不出來
 

@@ -13,7 +13,7 @@ from lab.fake import FakeRunner
 from lab.graph import Deps, LabError
 from lab.release_graph import build_release_graph
 from lab.renderer import ChromeRenderer, FakeRenderer, find_chrome
-from lab.release import (aspect_ratio, build_options_page, parse_release_info, parse_release_pick,
+from lab.release import (aspect_ratio, build_options_page, parse_release_info, parse_release_pick, site_rule_warnings,
                          png_size, write_asset_info, write_png, prune_release_game,
                          write_site_info, touch_mode)
 
@@ -237,3 +237,17 @@ def test_asset_info_mobile_ratio(tmp_path):
     info = {**INFO, "mobile": True, "ratio": "16:9", "ratio_site": True, "mobile_ratio": "16:9-21:9"}
     text = write_asset_info(tmp_path, info, COLORS[1]).read_text(encoding="utf-8")
     assert "| 遊戲畫面比例 | 電腦 16:9; 手機依螢幕 16:9～21:9 |" in text
+
+
+def test_site_rule_warnings(tmp_path):
+    (tmp_path / "audio").mkdir()
+    (tmp_path / "game.js").write_text(
+        "localStorage.setItem('ghost-echo:best', 1); localStorage.getItem(\"bcv19_best\");\n"
+        "localStorage.clear(); window.open('x'); location.href = 'y'; if (location.href === 'z') {}\n", encoding="utf-8")
+    (tmp_path / "audio" / "sound.js").write_text("try { sessionStorage.removeItem(`ghost-echo:muted`); } catch (e) {}", encoding="utf-8")
+    w = site_rule_warnings(tmp_path, "ghost-echo")
+    assert len(w) == 4
+    assert any("bcv19_best" in x for x in w) and not any("ghost-echo:best" in x or "ghost-echo:muted" in x for x in w)
+    assert any("清空" in x for x in w) and any("新視窗" in x for x in w) and any("改網址" in x for x in w)
+    (tmp_path / "game.js").write_text("const top = 1; parent.postMessage({}, location.origin);", encoding="utf-8")
+    assert site_rule_warnings(tmp_path, "ghost-echo") == []

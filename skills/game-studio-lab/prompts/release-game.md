@@ -38,8 +38,14 @@
    - `escPause`: 遊戲自己沒有 Esc 暫停 → true(共同守則的通用鍵, 由觸控層提供); 已有 → false
    - game.js 掛鉤子(兩份): 鍵盤遊戲的鍵盤輸入要走全域 `inputDown(鍵名)` / `inputUp(鍵名)` / `inputReset()`(沒有就把現有的按鍵處理整理成這三個), `inputDown` 開頭 `if (window.PVDX && PVDX.paused) return;`; 每幀 `if (!(window.PVDX && PVDX.paused)) update(dt);`, 畫完 `if (window.PVDX) PVDX.draw(ctx);`; 一局結束的時間點(打磨版下載試玩紀錄的那一刻)呼叫 `if (window.PVDX) PVDX.finish();`
    - 手機不放任何聲音按鈕或暫停按鈕(靜音、音量交給手機本身)
-7. 不改其他玩法、數值、美術、音效。不改存檔鍵名格式
-8. 用 Node vm + 假 canvas 自測兩份遊戲載入與開局不拋錯, 並確認網站版找不到任何下載(`download`、`createObjectURL`、`a.click`)的呼叫; 觸控層用 `?touch=1` 等效的設定(假 location.search)載入, 確認 `PVDX.draw` 每個畫面都不拋錯、模擬 pvd:pause 後遊戲不前進
+7. **儲存與上層頁面**(兩份都改; 規範在 PVD計畫網站 repo 的 `docs/遊戲接入規範.md` 第一節與第四節第 4 點; 所有遊戲和網站共用同一份瀏覽器儲存):
+   - localStorage / sessionStorage 鍵名一律改成 `$code:<用途>`(用途英文小駝峰, 例 `$code:best`、`$code:muted`), 不放版本號; IndexedDB 資料庫名同樣加 `$code:` 前綴, cookie 用 `${code}_`; 不用 `pvd:` 開頭(網站保留)
+   - 改名要搬舊值: 讀新鍵沒有值時讀舊鍵, 有就寫進新鍵並刪掉舊鍵(只刪自己的舊鍵), 玩家的最高分、設定才不會歸零
+   - 不呼叫 `localStorage.clear()` / `sessionStorage.clear()`, 不列舉刪除別人的鍵; 每個讀寫都包 try/catch, 儲存不能用(無痕、App 內建瀏覽器)時照樣能玩
+   - 不碰上層頁面: 不用 `window.top` / `parent.location`、不改網址(`location.href =`、`assign`、`replace`、`reload`)、不開新視窗(`window.open`)。只有觸控層送給網站的 postMessage 可以碰 `window.parent`
+   - 沒用到儲存、也沒有這些寫法就跳過
+8. 不改其他玩法、數值、美術、音效
+9. 用 Node vm + 假 canvas 自測兩份遊戲載入與開局不拋錯, 並確認網站版找不到任何下載(`download`、`createObjectURL`、`a.click`)的呼叫; grep 兩份確認儲存鍵名都是 `$code:` 開頭、沒有 `.clear(`、`window.top`、`window.open`、改網址的寫法; 觸控層用 `?touch=1` 等效的設定(假 location.search)載入, 確認 `PVDX.draw` 每個畫面都不拋錯、模擬 pvd:pause 後遊戲不前進
 
 ## 回報
-移除了哪些東西、名稱改在哪(兩份都要寫)、有沒有寫 interface.json、畫面比例怎麼改(各畫面怎麼延伸、哪些畫滿整面的東西改了)、縮放怎麼做、觸控層設定(mode、各畫面顯示哪些按鈕、為了按鈕移開了哪些資訊、斜走的畫面、第三鍵圖示)、一局結束掛在哪、自測結果。
+移除了哪些東西、名稱改在哪(兩份都要寫)、有沒有寫 interface.json、畫面比例怎麼改(各畫面怎麼延伸、哪些畫滿整面的東西改了)、縮放怎麼做、觸控層設定(mode、各畫面顯示哪些按鈕、為了按鈕移開了哪些資訊、斜走的畫面、第三鍵圖示)、一局結束掛在哪、儲存鍵名改了哪些(舊名 → 新名, 怎麼搬舊值)與拿掉的上層頁面寫法、自測結果。

@@ -154,6 +154,31 @@ def prune_release_game(game: Path) -> list[str]:
     return removed
 
 
+# PVD計畫網站《遊戲接入規範》: 儲存鍵名「<代號>:<用途>」、不清空共用儲存、不動上層頁面(第一、四節)
+STORAGE_KEY_RE = re.compile(r"""\b(?:localStorage|sessionStorage)\.(?:getItem|setItem|removeItem)\(\s*(['"`])([^'"`]*)\1""")
+SITE_FORBIDDEN = [(re.compile(r"\b(?:localStorage|sessionStorage)\.clear\s*\("), "清空整個共用儲存空間"),
+                  (re.compile(r"\bwindow\.top\b|\btop\.location\b|\bparent\.location\b"), "碰上層頁面"),
+                  (re.compile(r"\bwindow\.open\s*\("), "開新視窗"),
+                  (re.compile(r"\blocation\.(?:href\s*=(?!=)|assign\s*\(|replace\s*\(|reload\s*\()"), "改網址或重新載入")]
+
+
+def site_rule_warnings(game: Path, code: str) -> list[str]:
+    """掃網站版程式, 列出違反接入規範的寫法(只抓字面上看得出來的; 動態組出的鍵名靠 RD 自測)。"""
+    game = Path(game)
+    out = []
+    for p in sorted([*game.rglob("*.js"), *game.rglob("*.html")]):
+        rel = p.relative_to(game).as_posix()
+        text = p.read_text(encoding="utf-8", errors="ignore")
+        for m in STORAGE_KEY_RE.finditer(text):
+            key = m.group(2)
+            if not key.startswith(f"{code}:"):
+                out.append(f"{rel} 的儲存鍵名「{key}」不是「{code}:用途」格式")
+        for rx, what in SITE_FORBIDDEN:
+            if rx.search(text):
+                out.append(f"{rel} 有{what}的寫法(接入規範不允許)")
+    return list(dict.fromkeys(out))
+
+
 TOUCH_MODE_RE = re.compile(r"""\bmode:\s*['"](keys|mouse|none)['"]""")
 
 
