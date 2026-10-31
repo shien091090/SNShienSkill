@@ -9,3 +9,7 @@ auto-memory 只記一種東西: **進行中、跨 session 要接、且不是在�
 ## Commit 規範
 
 任何 repo 要下 commit 之前, 先讀 `~/.claude/rules/commit-format.md` 全文再動手, 格式、submodule 處理、專案別例外都在那份。
+
+## 本機路徑
+
+- PVD計畫網站 repo: `E:\Project\PVDWebsite`

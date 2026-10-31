@@ -10,7 +10,7 @@
 產出 `$game_dir/game/art/art.js` 與 `$game_dir/game/art/style.md`。
 
 - RD 正在**同時**照 interface.json 寫遊戲, 不會等你: 函式名、參數、state 欄位一律照 interface.json, 一個不多一個不少
-- `window.Art.canvas` 必須等於 interface.json 的 canvas 寬高
+- `window.Art.canvas` 必須等於 interface.json 的 canvas 寬高; canvas 有 `maxWidth`(發布加過寬度依裝置)時, 照 `$studio_refs/screen-width.md` 保留依裝置決定寬度的做法, 寬落在 width~maxWidth 之間
 - 每個物件畫在 interface.json 的 `size` 範圍內(那是判定範圍, 畫面邊界要等於判定邊界)
 - **探索 / 深掘(說明頁)**: 另做 `drawGuidePage(ctx, state)`, state 為 `{ page, x, y, w, h }`(page 0 起算), 畫 guide.md 每頁「圖要示意什麼」; 圖裡的遊戲物件直接用遊戲內的畫法
 - **打磨(沒有說明頁)**: 照 interface.json 做 `drawTitle`(開始畫面: 遊戲名、開始提示)與 `drawTutorial`(嵌入式新手教學提示, 照 spec「新手教學」表的提示內容與位置)。教學提示的**文字、按鍵圖示、已按過的鍵的打勾或變色、階段完成特效全部由你畫**, RD 只傳 state; 提示要貼近它在講的東西(角色、幽靈、機關), 不擋住玩家正在看的路線。上一版有 `drawGuidePage` 就刪掉

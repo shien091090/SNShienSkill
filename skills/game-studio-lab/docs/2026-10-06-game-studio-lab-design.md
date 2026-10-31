@@ -3,6 +3,8 @@
 日期: 2026-10-06
 流程圖(含節點說明與文件說明): https://claude.ai/artifact/XyRSAhFQfFD34WXH5Td13D
 
+> 本文件是初版設計紀錄, 部分細節(例: 下方 interface.json 範例的直式畫布)已過時。畫布規範以 `references/screen-width.md` 與設計任務(`prompts/design-*.md`)為準。
+
 ## 目的
 
 遊戲流水線(2026-10-09 起取代原本的 game-studio, game-studio 已移除), 目的是**快速產出試玩版、驗證新玩法**。核心產物是一份「玩法驗證文件」: 記錄「什麼機制帶來什麼體驗」的假設, 每輪試玩後保留成立的、刪掉推翻的, 最後讓玩家想要 / 不要的體驗與對應機制一目了然。

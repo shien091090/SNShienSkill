@@ -1,6 +1,6 @@
 ---
 name: game-studio-lab
-description: 遊戲玩法驗證流水線(LangGraph)。使用者要做遊戲 demo、遊戲原型、驗證一個遊戲玩法、把遊戲點子做成可以玩的, 或輸入 /game-studio-lab、提到 game-studio-lab、指向一個含 .lab/ 的專案資料夾時使用。相近說法如「做個小遊戲試試」「用 lab 流程做這個玩法」「繼續上次的遊戲」「我玩過了給回饋」。
+description: 遊戲玩法驗證流水線(LangGraph), 一次做多款試玩版、試玩後訪談、累積「機制 → 體驗」假設、打磨後發布到 PVD計畫網站。使用者想把遊戲點子做成多款試玩來比較、要邊試玩邊給回饋迭代、要驗證一個遊戲玩法、要發布遊戲到 PVD 網站, 或輸入 /game-studio-lab、提到 game-studio-lab、指向一個含 .lab/ 的專案資料夾時使用。相近說法如「做個小遊戲試試」「用 lab 流程做這個玩法」「繼續上次的遊戲」「我玩過了給回饋」。
 ---
 
 # game-studio-lab
@@ -32,7 +32,7 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 
 - `.venv` 不存在(新機器)→ 先 `python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`
 - `start` / `resume` 一輪要跑幾十分鐘: **一律用 Bash 的 run_in_background 執行**, 完成時會收到通知, 不要輪詢。等待期間告訴使用者大概要等多久即可
-- stdout 最後一行是狀態 JSON, `status` 有五種: `waiting_feedback`、`build_failed`、`waiting_release_pick`、`done`、`error`; `warnings` 非空(例如 push 失敗)要原文轉告使用者
+- stdout 最後一行是狀態 JSON, `status` 有六種: `waiting_feedback`、`build_failed`、`waiting_release_pick`、`done`、`error`、`paused`; `warnings` 非空(例如 push 失敗)要原文轉告使用者
 
 ## 開場
 
@@ -83,16 +83,16 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 把定版遊戲與 PVD計畫網站要的素材做成 `<專案>/release/`(`game/` 網站版遊戲、`assets/` 定版素材與網站讀的 `info.json`、`options/` 方案與選擇頁)。設計見 `docs/2026-10-29-release-stage-design.md`, 兩個使用者檔的格式見 `references/release-guide.md`。
 
 1. **問使用者三樣**, 寫成發布資訊檔(lab 專案 `polish/release-info.md`; 非 lab 專案 `<資料夾>/release-info.md`):
-   - **遊戲名稱**: 使用者提供。名稱定了就全部統一, 流程會把遊戲開始畫面(打磨版與網站版都改)、橫幅、素材資訊都換成這個名稱, 先先講明。超過 8 字時提醒網站建議 8 字以內(清單卡片寬度有限), 只提醒不強制, 使用者決定
+   - **遊戲名稱**: 使用者提供。名稱定了就全部統一, 流程會把遊戲開始畫面(打磨版與網站版都改)、橫幅、素材資訊都換成這個名稱, 先講明。超過 8 字時提醒網站建議 8 字以內(清單卡片寬度有限), 只提醒不強制, 使用者決定
    - **遊戲介紹**: 使用者提供, 1–2 句、30–60 字; 超出或太短提醒使用者, 不代改
-   - **遊戲代號**(網址用, 上線後不改): 你帶預設給使用者確認, 依序取上次 `release/assets/素材資訊.md` 的代號 → PVD計畫網站 repo 的 `site/js/games.js` 裡該遊戲已定的 `code`(本機例: `E:\Project\PVDWebsite`; 找不到 repo 就跳過這項) → 由專案名轉英文小寫加連字號
+   - **遊戲代號**(網址用, 上線後不改): 你帶預設給使用者確認, 依序取上次 `release/assets/素材資訊.md` 的代號 → PVD計畫網站 repo 的 `site/js/games.js` 裡該遊戲已定的 `code`(repo 位置看 `~/.claude/CLAUDE.md` 的「本機路徑」, 沒寫就問使用者; 找不到 repo 就跳過這項) → 由專案名轉英文小寫加連字號
 2. lab 專案: `resume <專案> --choice release --feedback <發布資訊檔>`; 非 lab 專案: `release <資料夾> --info <發布資訊檔>`。都要背景執行, 約十幾到三十分鐘。選發布不跑檢討假設: 這輪若有試玩回饋要進下一輪設計, 應選 continue
 3. 停在 `waiting_release_pick`: 把 `options_page`(選擇頁絕對路徑, 只能看不能操作)給使用者, 請使用者回代號(例「圖示 B、主色 2、橫幅 A」)。寫成 `release-pick.md`(放發布資訊檔旁), `--choice pick --feedback <檔>`; 都不喜歡 → `--choice redo`(只重做美術方案, 可把使用者的意見寫進 `release/options/redo-notes.md` 給美術看)
    - 網站版有觸控按鈕時(`touch.js` 的 `mode` 是 `keys`), 同時照 `references/touch-check.md` 逐畫面截觸控模式給使用者看, 有蓋到畫面資訊就調整後再 `pick`
    - 選定了但要微調某張(例: 橫幅換字型、某個字特別設計): 不用 redo(會整批重畫), 由你改該張繪製頁(`release/options/<方案>.html`)。變體繪製頁與 PNG 一律放 scratchpad, 不放進專案(繪製頁裡的 `../game/art/art.js` 改成 `release/game/art/art.js` 的絕對 `file:///` 路徑), 用 `lab.renderer.ChromeRenderer` 畫成 PNG; 比較頁用 Artifact 發布(PNG 以 `files` 帶上, 每張標方案代號與一句說明), 把連結給使用者挑, 可多輪來回。定案後把選中的繪製頁與 PNG 蓋回 `release/options/<方案>.html` / `.png`(繪製頁的美術路徑改回 `../game/art/art.js`), 刪掉 Artifact(Artifact 的 delete, 使用者會確認)與 scratchpad 的變體, 再 `pick`。外加字型: 用 Google Fonts 的 OFL 字型, 以 base64 data URI 內嵌在繪製頁(無頭 Chrome 從 file:// 用相對路徑載入字型會靜默失敗, 退回系統字), 繪製包在 `document.fonts.load(...).then()` 裡; 日文字型常缺繁中字(例: Dela Gothic One 缺「點」), 重畫後要看圖確認沒有缺字方塊
 4. 定版完: lab 專案回到同一個打磨停點(`waiting_feedback`, 遊戲不重做), 可再選 continue / back-* / end / release; 非 lab 專案流程結束。回報 `release/` 路徑與 `warnings`(例: 檔案超過網站 25MB 上限)
 
-畫面比例: 設計時畫布固定 1280×720(16:9, 網站電腦遊玩框的比例); 發布時 RD 把網站版與打磨版都改成寬度依裝置: 電腦 1280, 手機依螢幕 1280~1680(16:9~21:9), 中間 1280 是設計區, 兩側只放背景與貼邊的 HUD(做法見 `references/screen-width.md`; 直式不改, 會出現在 `warnings`)。網站版會自動清掉開發文件與沒載入的程式(網站同步工具會擋)。
+畫面比例: 設計時畫布固定; 發布時 RD 把網站版與打磨版都改成寬度依裝置, 尺寸與做法只寫在 `references/screen-width.md`(直式不改, 會出現在 `warnings`)。網站版會自動清掉開發文件與沒載入的程式(網站同步工具會擋)。
 
 手機與網站訊息: 發布時 RD 從 `references/touch-template.js` 加觸控層 `touch.js`(網站版與打磨版兩份): 鍵盤遊戲疊虛擬按鈕、滑鼠遊戲點擊即觸控、直式遊戲不做觸控; 直拿手機自動暫停; 接網站的暫停 / 繼續與玩完一局訊息; 遊戲沒有 Esc 暫停時由它提供。手機不放任何聲音或暫停按鈕(交給手機本身)。之後再打磨時設計與 RD 不管手機, 只是不能弄壞 `touch.js`; 下次發布 RD 會補新畫面的按鈕設定。比例符合且有觸控 → `info.json` 的 `mobile` 為 true。設計見 `docs/2026-10-31-release-mobile-design.md`。
 

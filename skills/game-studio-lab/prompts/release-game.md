@@ -18,7 +18,7 @@
 3. **介面描述**: `$release_dir/interface.json` 不存在時, 依程式實際情況寫一份給接合腳本用, 格式:
    `{"canvas": {"width": W, "height": H}, "draw": [{"name": "drawXxx", "state": ["欄位", ...]}, ...], "sounds": ["音效名", ...], "music": ["音樂名", ...]}`
    `draw` 列出 game.js 呼叫的每個 `Art.drawXxx`, 且必須含 `drawTitle`(開始畫面)與 `drawTutorial`(新手教學提示); 遊戲沒有這兩個名稱時, 在 art.js 既有的開始畫面 / 教學繪製函式上加同名別名(只加別名, 不改圖)
-4. **畫面寬度依裝置**(PVD計畫網站: 電腦遊玩框 16:9, 手機橫拿全螢幕; 做法與程式片段見 `$studio_refs/screen-width.md`): 高固定 720, 中間 1280×720 是設計區; 寬度啟動時決定, 電腦 1280、觸控裝置依螢幕 1280~1680。interface.json 的 canvas 已經是 `{"width": 1280, "height": 720, "maxWidth": 1680}` 且 art.js 已依裝置決定寬度就跳過這步。否則 `$release_dir/game/` **與** `$src_dir/game/` 兩份都改, 兩份的 interface.json(`$release_dir/interface.json`, 以及 `$src_dir/interface.json` 有的話)canvas 一起改:
+4. **畫面寬度依裝置**(PVD計畫網站: 電腦遊玩框 16:9, 手機橫拿全螢幕; 做法與程式片段見 `$studio_refs/screen-width.md`): interface.json 的 canvas 已經是 `{"width": 1280, "height": 720, "maxWidth": 1680}` 且 art.js 已依裝置決定寬度就跳過這步。否則 `$release_dir/game/` **與** `$src_dir/game/` 兩份都改, 兩份的 interface.json(`$release_dir/interface.json`, 以及 `$src_dir/interface.json` 有的話)canvas 一起改:
    - 高度不同就先整體等比換算成高 720(座標、尺寸乘同一個倍數), 再處理寬度; 原本已是 1680×720 固定寬的, 版面若以 1280 設計區置中就直接改成依裝置, 若版面用滿 1680 就把重要內容收進中間 1280
    - 原本的版面當成「設計區」整塊平移到中間(畫面最外層 translate 一次, 不逐一改座標), 只把**畫滿整個畫面**的東西(底色、背景、地面、暗角、壓暗、裁切範圍、全畫面特效)改成畫滿實際寬度; 場景往兩側延伸補畫, 美術不放大、不拉伸變形, 畫面不留空白或黑邊
    - 可視範圍跟著畫面寬的東西(捲動鏡頭、出界判斷、邊緣提示)改用實際寬度; 地圖比畫面窄時置中並補牆或背景, 不露出地圖外
@@ -27,7 +27,7 @@
    - 不改玩法與數值: 遊戲區、判定範圍維持原大小
    - 直式畫面(高大於寬)不改, 在回報寫明「直式, 網站會加寬邊, 要改橫式需另外討論」
 5. **畫布等比縮放**(兩份都查): 畫布要跟著容器(網站 iframe 或視窗)等比縮放並置中, 不裁切、不拉伸; 不假設視窗大小、不寫死畫布的 CSS 像素尺寸; 依 devicePixelRatio 放大實際像素, resize 與 orientationchange 時重算; 滑鼠 / 觸控座標用 `getBoundingClientRect` 換回邏輯座標。不符合就改
-6. **觸控層與網站訊息**(兩份都做; 設計見 skill 的 `docs/2026-10-31-release-mobile-design.md`): 讓手機能玩, 並接上 PVD計畫網站的暫停 / 繼續 / 玩完一局訊息。
+6. **觸控層與網站訊息**(兩份都做): 讓手機能玩, 並接上 PVD計畫網站的暫停 / 繼續 / 玩完一局訊息。
    - `touch.js` 不存在 → 把 `$studio_refs/touch-template.js` 原樣複製成 `$release_dir/game/touch.js` 與 `$src_dir/game/touch.js`, **只改開頭的 `CONFIG`**, 不改範本其他部分; 已存在(上一次發布加過)→ 保留, 只依這輪打磨的改動更新 `CONFIG`(新畫面、新按鍵)。兩份內容一致
    - `index.html` 在 `game.js` 之後載入 `touch.js`
    - `CONFIG.mode`: 鍵盤遊戲 `keys`; 滑鼠遊戲 `mouse`(點擊即觸控, 不畫按鈕; 遊戲聽 mouse / click 事件時 `mouseEvents: true`, 只聽 pointer 事件時 false); 直式遊戲 `none`(不做觸控, 只做網站訊息與 Esc 暫停)
