@@ -86,7 +86,7 @@ def test_status(env, capsys):
 
 
 INFO = "名稱: 金幣雨\n代號: coin-rain\n介紹: 點擊收集掉落的金幣。\n"
-PICK = "圖示: A\n主色: 3\n預覽圖: B\n"
+PICK = "圖示: A\n主色: 3\n橫幅: B\n"
 
 
 def to_polish(env, capsys):
@@ -118,7 +118,7 @@ def test_release_choice_validation(env, capsys):
     assert out["status"] == "waiting_release_pick"
     code, out = call(capsys, "resume", env["project"], "--choice", "continue", "--feedback", info)
     assert code == 1 and "pick" in out["error"]
-    badpick = write(env["tmp"] / "badpick.md", "圖示: A\n主色: 9\n預覽圖: B\n")
+    badpick = write(env["tmp"] / "badpick.md", "圖示: A\n主色: 9\n橫幅: B\n")
     code, out = call(capsys, "resume", env["project"], "--choice", "pick", "--feedback", badpick)
     assert code == 1 and "主色" in out["error"]
 

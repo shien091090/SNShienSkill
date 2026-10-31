@@ -1,4 +1,4 @@
-"""發布階段: 把打磨定版的遊戲複製成網站版, 做圖示 / 主色 / 分享預覽圖方案, 使用者挑完後定版。
+"""發布階段: 把打磨定版的遊戲複製成網站版, 做圖示 / 主色 / 遊戲橫幅方案, 使用者挑完後定版。
 
 產出 <專案>/release/: game/(網站版遊戲)、options/(方案與選擇頁)、assets/(定版素材)。
 規格見 docs/2026-10-29-release-stage-design.md。
@@ -12,7 +12,7 @@ import zlib
 from pathlib import Path
 
 ICON = (512, 512)
-SHARE = (1200, 630)
+BANNER = (1680, 720)  # 網站試玩頁頂端的封面, 21:9 跟遊戲畫面同尺寸; 左下角會被遊戲圖示蓋住
 ICON_IDS = ("A", "B", "C")
 COLOR_IDS = ("1", "2", "3")
 MAX_FILE_MB = 25
@@ -43,7 +43,7 @@ def parse_release_info(text: str) -> dict:
 
 def parse_release_pick(text: str) -> dict:
     kv = _parse_kv(text)
-    rules = {"圖示": ("icon", ICON_IDS), "主色": ("color", COLOR_IDS), "預覽圖": ("share", ICON_IDS)}
+    rules = {"圖示": ("icon", ICON_IDS), "主色": ("color", COLOR_IDS), "橫幅": ("banner", ICON_IDS)}
     out = {}
     for label, (key, allowed) in rules.items():
         v = (kv.get(label) or "").strip().upper()
@@ -91,6 +91,8 @@ h1{font-size:22px;margin:0 0 4px}h2{font-size:18px;margin:32px 0 12px}
 .opt{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .opt h3{margin:0 0 10px;font-size:16px}
 .big{display:block;max-width:100%}
+.ban{position:relative;display:inline-block;max-width:100%}
+.ban::after{content:"圖示會蓋住";position:absolute;left:0;bottom:0;width:25%;height:30%;box-sizing:border-box;border:2px dashed #fff;background:rgba(0,0,0,.35);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center}
 .thumbs{display:flex;align-items:flex-end;gap:12px;margin-top:12px}
 .thumbs img{border-radius:22%;border:4px solid #2d2144;display:block}
 .card{display:flex;align-items:center;gap:12px;width:320px;padding:14px;border-radius:16px}
@@ -113,14 +115,14 @@ def build_options_page(release: Path, info: dict, colors: list[dict]) -> Path:
         f'<img src="icon-a.png"><div><b>{e(info["name"])}</b><span>{e(info.get("time", ""))}</span></div></div>'
         f'<div class="note">{e(c["bg"])} / 字 {e(c["fg"])}　{e(c.get("note", ""))}</div></div>'
         for c in colors)
-    shares = "".join(f'<div class="opt"><h3>預覽圖 {i}</h3><img class="big" src="share-{i.lower()}.png" width="600"></div>'
-                     for i in ICON_IDS)
+    banners = "".join(f'<div class="opt"><h3>橫幅 {i}</h3><div class="ban"><img class="big" src="banner-{i.lower()}.png" width="700"></div></div>'
+                      for i in ICON_IDS)
     page = (f'<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>{e(info["name"])} 發布方案</title>'
             f"<style>{_PAGE_CSS}</style></head><body><h1>{e(info['name'])} 發布方案</h1>"
-            f"<div>看完回報代號, 例「圖示 B、主色 2、預覽圖 A」</div>"
+            f"<div>看完回報代號, 例「圖示 B、主色 2、橫幅 A」</div>"
             f'<h2>遊戲圖示</h2><div class="row">{icons}</div>'
             f'<h2>遊戲主色</h2><div class="row">{cards}</div>'
-            f'<h2>分享預覽圖</h2><div class="row">{shares}</div></body></html>')
+            f'<h2>遊戲橫幅</h2><div class="row">{banners}</div></body></html>')
     out = Path(release) / "options" / "index.html"
     out.write_text(page, encoding="utf-8")
     return out
@@ -170,7 +172,7 @@ def write_asset_info(release: Path, info: dict, color: dict) -> Path:
             ("遊戲介紹", info["intro"]), ("遊玩時長", time), ("支援裝置", DEVICE_MOBILE if info.get("mobile") else DEVICE_PC),
             ("遊戲主色", f"`{color['bg']}`, 字用{fg} `{color['fg']}`"),
             ("遊戲檔案", "`../game/`(入口 `index.html`)"), ("遊戲畫面比例", ratio_text),
-            ("分享預覽圖", "`share.png`(1200×630)")]
+            ("遊戲橫幅", "`banner.png`(1680×720)")]
     text = f"# {info['name']} 素材資訊\n\n| 項目 | 內容 |\n|---|---|\n" + "".join(f"| {k} | {v} |\n" for k, v in rows)
     out = Path(release) / "assets" / "素材資訊.md"
     out.parent.mkdir(parents=True, exist_ok=True)

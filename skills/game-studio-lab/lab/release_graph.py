@@ -12,7 +12,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
 from lab.graph import LabError
-from lab.release import (ICON, ICON_IDS, MAX_FILE_MB, SHARE, aspect_ratio, build_options_page,
+from lab.release import (ICON, ICON_IDS, MAX_FILE_MB, BANNER, aspect_ratio, build_options_page,
                          parse_release_info, parse_release_pick, png_size, prune_release_game, write_asset_info,
                          write_site_info)
 from lab.renderer import ChromeRenderer
@@ -23,7 +23,7 @@ class ReleaseState(TypedDict, total=False):
     round_dir: str
     feedback: str        # 發布資訊檔(名稱 / 代號 / 介紹)
     standalone: bool     # True: 非 lab 專案, 遊戲在 <project>/game/
-    pick: dict           # 使用者挑的方案 {"icon", "color", "share"}
+    pick: dict           # 使用者挑的方案 {"icon", "color", "banner"}
     release_warnings: list
 
 
@@ -31,7 +31,7 @@ class ReleaseOutput(TypedDict):
     release_warnings: list
 
 
-OPTION_PAGES = [f"icon-{i.lower()}" for i in ICON_IDS] + [f"share-{i.lower()}" for i in ICON_IDS]
+OPTION_PAGES = [f"icon-{i.lower()}" for i in ICON_IDS] + [f"banner-{i.lower()}" for i in ICON_IDS]
 
 
 def build_release_graph(deps, checkpointer=None):
@@ -88,7 +88,7 @@ def build_release_graph(deps, checkpointer=None):
     def art(s: ReleaseState):
         _, _, release = paths(s)
         opts = release / "options"
-        for p in [*opts.glob("icon-*"), *opts.glob("share-*"), opts / "colors.json"]:
+        for p in [*opts.glob("icon-*"), *opts.glob("banner-*"), *opts.glob("share-*"), opts / "colors.json"]:
             p.unlink(missing_ok=True)
         deps.runner.run("release-art", ctx(s))
         missing = [f"{n}.html" for n in OPTION_PAGES if not (opts / f"{n}.html").exists()]
@@ -105,7 +105,7 @@ def build_release_graph(deps, checkpointer=None):
         _, _, release = paths(s)
         opts = release / "options"
         for n in OPTION_PAGES:
-            size = ICON if n.startswith("icon") else SHARE
+            size = ICON if n.startswith("icon") else BANNER
             out = opts / f"{n}.png"
             renderer.render(opts / f"{n}.html", out, size)
             if png_size(out) != size:
@@ -134,7 +134,7 @@ def build_release_graph(deps, checkpointer=None):
             shutil.rmtree(assets)
         assets.mkdir()
         shutil.copyfile(opts / f"icon-{chosen['icon'].lower()}.png", assets / "icon.png")
-        shutil.copyfile(opts / f"share-{chosen['share'].lower()}.png", assets / "share.png")
+        shutil.copyfile(opts / f"banner-{chosen['banner'].lower()}.png", assets / "banner.png")
         info_data = json.loads((opts / "info.json").read_text(encoding="utf-8"))
         colors = json.loads((opts / "colors.json").read_text(encoding="utf-8"))
         color = next(c for c in colors if str(c["id"]) == chosen["color"])

@@ -212,7 +212,7 @@ def test_polish_release_then_back_to_interview(tmp_path):
     assert err is None, err
     assert interrupt_of(snap)["kind"] == "waiting_release_pick"
     pick = lab.project / "polish" / "release-pick.md"
-    pick.write_text("圖示: C\n主色: 1\n預覽圖: B", encoding="utf-8")
+    pick.write_text("圖示: C\n主色: 1\n橫幅: B", encoding="utf-8")
     snap, err = lab.resume(choice="pick", feedback=str(pick))
     assert err is None, err
     v = interrupt_of(snap)

@@ -83,12 +83,12 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 把定版遊戲與 PVD計畫網站要的素材做成 `<專案>/release/`(`game/` 網站版遊戲、`assets/` 定版素材與網站讀的 `info.json`、`options/` 方案與選擇頁)。設計見 `docs/2026-10-29-release-stage-design.md`, 兩個使用者檔的格式見 `references/release-guide.md`。
 
 1. **問使用者三樣**, 寫成發布資訊檔(lab 專案 `polish/release-info.md`; 非 lab 專案 `<資料夾>/release-info.md`):
-   - **遊戲名稱**: 使用者提供。名稱定了就全部統一, 流程會把遊戲開始畫面(打磨版與網站版都改)、預覽圖、素材資訊都換成這個名稱, 先先講明
+   - **遊戲名稱**: 使用者提供。名稱定了就全部統一, 流程會把遊戲開始畫面(打磨版與網站版都改)、橫幅、素材資訊都換成這個名稱, 先先講明
    - **遊戲介紹**: 使用者提供, 1–2 句、30–60 字; 超出或太短提醒使用者, 不代改
    - **遊戲代號**(網址用, 上線後不改): 你帶預設給使用者確認, 依序取上次 `release/assets/素材資訊.md` 的代號 → PVD計畫網站 repo 的 `site/js/games.js` 裡該遊戲已定的 `code`(本機例: `E:\Project\PVDWebsite`; 找不到 repo 就跳過這項) → 由專案名轉英文小寫加連字號
 2. lab 專案: `resume <專案> --choice release --feedback <發布資訊檔>`; 非 lab 專案: `release <資料夾> --info <發布資訊檔>`。都要背景執行, 約十幾到三十分鐘。選發布不跑檢討假設: 這輪若有試玩回饋要進下一輪設計, 應選 continue
-3. 停在 `waiting_release_pick`: 把 `options_page`(選擇頁絕對路徑, 只能看不能操作)給使用者, 請使用者回代號(例「圖示 B、主色 2、預覽圖 A」)。寫成 `release-pick.md`(放發布資訊檔旁), `--choice pick --feedback <檔>`; 都不喜歡 → `--choice redo`(只重做美術方案, 可把使用者的意見寫進 `release/options/redo-notes.md` 給美術看)
-   - 選定了但要微調某張(例: 預覽圖換字型、某個字特別設計): 不用 redo(會整批重畫), 由你改該張繪製頁(`release/options/<方案>.html`)。變體繪製頁與 PNG 一律放 scratchpad, 不放進專案(繪製頁裡的 `../game/art/art.js` 改成 `release/game/art/art.js` 的絕對 `file:///` 路徑), 用 `lab.renderer.ChromeRenderer` 畫成 PNG; 比較頁用 Artifact 發布(PNG 以 `files` 帶上, 每張標方案代號與一句說明), 把連結給使用者挑, 可多輪來回。定案後把選中的繪製頁與 PNG 蓋回 `release/options/<方案>.html` / `.png`(繪製頁的美術路徑改回 `../game/art/art.js`), 刪掉 Artifact(Artifact 的 delete, 使用者會確認)與 scratchpad 的變體, 再 `pick`。外加字型: 用 Google Fonts 的 OFL 字型, 以 base64 data URI 內嵌在繪製頁(無頭 Chrome 從 file:// 用相對路徑載入字型會靜默失敗, 退回系統字), 繪製包在 `document.fonts.load(...).then()` 裡; 日文字型常缺繁中字(例: Dela Gothic One 缺「點」), 重畫後要看圖確認沒有缺字方塊
+3. 停在 `waiting_release_pick`: 把 `options_page`(選擇頁絕對路徑, 只能看不能操作)給使用者, 請使用者回代號(例「圖示 B、主色 2、橫幅 A」)。寫成 `release-pick.md`(放發布資訊檔旁), `--choice pick --feedback <檔>`; 都不喜歡 → `--choice redo`(只重做美術方案, 可把使用者的意見寫進 `release/options/redo-notes.md` 給美術看)
+   - 選定了但要微調某張(例: 橫幅換字型、某個字特別設計): 不用 redo(會整批重畫), 由你改該張繪製頁(`release/options/<方案>.html`)。變體繪製頁與 PNG 一律放 scratchpad, 不放進專案(繪製頁裡的 `../game/art/art.js` 改成 `release/game/art/art.js` 的絕對 `file:///` 路徑), 用 `lab.renderer.ChromeRenderer` 畫成 PNG; 比較頁用 Artifact 發布(PNG 以 `files` 帶上, 每張標方案代號與一句說明), 把連結給使用者挑, 可多輪來回。定案後把選中的繪製頁與 PNG 蓋回 `release/options/<方案>.html` / `.png`(繪製頁的美術路徑改回 `../game/art/art.js`), 刪掉 Artifact(Artifact 的 delete, 使用者會確認)與 scratchpad 的變體, 再 `pick`。外加字型: 用 Google Fonts 的 OFL 字型, 以 base64 data URI 內嵌在繪製頁(無頭 Chrome 從 file:// 用相對路徑載入字型會靜默失敗, 退回系統字), 繪製包在 `document.fonts.load(...).then()` 裡; 日文字型常缺繁中字(例: Dela Gothic One 缺「點」), 重畫後要看圖確認沒有缺字方塊
 4. 定版完: lab 專案回到同一個打磨停點(`waiting_feedback`, 遊戲不重做), 可再選 continue / back-* / end / release; 非 lab 專案流程結束。回報 `release/` 路徑與 `warnings`(例: 檔案超過網站 25MB 上限)
 
 網站遊玩框是 21:9: 新遊戲設計時畫布就固定 1680×720; 舊遊戲比例不同的, 發布時 RD 會把網站版與打磨版都改成 21:9(直式不改, 會出現在 `warnings`)。網站版會自動清掉開發文件與沒載入的程式(網站同步工具會擋)。

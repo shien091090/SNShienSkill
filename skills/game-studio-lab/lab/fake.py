@@ -14,7 +14,7 @@ FIXTURE = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "good"
 
 class FakeRunner:
     def __init__(self, break_once=None, fail_once=None, games_per_round=2, drop_option=None):
-        self.drop_option = drop_option  # 發布美術少寫的那張繪製頁(例 "share-c.html")
+        self.drop_option = drop_option  # 發布美術少寫的那張繪製頁(例 "banner-c.html")
         self.break_once = set(break_once or ())
         self.fail_once = set(fail_once or ())
         self.games_per_round = games_per_round
@@ -115,7 +115,7 @@ class FakeRunner:
 
     def _release_art(self, ctx, broken):
         opts = Path(ctx["release_dir"]) / "options"
-        for n in ("icon-a", "icon-b", "icon-c", "share-a", "share-b", "share-c"):
+        for n in ("icon-a", "icon-b", "icon-c", "banner-a", "banner-b", "banner-c"):
             if f"{n}.html" != self.drop_option:
                 (opts / f"{n}.html").write_text(f"<!doctype html><title>{n}</title>", encoding="utf-8")
         colors = [{"id": str(i), "bg": bg, "fg": "#2d2144", "note": "假"}

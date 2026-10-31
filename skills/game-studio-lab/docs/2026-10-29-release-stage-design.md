@@ -8,7 +8,7 @@
 
 網站上架的 4 款(使用者指定): 捕泡手(`E:\Project\Game\WebGame_BubbleCatcher`)、DungeonZoo(`E:\Project\Game\WebGame_DungeonZoo`)、GhostEchoV2(`E:\Project\Game\WebGame_GhostEchoV2`)、SoulSmithDefense(`E:\Project\Game\SoulSmithDefense`)。SlimeTetris 不上架。後三款是 lab 專案; 捕泡手是舊流程做的(無 `.lab/`、遊戲在根目錄 `game/`、無 `interface.json`、試玩紀錄是 `telemetry.md`), 要另有入口(見「非 lab 專案的發布」)。
 
-成功的樣子: 使用者在打磨停下時選「發布」, 回答遊戲名稱與介紹, 等流程跑完, 看一張選擇頁挑圖示 / 主色 / 預覽圖, 回報代號, 拿到 `release/` 整包。
+成功的樣子: 使用者在打磨停下時選「發布」, 回答遊戲名稱與介紹, 等流程跑完, 看一張選擇頁挑圖示 / 主色 / 橫幅, 回報代號, 拿到 `release/` 整包。
 
 ## 範圍
 
@@ -27,20 +27,20 @@
 | 項目 | 來源 | 說明 |
 |---|---|---|
 | 遊戲代號 | 主 session 帶預設, 使用者確認 | 預設依序取: 上次 `release/` 的值 → 網站 `E:\Project\PVDWebsite\site\js\games.js` 已定的值(`bubble-catcher`、`dungeon-zoo`、`ghost-echo`) → 由專案名推。上線後不改(這條是我的決定, 使用者沒否決) |
-| 遊戲名稱 | **使用者提供** | 開發流程沒有定名步驟, 發布時由主 session 問。**名稱一旦定了要全部統一**: 遊戲開始畫面(打磨版與發布複本都改)、分享預覽圖、素材資訊都用同一個 |
+| 遊戲名稱 | **使用者提供** | 開發流程沒有定名步驟, 發布時由主 session 問。**名稱一旦定了要全部統一**: 遊戲開始畫面(打磨版與發布複本都改)、遊戲橫幅、素材資訊都用同一個 |
 | 遊戲介紹 | **使用者提供** | 1–2 句, 30–60 字; 主 session 收下時檢查字數, 超出就提醒(不代改) |
 | 遊戲圖示 | 多方案挑選 | 512×512 PNG, 不透明背景; **只放角色 / 場景, 不放文字**; 重要內容在中間 80%(四角會被網站裁成圓角) |
 | 遊戲主色 | 多方案挑選 | 一個色碼 + 主色上的字用深色或白色; 建議從 `#f29cac` 粉、`#aaefd5` 薄荷、`#4776c3` 藍、`#e0c64f` 金挑, 也可依遊戲配色另提 |
-| 分享預覽圖 | 多方案挑選 | 1200×630 PNG; 角色與場景重新排版 **+ 遊戲名稱** |
+| 遊戲橫幅 | 多方案挑選 | 1680×720 PNG(21:9, 跟遊戲畫面同尺寸), 背景不透明; 網站試玩頁遊戲介紹頂端的封面, 原比例縮小不裁切; 角色與場景重新排版營造氛圍 **+ 遊戲名稱**; 左下角(左 25%、下 30%)會被遊戲圖示蓋住, 不放標題與主角。網站不做分享功能, 不再出 1200×630 的分享預覽圖 |
 | 遊玩時長 | 推算 | 從 `polish/logs/` 的試玩紀錄算一局時長, 寫成「X–Y 分鐘」; 沒紀錄就依關卡數與規格估, 並註明是估的 |
 | 支援裝置 | 固定 | 「只支援電腦」 |
 | 遊戲畫面比例 | 查程式 | 網站遊玩框是 21:9(1680×720); 發布時 RD 把橫式但比例不同的遊戲改成 21:9(網站版與打磨版都改, 設計區整塊置中、畫滿整面的東西延伸到兩側, 美術不拉伸), 畫布跟著容器等比縮放; 直式不改, 定版時在 `warnings` 提出。`info.json` 的 `ratio` 依實際比例填 |
 
 操作方式說明不輸出: 網站不顯示, 操作由遊戲內教學帶(使用者決定)。
 
-多方案的數量: 每項 3 個(圖示 A/B/C、主色 1/2/3、預覽圖 A/B/C)。
+多方案的數量: 每項 3 個(圖示 A/B/C、主色 1/2/3、橫幅 A/B/C)。
 
-圖示與預覽圖的畫法: **沿用遊戲 `art/art.js` 裡已畫好的角色與場景重新排版**, 不生圖、不用實際遊玩截圖。
+圖示與橫幅的畫法: **沿用遊戲 `art/art.js` 裡已畫好的角色與場景重新排版**, 不生圖、不用實際遊玩截圖。
 
 ## 流程
 
@@ -56,17 +56,17 @@
    - RD 改完後由程式清掉網站不要的檔: `.md`(授權來源 `audio/credits.md` 除外)與沒被 `index.html` 或其他程式提到的 `.js`(例: 美術參考用的 `ref-objects.js`)。網站同步工具照《遊戲發布格式》第二節檢查, 留著會被擋
    - 名稱與開始畫面現有名稱不同時, 開始畫面的名稱改成使用者給的(美術或 RD, 看名稱畫在哪), **打磨版 `polish/game/` 也一起改**, 下一輪打磨才不會變回舊名; 改完重跑接合腳本
 2. **素材資訊**(一般 session): 推算時長寫成 `release/options/info.json`(或等價格式, 讓後面定版直接用)
-3. **方案製作**(美術): 在 `release/options/` 做 3 張圖示、3 張預覽圖的繪製頁(引用 `release/game/art/art.js`), 與 3 組主色
+3. **方案製作**(美術): 在 `release/options/` 做 3 張圖示、3 張橫幅的繪製頁(引用 `release/game/art/art.js`), 與 3 組主色
 4. **輸出 PNG**(程式, 非 AI): 用本機無頭 Chrome(`chrome --headless --screenshot --window-size=W,H`)把每張繪製頁存成 PNG。Chrome 不在時報錯停下
 5. **選擇頁**(程式或美術): `release/options/index.html`, 只看不操作。並排列出:
    - 圖示 A/B/C: 原圖, 加一個裁成圓角 + 粗框的小尺寸預覽(模擬網站顯示 30–150 px)
    - 主色 1/2/3: 每組套在仿網站遊戲卡片上(主色底 + 該色字 + 遊戲名稱)
-   - 預覽圖 A/B/C: 原尺寸縮放顯示
+   - 橫幅 A/B/C: 縮小顯示, 左下角疊虛線框標出會被圖示蓋住的範圍
 6. 停下, 狀態 `waiting_release_pick`, 回傳選擇頁絕對路徑
 
 ### 挑選與定版
 
-使用者看選擇頁, 在對話告訴主 session 代號(例「圖示 B、主色 2、預覽圖 A」)。主 session 寫成 `polish/release-pick.md`, `resume --choice pick --feedback polish/release-pick.md`。
+使用者看選擇頁, 在對話告訴主 session 代號(例「圖示 B、主色 2、橫幅 A」)。主 session 寫成 `polish/release-pick.md`, `resume --choice pick --feedback polish/release-pick.md`。
 
 定版(程式): 把選中的檔案複製進 `release/assets/`, 寫 `release/assets/info.json`(網站同步工具讀的資料, 格式照 `E:\Project\PVDWebsite\docs\遊戲發布格式.md` 第三節)與 `release/assets/素材資訊.md`(給人看)。完成後回到打磨的 `waiting_feedback` 停點(同一版遊戲, 不重做), 使用者可再選 continue / back-* / end / release。
 
@@ -92,7 +92,7 @@
 ├── game/                     遊戲執行檔(index.html 入口, 相對路徑, 無試玩紀錄下載)
 ├── assets/
 │   ├── icon.png              512×512
-│   ├── share.png             1200×630
+│   ├── banner.png            1680×720
 │   ├── info.json             網站讀: code、name、intro、time、mobile、color、textColor、ratio
 │   └── 素材資訊.md            同一份資料給人看(網站不讀)
 ├── interface.json            接合腳本讀(在 game/ 上一層), 網站不讀

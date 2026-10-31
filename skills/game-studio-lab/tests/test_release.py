@@ -39,9 +39,9 @@ def test_parse_release_info_rejects(text, word):
 
 
 def test_parse_release_pick():
-    assert parse_release_pick("圖示: b\n主色: 2\n預覽圖: A") == {"icon": "B", "color": "2", "share": "A"}
+    assert parse_release_pick("圖示: b\n主色: 2\n橫幅: A") == {"icon": "B", "color": "2", "banner": "A"}
     with pytest.raises(ValueError, match="主色"):
-        parse_release_pick("圖示: B\n主色: 4\n預覽圖: A")
+        parse_release_pick("圖示: B\n主色: 4\n橫幅: A")
 
 
 @pytest.mark.parametrize("w,h,want", [(1680, 720, ("21:9", True)), (1280, 720, ("16:9", False)), (720, 1280, ("9:16", False)),
@@ -59,8 +59,8 @@ def test_png_roundtrip(tmp_path):
 def test_options_page_lists_all(tmp_path):
     (tmp_path / "options").mkdir()
     page = build_options_page(tmp_path, INFO, COLORS).read_text(encoding="utf-8")
-    for s in ["圖示 A", "圖示 B", "圖示 C", "主色 1", "主色 2", "主色 3", "預覽圖 A", "預覽圖 C",
-              "#f29cac", "#4776c3", "#e0c64f", "icon-a.png", "share-c.png", "幽影接力"]:
+    for s in ["圖示 A", "圖示 B", "圖示 C", "主色 1", "主色 2", "主色 3", "橫幅 A", "橫幅 C",
+              "#f29cac", "#4776c3", "#e0c64f", "icon-a.png", "banner-c.png", "幽影接力"]:
         assert s in page
     assert "<button" not in page and "<input" not in page
 
@@ -127,7 +127,7 @@ class Rel:
         return self.call({"project": str(self.project), "round_dir": "", "feedback": str(self.info),
                           "standalone": True})
 
-    def pick(self, text="圖示: B\n主色: 2\n預覽圖: A"):
+    def pick(self, text="圖示: B\n主色: 2\n橫幅: A"):
         f = self.project / "release-pick.md"
         f.write_text(text, encoding="utf-8")
         return self.call(Command(resume={"choice": "pick", "feedback": str(f)}))
@@ -146,8 +146,8 @@ def test_release_pauses_with_options_page(tmp_path):
     opts = rel.project / "release" / "options"
     for n in ("icon-a", "icon-b", "icon-c"):
         assert png_size(opts / f"{n}.png") == (512, 512)
-    for n in ("share-a", "share-b", "share-c"):
-        assert png_size(opts / f"{n}.png") == (1200, 630)
+    for n in ("banner-a", "banner-b", "banner-c"):
+        assert png_size(opts / f"{n}.png") == (1680, 720)
     info = json.loads((opts / "info.json").read_text(encoding="utf-8"))
     assert info["name"] == "捕泡手" and info["code"] == "bubble-catcher" and info["mobile"] is False
     assert info["ratio"] == "3:4" and info["ratio_site"] is False
@@ -159,7 +159,8 @@ def test_release_pick_finalizes_assets(tmp_path):
     snap, err = rel.pick()
     assert err is None and not snap.next
     assets = rel.project / "release" / "assets"
-    assert png_size(assets / "icon.png") == (512, 512) and png_size(assets / "share.png") == (1200, 630)
+    assert not (assets / "share.png").exists()
+    assert png_size(assets / "icon.png") == (512, 512) and png_size(assets / "banner.png") == (1680, 720)
     assert "#aaefd5" in (assets / "素材資訊.md").read_text(encoding="utf-8")
     site = json.loads((assets / "info.json").read_text(encoding="utf-8"))
     assert site["code"] == "bubble-catcher" and site["color"] == "#aaefd5" and site["mobile"] is False
@@ -177,9 +178,9 @@ def test_release_redo_only_reruns_art(tmp_path):
 
 
 def test_release_missing_option_fails(tmp_path):
-    rel = Rel(tmp_path, runner=FakeRunner(drop_option="share-c.html"))
+    rel = Rel(tmp_path, runner=FakeRunner(drop_option="banner-c.html"))
     _, err = rel.start()
-    assert isinstance(err, LabError) and "share-c.html" in str(err)
+    assert isinstance(err, LabError) and "banner-c.html" in str(err)
 
 
 def test_render_size_mismatch_fails(tmp_path):
@@ -191,7 +192,7 @@ def test_render_size_mismatch_fails(tmp_path):
 def test_release_bad_pick_errors(tmp_path):
     rel = Rel(tmp_path)
     rel.start()
-    _, err = rel.pick("圖示: D\n主色: 2\n預覽圖: A")
+    _, err = rel.pick("圖示: D\n主色: 2\n橫幅: A")
     assert isinstance(err, LabError) and "圖示" in str(err)
 
 
