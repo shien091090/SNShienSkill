@@ -14,11 +14,11 @@ from lab.graph import Deps, LabError
 from lab.release_graph import build_release_graph
 from lab.renderer import ChromeRenderer, FakeRenderer, find_chrome
 from lab.release import (aspect_ratio, build_options_page, parse_release_info, parse_release_pick,
-                         png_size, write_asset_info, write_png)
+                         png_size, write_asset_info, write_png, prune_release_game, detect_mobile,
+                         write_site_info)
 
 INFO = {"name": "幽影接力", "code": "ghost-echo", "intro": "和過去的自己接力闖關。", "time": "5–10 分鐘",
-        "time_estimated": True, "ratio": "9:16", "ratio_16_9": False, "controls": "方向鍵移動、Z 互動",
-        "device": "只支援電腦"}
+        "time_estimated": True, "ratio": "9:16", "ratio_16_9": False, "mobile": False}
 COLORS = [{"id": "1", "bg": "#f29cac", "fg": "#2d2144", "note": "粉"},
           {"id": "2", "bg": "#4776c3", "fg": "#ffffff", "note": "藍"},
           {"id": "3", "bg": "#e0c64f", "fg": "#2d2144", "note": "金"}]
@@ -68,9 +68,41 @@ def test_options_page_lists_all(tmp_path):
 def test_asset_info_fields(tmp_path):
     text = write_asset_info(tmp_path, INFO, COLORS[1]).read_text(encoding="utf-8")
     for s in ["遊戲代號", "遊戲名稱", "遊戲介紹", "遊玩時長", "支援裝置", "遊戲主色", "遊戲畫面比例",
-              "操作方式說明", "ghost-echo", "5–10 分鐘(估計)", "只支援電腦", "#4776c3", "#ffffff", "白色字",
+              "ghost-echo", "5–10 分鐘(估計)", "只支援電腦", "#4776c3", "#ffffff", "白色字",
               "不是 16:9"]:
         assert s in text
+    assert "操作方式說明" not in text
+
+
+def test_site_info_matches_website_format(tmp_path):
+    info = {**INFO, "time": "5-10 分鐘", "mobile": True, "ratio": "16:9"}
+    data = json.loads(write_site_info(tmp_path, info, {"bg": "#4AC", "fg": "#FFF"}).read_text(encoding="utf-8"))
+    assert data == {"code": "ghost-echo", "name": "幽影接力", "intro": "和過去的自己接力闖關。", "time": "5–10 分鐘",
+                    "mobile": True, "color": "#44aacc", "textColor": "#ffffff", "ratio": "16:9"}
+    data = json.loads(write_site_info(tmp_path, INFO, COLORS[0]).read_text(encoding="utf-8"))
+    assert data["textColor"] == "#2d2144" and data["mobile"] is False
+
+
+def test_prune_release_game_keeps_only_runtime_files(tmp_path):
+    g = tmp_path / "game"
+    for f, body in {"index.html": '<script src="art/art.js"></script><script src="game.js"></script>',
+                    "game.js": "Snd.load('audio/sound.js')", "art/art.js": "", "art/style.md": "",
+                    "art/ref-objects.js": "", "audio/sound.js": "", "audio/sound.md": "", "audio/credits.md": ""}.items():
+        (g / f).parent.mkdir(parents=True, exist_ok=True)
+        (g / f).write_text(body, encoding="utf-8")
+    assert sorted(prune_release_game(g)) == ["art/ref-objects.js", "art/style.md", "audio/sound.md"]
+    assert sorted(p.relative_to(g).as_posix() for p in g.rglob("*") if p.is_file()) == [
+        "art/art.js", "audio/credits.md", "audio/sound.js", "game.js", "index.html"]
+
+
+@pytest.mark.parametrize("js,want", [
+    ("addEventListener('touchstart', f); el.style.touchAction; css='canvas{touch-action: none}'", True),
+    ("addEventListener('touchstart', f)", False),
+    ("addEventListener('keydown', f); css='touch-action:none'", False),
+])
+def test_detect_mobile(tmp_path, js, want):
+    (tmp_path / "game.js").write_text(js, encoding="utf-8")
+    assert detect_mobile(tmp_path) is want
 
 
 # ---- 發布子圖(單獨模式) ----
@@ -127,7 +159,7 @@ def test_release_pauses_with_options_page(tmp_path):
     for n in ("share-a", "share-b", "share-c"):
         assert png_size(opts / f"{n}.png") == (1200, 630)
     info = json.loads((opts / "info.json").read_text(encoding="utf-8"))
-    assert info["name"] == "捕泡手" and info["code"] == "bubble-catcher" and info["device"] == "只支援電腦"
+    assert info["name"] == "捕泡手" and info["code"] == "bubble-catcher" and info["mobile"] is False
     assert info["ratio"] == "3:4" and info["ratio_16_9"] is False
 
 
@@ -139,6 +171,8 @@ def test_release_pick_finalizes_assets(tmp_path):
     assets = rel.project / "release" / "assets"
     assert png_size(assets / "icon.png") == (512, 512) and png_size(assets / "share.png") == (1200, 630)
     assert "#aaefd5" in (assets / "素材資訊.md").read_text(encoding="utf-8")
+    site = json.loads((assets / "info.json").read_text(encoding="utf-8"))
+    assert site["code"] == "bubble-catcher" and site["color"] == "#aaefd5" and site["mobile"] is False
     assert snap.values["release_warnings"] == []
 
 

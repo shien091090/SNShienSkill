@@ -17,7 +17,7 @@
 2. 發布素材: 素材清單「一、每款遊戲」的各項(見下表)
 
 不做(使用者明確排除或之後再談):
-- 手機版支援: 目前一律「只支援電腦」; 之後要改成手機可玩會另外討論, 且要改遊戲程式
+- 把遊戲改成手機可玩(加觸控操作): 要改遊戲程式, 另外討論; 發布只依遊戲現況判斷支援裝置(見下表)
 - 接入規範的鍵名格式(`<代號>:<用途>`)、`pvd:pause` / `pvd:resume` 串接: 規範寫明可之後改, 這次不動
 - 全站素材(網站標題、全站預覽圖、網站小圖示等)
 - 把產物搬進 PVDWebsite repo, 或改網站的遊戲清單(名稱、代號、換掉 SlimeTetris): 素材資訊寫好即可, 網站由 PVD網站的工作另外更新
@@ -33,9 +33,10 @@
 | 遊戲主色 | 多方案挑選 | 一個色碼 + 主色上的字用深色或白色; 建議從 `#f29cac` 粉、`#aaefd5` 薄荷、`#4776c3` 藍、`#e0c64f` 金挑, 也可依遊戲配色另提 |
 | 分享預覽圖 | 多方案挑選 | 1200×630 PNG; 角色與場景重新排版 **+ 遊戲名稱** |
 | 遊玩時長 | 推算 | 從 `polish/logs/` 的試玩紀錄算一局時長, 寫成「X–Y 分鐘」; 沒紀錄就依關卡數與規格估, 並註明是估的 |
-| 支援裝置 | 固定 | 「只支援電腦」 |
+| 支援裝置 | 查程式 | 遊戲有觸控操作(`touchstart` / `pointerdown`), 且宣告 `touch-action: none` 讓遊戲區內拖曳不捲動頁面 → 「電腦與手機都支援」(`mobile: true`), 否則「只支援電腦」。依據網站《遊戲接入規範》第四節第 5 點 |
 | 遊戲畫面比例 | 查程式 | 是不是 16:9; 不是要寫出實際比例 |
-| 操作方式說明 | 整理 | 從 spec.md 與程式整理一段, 例「方向鍵移動、空白鍵跳」 |
+
+操作方式說明不輸出: 網站不顯示, 操作由遊戲內教學帶(使用者決定)。
 
 多方案的數量: 每項 3 個(圖示 A/B/C、主色 1/2/3、預覽圖 A/B/C)。
 
@@ -52,8 +53,9 @@
 ### 發布節點(依序)
 
 1. **遊戲複本 + 移除試玩紀錄**(RD): 把 `polish/game/` 複製成 `release/game/`(整個覆蓋舊的), 在複本上移除試玩紀錄下載與相關暫存鍵。`polish/game/` 不動, 下一輪打磨照樣有埋點。接合腳本要能跑過複本(腳本會讀上一層的 `interface.json`, 複本旁要放一份; 腳本本來就不檢查埋點, 不用放寬)
+   - RD 改完後由程式清掉網站不要的檔: `.md`(授權來源 `audio/credits.md` 除外)與沒被 `index.html` 或其他程式提到的 `.js`(例: 美術參考用的 `ref-objects.js`)。網站同步工具照《遊戲發布格式》第二節檢查, 留著會被擋
    - 名稱與開始畫面現有名稱不同時, 開始畫面的名稱改成使用者給的(美術或 RD, 看名稱畫在哪), **打磨版 `polish/game/` 也一起改**, 下一輪打磨才不會變回舊名; 改完重跑接合腳本
-2. **素材資訊**(一般 session): 決定代號、推算時長、查比例、整理操作說明, 寫成 `release/options/info.json`(或等價格式, 讓後面定版直接用)
+2. **素材資訊**(一般 session): 推算時長寫成 `release/options/info.json`(或等價格式, 讓後面定版直接用)
 3. **方案製作**(美術): 在 `release/options/` 做 3 張圖示、3 張預覽圖的繪製頁(引用 `release/game/art/art.js`), 與 3 組主色
 4. **輸出 PNG**(程式, 非 AI): 用本機無頭 Chrome(`chrome --headless --screenshot --window-size=W,H`)把每張繪製頁存成 PNG。Chrome 不在時報錯停下
 5. **選擇頁**(程式或美術): `release/options/index.html`, 只看不操作。並排列出:
@@ -66,7 +68,7 @@
 
 使用者看選擇頁, 在對話告訴主 session 代號(例「圖示 B、主色 2、預覽圖 A」)。主 session 寫成 `polish/release-pick.md`, `resume --choice pick --feedback polish/release-pick.md`。
 
-定版(程式): 把選中的檔案複製進 `release/assets/`, 寫 `release/assets/素材資訊.md`。完成後回到打磨的 `waiting_feedback` 停點(同一版遊戲, 不重做), 使用者可再選 continue / back-* / end / release。
+定版(程式): 把選中的檔案複製進 `release/assets/`, 寫 `release/assets/info.json`(網站同步工具讀的資料, 格式照 `E:\Project\PVDWebsite\docs\遊戲發布格式.md` 第三節)與 `release/assets/素材資訊.md`(給人看)。完成後回到打磨的 `waiting_feedback` 停點(同一版遊戲, 不重做), 使用者可再選 continue / back-* / end / release。
 
 想換方案(例: 都不喜歡)→ 再選一次 `release` 重做方案。
 
@@ -91,8 +93,10 @@
 ├── assets/
 │   ├── icon.png              512×512
 │   ├── share.png             1200×630
-│   └── 素材資訊.md            代號、名稱、介紹、時長、裝置、主色 + 字色、比例、操作說明; 欄位照素材清單排, 可直接複製
-└── options/                  所有方案、繪製頁、選擇頁(index.html)
+│   ├── info.json             網站讀: code、name、intro、time、mobile、color、textColor、ratio
+│   └── 素材資訊.md            同一份資料給人看(網站不讀)
+├── interface.json            接合腳本讀(在 game/ 上一層), 網站不讀
+└── options/                  所有方案、繪製頁、選擇頁(index.html), 網站不讀
 ```
 
 ## 限制

@@ -12,8 +12,9 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
 from lab.graph import LabError
-from lab.release import (DEVICE, ICON, ICON_IDS, MAX_FILE_MB, SHARE, aspect_ratio, build_options_page,
-                         parse_release_info, parse_release_pick, png_size, write_asset_info)
+from lab.release import (ICON, ICON_IDS, MAX_FILE_MB, SHARE, aspect_ratio, build_options_page, detect_mobile,
+                         parse_release_info, parse_release_pick, png_size, prune_release_game, write_asset_info,
+                         write_site_info)
 from lab.renderer import ChromeRenderer
 
 
@@ -58,6 +59,7 @@ def build_release_graph(deps, checkpointer=None):
         if (src / "interface.json").exists():
             shutil.copyfile(src / "interface.json", release / "interface.json")
         deps.runner.run("release-game", ctx(s))
+        prune_release_game(release / "game")
         targets = [release / "game"] + ([] if s.get("standalone") else [src / "game"])
         for t in targets:
             result = deps.checker.check(t, "polish")
@@ -79,7 +81,7 @@ def build_release_graph(deps, checkpointer=None):
         iface = json.loads(iface_path.read_text(encoding="utf-8")) if iface_path.exists() else {}
         ratio, is_16_9 = aspect_ratio(iface)
         data.update({k: c[k] for k in ("name", "code", "intro")})
-        data.update({"ratio": ratio, "ratio_16_9": is_16_9, "device": DEVICE})
+        data.update({"ratio": ratio, "ratio_16_9": is_16_9, "mobile": detect_mobile(release / "game")})
         out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         return {}
 
@@ -137,6 +139,7 @@ def build_release_graph(deps, checkpointer=None):
         colors = json.loads((opts / "colors.json").read_text(encoding="utf-8"))
         color = next(c for c in colors if str(c["id"]) == chosen["color"])
         write_asset_info(release, info_data, color)
+        write_site_info(release, info_data, color)
         warnings = [f"{p.relative_to(release)} 有 {p.stat().st_size / 1024 / 1024:.1f}MB, 超過網站上限 {MAX_FILE_MB}MB"
                     for d in (release / "game", assets) for p in d.rglob("*")
                     if p.is_file() and p.stat().st_size > MAX_FILE_MB * 1024 * 1024]

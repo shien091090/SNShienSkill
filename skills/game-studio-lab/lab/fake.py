@@ -110,7 +110,7 @@ class FakeRunner:
 
     def _release_info(self, ctx, broken):
         out = Path(ctx["release_dir"]) / "options" / "info.json"
-        out.write_text(json.dumps({"time": "5–10 分鐘", "time_estimated": True, "controls": "點擊收集金幣"},
+        out.write_text(json.dumps({"time": "5–10 分鐘", "time_estimated": True},
                                   ensure_ascii=False), encoding="utf-8")
 
     def _release_art(self, ctx, broken):
