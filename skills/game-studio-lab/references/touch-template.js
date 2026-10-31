@@ -38,7 +38,7 @@
     initAudio: function () { },
   };
 
-  // ───────── 版面(以 1680×720 為準; 右邊的按鈕對齊右緣, 換算成實際畫布寬) ─────────
+  // ───────── 版面(以 1680×720 為準; 右邊的按鈕對齊右緣, 換算成實際畫布寬, 畫面 1280~1680 都適用) ─────────
   var CW = (window.Art && Art.canvas && Art.canvas.width) || 1680, CH = (window.Art && Art.canvas && Art.canvas.height) || 720;
   var LAYOUT = {
     // 圓弧方向鍵: 中心 (x, y), 外圈半徑 Ro、內圈半徑 Ri, 四段之間留 gap 寬的細縫; 可按範圍半徑 R(比外圈大, 手指偏出去也算), 中心 dead 內不算

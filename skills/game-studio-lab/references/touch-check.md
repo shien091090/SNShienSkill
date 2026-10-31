@@ -6,16 +6,17 @@
 
 一個 html, 用 `<base href="file:///<專案>/release/game/">` 指向網站版, 照 `index.html` 的順序載入 `art/art.js` →(有的話)`audio/sound.js` → `game.js` → `touch.js`, 最後再載入你寫的「跳畫面」腳本:
 
-- canvas 的 id 與寬高照 `index.html`, CSS 照遊戲的等比縮放寫法(例 `width: min(100vw, calc(100vh * 7 / 3)); aspect-ratio: 1680 / 720`)
+- canvas 的 id 與寬高照 `index.html`, CSS 照遊戲的等比縮放寫法(例 `width: min(100vw, calc(100vh * var(--cw, 1280) / 720)); aspect-ratio: var(--cw, 1280) / 720`)
 - 跳畫面腳本讀網址參數(例 `?s=shop`), 直接呼叫 game.js 自己的函式造出該畫面的狀態(例: 開某座地下城、進商店、開引導卡); 先讀 game.js 找出各畫面的進入函式與要先備好的資料
 - 要等計時才出現的畫面(例: 進場 3 秒後的引導): 虛擬時間下 rAF 幀很稀疏, 在跳畫面腳本裡同步呼叫 `update(1/60)` N 次推進遊戲時間, 不靠等待
-- 網址帶 `&touch=1` 強制觸控模式
+- 網址帶 `&touch=1` 強制觸控模式, `&w=<寬>` 指定畫面寬度(無頭 Chrome 的螢幕尺寸不等於視窗, 不指定會判成 1280)
+- 寬度依裝置的遊戲, 每個畫面截電腦 1280(不帶 touch)、觸控 1280 / 1560 / 1680 四種, `--window-size` 跟著寬度
 
 ## 截圖
 
 ```
 chrome --headless=new --user-data-dir=<暫存資料夾> --disable-gpu --hide-scrollbars --mute-audio --no-first-run
-       --force-device-scale-factor=1 --allow-file-access-from-files --window-size=1680,720
+       --force-device-scale-factor=1 --allow-file-access-from-files --window-size=<寬>,720
        --virtual-time-budget=3000 --screenshot=<輸出.png> "file:///<harness>.html?s=<畫面>&touch=1"
 ```
 

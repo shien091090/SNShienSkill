@@ -81,10 +81,11 @@ def build_release_graph(deps, checkpointer=None):
         data = json.loads(out.read_text(encoding="utf-8"))
         iface_path = release / "interface.json"
         iface = json.loads(iface_path.read_text(encoding="utf-8")) if iface_path.exists() else {}
-        ratio, is_site = aspect_ratio(iface)
+        ratio, is_site, mobile_ratio = aspect_ratio(iface)
         data.update({k: c[k] for k in ("name", "code", "intro")})
-        # 手機能玩 = 21:9 橫式且觸控層有做觸控(直式遊戲 mode 是 none, 網站在手機直拿時本來就不開遊戲)
-        data.update({"ratio": ratio, "ratio_site": is_site, "mobile": is_site and touch_mode(release / "game") in ("keys", "mouse")})
+        # 手機能玩 = 符合網站比例的橫式且觸控層有做觸控(直式遊戲 mode 是 none, 網站在手機直拿時本來就不開遊戲)
+        data.update({"ratio": ratio, "ratio_site": is_site, "mobile_ratio": mobile_ratio,
+                     "mobile": is_site and touch_mode(release / "game") in ("keys", "mouse")})
         out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         return {}
 
@@ -144,7 +145,7 @@ def build_release_graph(deps, checkpointer=None):
         write_asset_info(release, info_data, color)
         write_site_info(release, info_data, color)
         warnings = [] if info_data.get("ratio_site") else [
-            f"遊戲畫面是 {info_data.get('ratio', '未知')}, 不是網站的 21:9, 網站會加邊(直式要改橫式需另外討論)"]
+            f"遊戲畫面是 {info_data.get('ratio', '未知')}, 不是網站的 16:9(寬度依裝置 1280~1680 × 720), 網站會加邊(直式要改橫式需另外討論)"]
         warnings += [f"{p.relative_to(release)} 有 {p.stat().st_size / 1024 / 1024:.1f}MB, 超過網站上限 {MAX_FILE_MB}MB"
                     for d in (release / "game", assets) for p in d.rglob("*")
                     if p.is_file() and p.stat().st_size > MAX_FILE_MB * 1024 * 1024]

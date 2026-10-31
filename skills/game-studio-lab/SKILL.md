@@ -92,9 +92,9 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
    - 選定了但要微調某張(例: 橫幅換字型、某個字特別設計): 不用 redo(會整批重畫), 由你改該張繪製頁(`release/options/<方案>.html`)。變體繪製頁與 PNG 一律放 scratchpad, 不放進專案(繪製頁裡的 `../game/art/art.js` 改成 `release/game/art/art.js` 的絕對 `file:///` 路徑), 用 `lab.renderer.ChromeRenderer` 畫成 PNG; 比較頁用 Artifact 發布(PNG 以 `files` 帶上, 每張標方案代號與一句說明), 把連結給使用者挑, 可多輪來回。定案後把選中的繪製頁與 PNG 蓋回 `release/options/<方案>.html` / `.png`(繪製頁的美術路徑改回 `../game/art/art.js`), 刪掉 Artifact(Artifact 的 delete, 使用者會確認)與 scratchpad 的變體, 再 `pick`。外加字型: 用 Google Fonts 的 OFL 字型, 以 base64 data URI 內嵌在繪製頁(無頭 Chrome 從 file:// 用相對路徑載入字型會靜默失敗, 退回系統字), 繪製包在 `document.fonts.load(...).then()` 裡; 日文字型常缺繁中字(例: Dela Gothic One 缺「點」), 重畫後要看圖確認沒有缺字方塊
 4. 定版完: lab 專案回到同一個打磨停點(`waiting_feedback`, 遊戲不重做), 可再選 continue / back-* / end / release; 非 lab 專案流程結束。回報 `release/` 路徑與 `warnings`(例: 檔案超過網站 25MB 上限)
 
-網站遊玩框是 21:9: 新遊戲設計時畫布就固定 1680×720; 舊遊戲比例不同的, 發布時 RD 會把網站版與打磨版都改成 21:9(直式不改, 會出現在 `warnings`)。網站版會自動清掉開發文件與沒載入的程式(網站同步工具會擋)。
+畫面比例: 設計時畫布固定 1280×720(16:9, 網站電腦遊玩框的比例); 發布時 RD 把網站版與打磨版都改成寬度依裝置: 電腦 1280, 手機依螢幕 1280~1680(16:9~21:9), 中間 1280 是設計區, 兩側只放背景與貼邊的 HUD(做法見 `references/screen-width.md`; 直式不改, 會出現在 `warnings`)。網站版會自動清掉開發文件與沒載入的程式(網站同步工具會擋)。
 
-手機與網站訊息: 發布時 RD 從 `references/touch-template.js` 加觸控層 `touch.js`(網站版與打磨版兩份): 鍵盤遊戲疊虛擬按鈕、滑鼠遊戲點擊即觸控、直式遊戲不做觸控; 直拿手機自動暫停; 接網站的暫停 / 繼續與玩完一局訊息; 遊戲沒有 Esc 暫停時由它提供。手機不放任何聲音或暫停按鈕(交給手機本身)。之後再打磨時設計與 RD 不管手機, 只是不能弄壞 `touch.js`; 下次發布 RD 會補新畫面的按鈕設定。21:9 且有觸控 → `info.json` 的 `mobile` 為 true。設計見 `docs/2026-10-31-release-mobile-design.md`。
+手機與網站訊息: 發布時 RD 從 `references/touch-template.js` 加觸控層 `touch.js`(網站版與打磨版兩份): 鍵盤遊戲疊虛擬按鈕、滑鼠遊戲點擊即觸控、直式遊戲不做觸控; 直拿手機自動暫停; 接網站的暫停 / 繼續與玩完一局訊息; 遊戲沒有 Esc 暫停時由它提供。手機不放任何聲音或暫停按鈕(交給手機本身)。之後再打磨時設計與 RD 不管手機, 只是不能弄壞 `touch.js`; 下次發布 RD 會補新畫面的按鈕設定。比例符合且有觸控 → `info.json` 的 `mobile` 為 true。設計見 `docs/2026-10-31-release-mobile-design.md`。
 
 不做: 存檔鍵名改格式、改 PVDWebsite repo(網站另外更新)。
 

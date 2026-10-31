@@ -189,8 +189,10 @@ if (!Art) {
   fail('art', 'art.js 載入後沒有 window.Art');
   finish();
 }
-if (Art.canvas && iface.canvas && (Art.canvas.width !== iface.canvas.width || Art.canvas.height !== iface.canvas.height)) {
-  fail('art', `Art.canvas ${Art.canvas.width}x${Art.canvas.height} 與介面 ${iface.canvas.width}x${iface.canvas.height} 不符`);
+// 寬度可依裝置變動的遊戲: 介面 canvas.width 是設計寬(安全區), maxWidth 是最寬; Art.canvas.width 落在兩者之間就算相符
+const ifaceMaxW = iface.canvas?.maxWidth || iface.canvas?.width;
+if (Art.canvas && iface.canvas && (Art.canvas.width < iface.canvas.width || Art.canvas.width > ifaceMaxW || Art.canvas.height !== iface.canvas.height)) {
+  fail('art', `Art.canvas ${Art.canvas.width}x${Art.canvas.height} 與介面 ${iface.canvas.width}${ifaceMaxW !== iface.canvas.width ? '~' + ifaceMaxW : ''}x${iface.canvas.height} 不符`);
 }
 for (const name of requiredDraws) {
   if (typeof Art[name] !== 'function') { fail('art', `Art.${name} 不存在`); continue; }

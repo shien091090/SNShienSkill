@@ -44,11 +44,14 @@ def test_parse_release_pick():
         parse_release_pick("圖示: B\n主色: 4\n橫幅: A")
 
 
-@pytest.mark.parametrize("w,h,want", [(1680, 720, ("21:9", True)), (1280, 720, ("16:9", False)), (720, 1280, ("9:16", False)),
-                                      (480, 640, ("3:4", False))])
-def test_aspect_ratio(w, h, want):
-    assert aspect_ratio({"canvas": {"width": w, "height": h}}) == want
-    assert aspect_ratio({}) == ("未知", False)
+@pytest.mark.parametrize("canvas,want", [({"width": 1280, "height": 720, "maxWidth": 1680}, ("16:9", True, "16:9-21:9")),
+                                         ({"width": 1280, "height": 720}, ("16:9", True, "16:9")),
+                                         ({"width": 1680, "height": 720}, ("21:9", False, "21:9")),
+                                         ({"width": 720, "height": 1280}, ("9:16", False, "9:16")),
+                                         ({"width": 480, "height": 640}, ("3:4", False, "3:4"))])
+def test_aspect_ratio(canvas, want):
+    assert aspect_ratio({"canvas": canvas}) == want
+    assert aspect_ratio({}) == ("未知", False, "未知")
 
 
 def test_png_roundtrip(tmp_path):
@@ -69,18 +72,19 @@ def test_asset_info_fields(tmp_path):
     text = write_asset_info(tmp_path, INFO, COLORS[1]).read_text(encoding="utf-8")
     for s in ["遊戲代號", "遊戲名稱", "遊戲介紹", "遊玩時長", "支援裝置", "遊戲主色", "遊戲畫面比例",
               "ghost-echo", "5–10 分鐘(估計)", "只支援電腦", "#4776c3", "#ffffff", "白色字",
-              "不是 21:9"]:
+              "不是 16:9"]:
         assert s in text
     assert "操作方式說明" not in text
 
 
 def test_site_info_matches_website_format(tmp_path):
-    info = {**INFO, "time": "5-10 分鐘", "mobile": True, "ratio": "16:9"}
+    info = {**INFO, "time": "5-10 分鐘", "mobile": True, "ratio": "16:9", "mobile_ratio": "16:9-21:9"}
     data = json.loads(write_site_info(tmp_path, info, {"bg": "#4AC", "fg": "#FFF"}).read_text(encoding="utf-8"))
     assert data == {"code": "ghost-echo", "name": "幽影接力", "intro": "和過去的自己接力闖關。", "time": "5–10 分鐘",
-                    "mobile": True, "color": "#44aacc", "textColor": "#ffffff", "ratio": "16:9"}
+                    "mobile": True, "color": "#44aacc", "textColor": "#ffffff", "ratio": "16:9",
+                    "mobileRatio": "16:9-21:9"}
     data = json.loads(write_site_info(tmp_path, INFO, COLORS[0]).read_text(encoding="utf-8"))
-    assert data["textColor"] == "#2d2144" and data["mobile"] is False
+    assert data["textColor"] == "#2d2144" and data["mobile"] is False and "mobileRatio" not in data
 
 
 def test_prune_release_game_keeps_only_runtime_files(tmp_path):
@@ -165,7 +169,7 @@ def test_release_pick_finalizes_assets(tmp_path):
     site = json.loads((assets / "info.json").read_text(encoding="utf-8"))
     assert site["code"] == "bubble-catcher" and site["color"] == "#aaefd5" and site["mobile"] is False
     w = snap.values["release_warnings"]  # 測試用的遊戲是直式 3:4, 只會有比例提醒
-    assert len(w) == 1 and "3:4" in w[0] and "21:9" in w[0]
+    assert len(w) == 1 and "3:4" in w[0] and "16:9" in w[0]
 
 
 def test_release_redo_only_reruns_art(tmp_path):
@@ -227,3 +231,9 @@ def test_release_without_touch_layer_fails(tmp_path):
     rel = Rel(tmp_path, runner=FakeRunner(touch=None))
     _, err = rel.start()
     assert isinstance(err, LabError) and "觸控層" in str(err)
+
+
+def test_asset_info_mobile_ratio(tmp_path):
+    info = {**INFO, "mobile": True, "ratio": "16:9", "ratio_site": True, "mobile_ratio": "16:9-21:9"}
+    text = write_asset_info(tmp_path, info, COLORS[1]).read_text(encoding="utf-8")
+    assert "| 遊戲畫面比例 | 電腦 16:9; 手機依螢幕 16:9～21:9 |" in text

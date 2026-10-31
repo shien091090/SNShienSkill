@@ -12,7 +12,7 @@ import zlib
 from pathlib import Path
 
 ICON = (512, 512)
-BANNER = (1680, 720)  # 網站試玩頁頂端的封面, 21:9 跟遊戲畫面同尺寸; 左下角會被遊戲圖示蓋住
+BANNER = (1680, 720)  # 網站試玩頁頂端的封面(21:9); 左下角會被遊戲圖示蓋住
 ICON_IDS = ("A", "B", "C")
 COLOR_IDS = ("1", "2", "3")
 MAX_FILE_MB = 25
@@ -53,19 +53,28 @@ def parse_release_pick(text: str) -> dict:
     return out
 
 
-SITE_RATIO = "21:9"  # PVD計畫網站遊玩框的比例(《遊戲接入規範》第四節), 建議尺寸 1680×720
+SITE_RATIO = "16:9"  # PVD計畫網站電腦遊玩框的比例, 遊戲設計寬 1280×720; 手機全螢幕, 寬度依螢幕最寬到 MAX_W
+MAX_W = 1680  # 手機最寬 21:9
 
 
-def aspect_ratio(iface: dict) -> tuple[str, bool]:
-    """回傳 (比例文字, 是否符合網站的 21:9)。1680×720 約分是 7:3, 照網站慣用寫法回 "21:9"。"""
+def _ratio_text(w: int, h: int) -> str:
+    if w * 9 == h * 21:
+        return "21:9"  # 1680×720 約分是 7:3, 照網站慣用寫法
+    g = math.gcd(w, h)
+    return f"{w // g}:{h // g}"
+
+
+def aspect_ratio(iface: dict) -> tuple[str, bool, str]:
+    """回傳 (電腦比例, 是否符合網站的 16:9, 手機比例)。
+    介面 canvas 的 width 是設計寬(電腦用這個寬), maxWidth 是觸控裝置最寬; 手機比例例 "16:9-21:9"。"""
     c = iface.get("canvas") or {}
     w, h = int(c.get("width") or 0), int(c.get("height") or 0)
     if not w or not h:
-        return "未知", False
-    if w * 9 == h * 21:
-        return SITE_RATIO, True
-    g = math.gcd(w, h)
-    return f"{w // g}:{h // g}", False
+        return "未知", False, "未知"
+    max_w = int(c.get("maxWidth") or w)
+    ratio = _ratio_text(w, h)
+    mobile = ratio if max_w <= w else f"{ratio}-{_ratio_text(max_w, h)}"
+    return ratio, ratio == SITE_RATIO and w <= max_w <= MAX_W * h // 720, mobile
 
 
 def png_size(path: Path) -> tuple[int, int]:
@@ -170,6 +179,8 @@ def write_site_info(release: Path, info: dict, color: dict) -> Path:
             "mobile": bool(info.get("mobile")), "color": _hex6(color["bg"]),
             "textColor": "#ffffff" if _hex6(color["fg"]) == "#ffffff" else "#2d2144",
             "ratio": info.get("ratio", "未知")}
+    if info.get("mobile"):
+        data["mobileRatio"] = info.get("mobile_ratio") or data["ratio"]
     out = Path(release) / "assets" / "info.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -180,6 +191,8 @@ def write_asset_info(release: Path, info: dict, color: dict) -> Path:
     time = info.get("time", "") + ("(估計)" if info.get("time_estimated") else "")
     ratio = info.get("ratio", "未知")
     ratio_text = ratio + ("" if info.get("ratio_site") else f"(不是 {SITE_RATIO}, 網站會加邊)")
+    if info.get("mobile") and info.get("mobile_ratio") and info["mobile_ratio"] != ratio:
+        ratio_text = f"電腦 {ratio_text}; 手機依螢幕 {info['mobile_ratio'].replace('-', '～')}"
     fg = "白色字" if color["fg"].lower() in ("#fff", "#ffffff") else "深色字"
     rows = [("遊戲代號", f"`{info['code']}`"), ("遊戲名稱", info["name"]), ("遊戲圖示", "`icon.png`(512×512)"),
             ("遊戲介紹", info["intro"]), ("遊玩時長", time), ("支援裝置", DEVICE_MOBILE if info.get("mobile") else DEVICE_PC),
