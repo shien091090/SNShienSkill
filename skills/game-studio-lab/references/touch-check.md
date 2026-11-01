@@ -17,13 +17,17 @@
 ```
 chrome --headless=new --user-data-dir=<暫存資料夾> --disable-gpu --hide-scrollbars --mute-audio --no-first-run
        --force-device-scale-factor=1 --allow-file-access-from-files --window-size=<寬>,720
-       --virtual-time-budget=3000 --screenshot=<輸出.png> "file:///<harness>.html?s=<畫面>&touch=1"
+       --timeout=2500 --screenshot=<輸出.png> "file:///<harness>.html?s=<畫面>&touch=1"
 ```
 
-Chrome 路徑用 `lab.renderer.find_chrome()`。每個玩家會操作的畫面都截一張(開始畫面、各選單、遊戲主畫面的左右兩端、結算、教學 / 引導卡出現時)。用 Read 看過每張, 找被按鈕蓋住的文字、數值、可選項目, 也確認畫面要求按的鍵(例: 引導卡的「A 繼續」)真的有畫出來——疊在不能操作的場景上的引導最容易漏(例: 見習表演的引導卡, 表演場整組不畫, 卡片要按 A 卻沒有 A 鈕)。
+- 用 `--timeout`, 不用 `--virtual-time-budget`: 遊戲的 rAF 迴圈一直排新的一幀, 虛擬時間永遠等不到閒置, Chrome 會卡死不出圖。跳畫面腳本造好畫面後, 把遊戲的每幀更新換成空函式(畫面凍結在那一刻, 只剩繪製), 截到的才是造出來的狀態
+- 每次截圖外面包 `timeout 40`。卡死殘留的 headless Chrome 會鎖住 `--user-data-dir`, 之後每次截圖都秒退、不出檔: 截圖秒退時先結束殘留的 chrome 行程或換一個新的暫存資料夾
+
+Chrome 路徑用 `lab.renderer.find_chrome()`。每個玩家會操作的畫面都截一張(開始畫面、各選單、遊戲主畫面的左右兩端、結算、教學 / 引導卡出現時)。用 Read 看過每張, 找被按鈕蓋住的文字、數值、可選項目; 確認兩側是純黑塊(沒有延伸出來的背景、壓暗、HUD); 也確認畫面寫到的每個鍵(鍵帽與純文字的「按 Z」「空白鍵」, 含介面列的操作提示)在手機上都有按鈕, 沒有的不該出現(例: Esc 暫停、M 靜音、C 開圖鑑), 以及畫面要求按的鍵(例: 引導卡的「A 繼續」)真的有畫出來——疊在不能操作的場景上的引導最容易漏(例: 見習表演的引導卡, 表演場整組不畫, 卡片要按 A 卻沒有 A 鈕)。
 
 ## 給使用者看與調整
 
 - 截圖用 Artifact 發布(PNG 以 `files` 帶上, 每張標畫面名稱), 連結和選擇頁一起給使用者
-- 有蓋到: 你改 `touch.js` 的 `CONFIG`(該畫面不畫那顆按鈕、或改按鈕顯示條件), 網站版與打磨版兩份同步改; 要移開遊戲資訊才改 game.js, 只在觸控模式(`PVDX.on`)下移
+- 有蓋到: 你改 `touch.js` 的 `CONFIG`(該畫面不畫那顆按鈕、或改按鈕顯示條件), 網站版與打磨版兩份同步改; 要移開遊戲資訊才改 game.js, 只在觸控模式(`PVDX.on`)下移。黑塊不夠寬時按鈕壓到設計區邊緣一點是刻意的取捨(不縮小遊戲畫面, 免得 HUD 字太小), 只處理蓋住要按的東西或關鍵資訊的情況
+- 按鍵提示對不上(上一點檢查到的): 改 game.js / art.js 讓那段提示在 `PVDX.on` 時換字或不畫, 一樣兩份同步; 手機缺的常用功能(例: 開圖鑑)接到 `touch.js` 的功能鍵 d
 - 改完重截確認, 使用者看過後刪掉 Artifact
