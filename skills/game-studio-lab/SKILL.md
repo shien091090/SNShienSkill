@@ -28,6 +28,7 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 | `resume <專案>` | 上次出錯停下, 修好後從失敗的節點接著跑 |
 | `status <專案>` | 查目前停在哪 |
 | `release <資料夾> --info <檔>` | 非 lab 專案(遊戲在 `<資料夾>/game/`, 例: 捕泡手)的發布; 停在挑選頁後用 `--choice pick --feedback <檔>` 或 `--choice redo`; 中途出錯修好後不帶參數接續 |
+| `loader <遊戲資料夾>` | 網站版遊戲(例 `<專案>/release/game`)加上或更新載入進度條, 不 commit; 什麼時候用見「發布」段的載入進度條 |
 | `probe-models` | 每種節點用正式參數起一次極短 session, 回報實際用到的模型(改了模型設定或 managed settings 後用) |
 
 - `.venv` 不存在(新機器)→ 先 `python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`
@@ -94,9 +95,11 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 
 畫面比例: 設計時畫布固定; 發布時 RD 把網站版與打磨版都改成寬度依裝置, 尺寸與做法只寫在 `references/screen-width.md`(直式不改, 會出現在 `warnings`)。網站版會自動清掉開發文件與沒載入的程式(網站同步工具會擋)。
 
-手機與網站訊息: 發布時 RD 從 `references/touch-template.js` 加觸控層 `touch.js`(網站版與打磨版兩份): 鍵盤遊戲疊虛擬按鈕、滑鼠遊戲點擊即觸控、直式遊戲不做觸控; 直拿手機自動暫停; 接網站的暫停 / 繼續與玩完一局訊息; 遊戲沒有 Esc 暫停時由它提供。手機不放任何聲音或暫停按鈕(交給手機本身)。之後再打磨時設計與 RD 不管手機, 只是不能弄壞 `touch.js`; 下次發布 RD 會補新畫面的按鈕設定。比例符合且有觸控 → `info.json` 的 `mobile` 為 true。設計見 `docs/2026-10-31-release-mobile-design.md`。
+手機與網站訊息: 發布時 RD 從 `references/touch-template.js` 加觸控層 `touch.js`(網站版與打磨版兩份): 鍵盤遊戲疊虛擬按鈕、滑鼠遊戲點擊即觸控、直式遊戲不做觸控; 直拿手機自動暫停; 接網站的暫停 / 繼續與玩完一局訊息; 遊戲沒有 Esc 暫停時由它提供。觸控模式下字與小圖示放大到手機字級下限(`references/screen-width.md`)。手機不放任何聲音或暫停按鈕(交給手機本身)。之後再打磨時設計與 RD 不管手機, 只是不能弄壞 `touch.js`; 下次發布 RD 會補新畫面的按鈕設定。比例符合且有觸控 → `info.json` 的 `mobile` 為 true。設計見 `docs/2026-10-31-release-mobile-design.md`。
 
 儲存與上層頁面: 發布時 RD 把兩份的儲存鍵名改成「遊戲代號:用途」(搬舊值)、拿掉清空儲存與碰上層頁面 / 開新視窗 / 改網址的寫法; 定版時再掃一次網站版, 字面上看得出來的違規列進 `warnings`。
+
+載入進度條: 定版時流程自動把網站版 `index.html` 的本地程式換成載入程式, 畫面顯示百分比, 並送 `{type:'pvd:progress', progress: 0~1}` 與載完的 `{type:'pvd:loaded'}` 給網站。之後手動改了 `release/game/` 的程式(檔案大小變了), 改完跑 `loader <專案>/release/game` 更新再 commit; 替還沒有進度條的舊遊戲補上也用這個指令。
 
 不做: 改 PVDWebsite repo(網站另外更新)。
 

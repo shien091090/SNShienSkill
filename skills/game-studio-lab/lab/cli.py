@@ -4,6 +4,7 @@
   python -m lab resume <專案> [--choice ...] [--feedback <檔>] [--target <款>]
   python -m lab status <專案>
   python -m lab release <資料夾> [--info <檔>] [--choice pick|redo] [--feedback <檔>]  (非 lab 專案的發布)
+  python -m lab loader <遊戲資料夾>  (網站版遊戲加上 / 更新載入進度條, 不 commit)
 """
 import argparse
 import json
@@ -258,6 +259,18 @@ def cmd_status(args) -> dict:
     return report(project, snap)
 
 
+def cmd_loader(args) -> dict:
+    from lab.loader import add_loader
+    game = Path(args.game).resolve()
+    if not (game / "index.html").exists():
+        raise SetupError(f"{game} 底下沒有 index.html")
+    try:
+        files = add_loader(game)
+    except (FileNotFoundError, ValueError) as e:
+        raise SetupError(str(e)) from e
+    return {"status": "done", "files": files, "warnings": [] if files else ["index.html 沒有本地程式, 沒有加載入進度條"]}
+
+
 def cmd_probe_models(args) -> dict:
     from lab.runner import probe_models
     return {"status": "done", "models": probe_models(Path.cwd()), "warnings": []}
@@ -283,10 +296,12 @@ def main(argv=None) -> int:
     rl.add_argument("--info")
     rl.add_argument("--choice")
     rl.add_argument("--feedback")
+    ld = sub.add_parser("loader")
+    ld.add_argument("game")
     args = p.parse_args(argv)
     try:
         out = {"start": cmd_start, "resume": cmd_resume, "status": cmd_status, "release": cmd_release,
-               "probe-models": cmd_probe_models}[args.cmd](args)
+               "loader": cmd_loader, "probe-models": cmd_probe_models}[args.cmd](args)
     except SetupError as e:
         out = {"status": "error", "error": str(e), "warnings": []}
     sys.stdout.reconfigure(encoding="utf-8")

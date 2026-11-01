@@ -11,6 +11,7 @@ from langgraph.types import Command
 from lab.checker import NodeChecker
 from lab.fake import FakeRunner
 from lab.graph import Deps, LabError
+from lab.loader import add_loader
 from lab.release_graph import build_release_graph
 from lab.renderer import ChromeRenderer, FakeRenderer, find_chrome
 from lab.release import (aspect_ratio, build_options_page, parse_release_info, parse_release_pick, site_rule_warnings,
@@ -170,6 +171,10 @@ def test_release_pick_finalizes_assets(tmp_path):
     assert site["code"] == "bubble-catcher" and site["color"] == "#aaefd5" and site["mobile"] is False
     w = snap.values["release_warnings"]  # 測試用的遊戲是直式 3:4, 只會有比例提醒
     assert len(w) == 1 and "3:4" in w[0] and "16:9" in w[0]
+    game = rel.project / "release" / "game"   # 定版時加上載入進度條, 接合檢查照樣讀得到程式
+    assert "<!-- pvd-loader -->" in (game / "index.html").read_text(encoding="utf-8")
+    result = NodeChecker().check(game, "deepen")
+    assert result["ok"], result["errors"]
 
 
 def test_release_redo_only_reruns_art(tmp_path):
@@ -251,3 +256,52 @@ def test_site_rule_warnings(tmp_path):
     assert any("清空" in x for x in w) and any("新視窗" in x for x in w) and any("改網址" in x for x in w)
     (tmp_path / "game.js").write_text("const top = 1; parent.postMessage({}, location.origin);", encoding="utf-8")
     assert site_rule_warnings(tmp_path, "ghost-echo") == []
+
+
+# ---- 載入進度條 ----
+NL = chr(10)
+
+
+def _loader_game(tmp_path, index):
+    g = tmp_path / "game"
+    for f, body in {"index.html": index, "art/art.js": "a" * 10, "game.js": "g" * 20, "touch.js": "mode: 'keys'"}.items():
+        (g / f).parent.mkdir(parents=True, exist_ok=True)
+        (g / f).write_text(body, encoding="utf-8")
+    return g
+
+
+def test_add_loader_replaces_local_scripts_in_order(tmp_path):
+    g = _loader_game(tmp_path, '<head><script src="https://cdn.x/lib.js"></script></head><body><canvas></canvas>' + NL +
+                     '<script src="art/art.js"></script>' + NL + '<script src="game.js"></script>' + NL + '<script src="touch.js"></script>' + NL + '</body>')
+    assert add_loader(g) == ["art/art.js", "game.js", "touch.js"]
+    html = (g / "index.html").read_text(encoding="utf-8")
+    assert '<script src="https://cdn.x/lib.js">' in html and '<script src="game.js">' not in html
+    assert 'var FILES = [["art/art.js", 10], ["game.js", 20], ["touch.js", 12]];' in html
+    assert html.index("<canvas>") < html.index("<!-- pvd-loader -->")
+    assert touch_mode(g) == "keys"
+    (g / "game.js").write_text("g" * 25, encoding="utf-8")   # 改了遊戲檔重跑: 只更新大小, 不重複加
+    assert add_loader(g) == ["art/art.js", "game.js", "touch.js"]
+    html = (g / "index.html").read_text(encoding="utf-8")
+    assert html.count("<!-- pvd-loader -->") == 1 and '["game.js", 25]' in html
+
+
+def test_add_loader_rejects_inline_script_after(tmp_path):
+    g = _loader_game(tmp_path, '<script src="art/art.js"></script><script src="game.js"></script><script>start()</script>')
+    with pytest.raises(ValueError):
+        add_loader(g)
+
+
+def test_add_loader_missing_file(tmp_path):
+    g = _loader_game(tmp_path, '<script src="art/art.js"></script><script src="nope.js"></script>')
+    with pytest.raises(FileNotFoundError):
+        add_loader(g)
+
+
+def test_loader_uses_page_background(tmp_path):
+    from lab.loader import page_background
+    assert page_background("<style>\nhtml,body{margin:0;background:#1a2b3c}</style>") == "#1a2b3c"
+    assert page_background("<style>body { background-color: black; }</style>") == "black"
+    assert page_background("<style>canvas{background:#fff}</style>") == "#111"
+    g = _loader_game(tmp_path, '<style>body{background:#222}</style><script src="art/art.js"></script>')
+    add_loader(g)
+    assert "background:#222;color" in (g / "index.html").read_text(encoding="utf-8")

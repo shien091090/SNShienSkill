@@ -12,6 +12,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
 from lab.graph import LabError
+from lab.loader import add_loader
 from lab.release import (ICON, ICON_IDS, MAX_FILE_MB, BANNER, aspect_ratio, build_options_page,
                          parse_release_info, parse_release_pick, png_size, prune_release_game, site_rule_warnings,
                          touch_mode, write_asset_info,
@@ -145,6 +146,10 @@ def build_release_graph(deps, checkpointer=None):
         color = next(c for c in colors if str(c["id"]) == chosen["color"])
         write_asset_info(release, info_data, color)
         write_site_info(release, info_data, color)
+        try:
+            add_loader(release / "game")   # 最後才加: 前面的接合檢查與觸控截圖都讀原本的 <script src>
+        except (FileNotFoundError, ValueError) as e:
+            raise LabError(f"網站版加載入進度條失敗: {e}; 修好 release/game/index.html 後 resume") from e
         warnings = [] if info_data.get("ratio_site") else [
             f"遊戲畫面是 {info_data.get('ratio', '未知')}, 不是網站的 16:9(寬度依裝置 1280~1680 × 720), 網站會加邊(直式要改橫式需另外討論)"]
         warnings += [f"{p.relative_to(release)} 有 {p.stat().st_size / 1024 / 1024:.1f}MB, 超過網站上限 {MAX_FILE_MB}MB"

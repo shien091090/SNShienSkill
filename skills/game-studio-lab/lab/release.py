@@ -11,6 +11,8 @@ import struct
 import zlib
 from pathlib import Path
 
+from lab.loader import loader_files
+
 ICON = (512, 512)
 BANNER = (1680, 720)  # 網站試玩頁頂端的封面(21:9); 左下角會被遊戲圖示蓋住
 ICON_IDS = ("A", "B", "C")
@@ -186,7 +188,7 @@ def touch_mode(game: Path) -> str | None:
     """網站版遊戲的觸控層設定(touch.js 的 CONFIG.mode); 沒有 touch.js 或 index.html 沒載入它 → None。"""
     game = Path(game)
     touch, index = game / "touch.js", game / "index.html"
-    if not touch.exists() or not index.exists() or not re.search(r"<script[^>]+src=[\"'](\./)?touch\.js[\"']", index.read_text(encoding="utf-8")):
+    if not touch.exists() or not index.exists() or not any(re.fullmatch(r"(\./)?touch\.js", f) for f in loader_files(index.read_text(encoding="utf-8"))):
         return None
     m = TOUCH_MODE_RE.search(touch.read_text(encoding="utf-8"))
     return m.group(1) if m else None

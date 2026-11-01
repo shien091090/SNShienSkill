@@ -37,6 +37,7 @@
    - `setAudioPaused(paused)`: 暫停時整個聲音靜音, 繼續時還原成遊戲自己的靜音設定(不動遊戲的靜音開關); `initAudio()`: 做遊戲第一次輸入時的聲音初始化
    - `escPause`: 遊戲自己沒有 Esc 暫停 → true(共同守則的通用鍵, 由觸控層提供); 已有 → false
    - game.js 掛鉤子(兩份): 鍵盤遊戲的鍵盤輸入要走全域 `inputDown(鍵名)` / `inputUp(鍵名)` / `inputReset()`(沒有就把現有的按鍵處理整理成這三個), `inputDown` 開頭 `if (window.PVDX && PVDX.paused) return;`; 每幀 `if (!(window.PVDX && PVDX.paused)) update(dt);`, 畫完 `if (window.PVDX) PVDX.draw(ctx);`; 一局結束的時間點(打磨版下載試玩紀錄的那一刻)呼叫 `if (window.PVDX) PVDX.finish();`
+   - 手機字級下限: 觸控模式下照 `$studio_refs/screen-width.md`「版面要顧的」的手機字級下限放大字與小圖示(art.js 與 game.js 兩份), 電腦版不動
    - 手機不放任何聲音按鈕或暫停按鈕(靜音、音量交給手機本身); 遊戲畫面上的聲音開關圖示在觸控模式(`PVDX.on`)不畫
 7. **儲存與上層頁面**(兩份都改; 規範在 PVD計畫網站 repo 的 `docs/遊戲接入規範.md` 第一節與第四節第 4 點; 所有遊戲和網站共用同一份瀏覽器儲存):
    - localStorage / sessionStorage 鍵名一律改成 `$code:<用途>`(用途英文小駝峰, 例 `$code:best`、`$code:muted`), 不放版本號; IndexedDB 資料庫名同樣加 `$code:` 前綴, cookie 用 `${code}_`; 不用 `pvd:` 開頭(網站保留)

@@ -77,7 +77,11 @@ if (!fs.existsSync(indexPath)) {
 const html = fs.readFileSync(indexPath, 'utf8');
 if (!/<meta[^>]+charset\s*=\s*["']?utf-8/i.test(html)) fail('charset', 'index.html 沒有宣告 <meta charset="utf-8">');
 if (/<script[^>]+type\s*=\s*["']module["']/i.test(html)) fail('script', 'index.html 用了 type="module", file:// 下會被擋');
-const scripts = [...html.matchAll(/<script[^>]*\ssrc\s*=\s*["']([^"']+)["'][^>]*>/gi)].map((m) => m[1]);
+// 發布加過載入進度條(<!-- pvd-loader -->)的網站版: 本地程式改列在載入程式的 FILES 裡, 載入程式本身不在這裡跑
+const loaderBlock = /<!-- pvd-loader -->[\s\S]*?<!-- \/pvd-loader -->/.exec(html);
+const htmlNoLoader = loaderBlock ? html.replace(loaderBlock[0], '') : html;
+const loaderFiles = loaderBlock ? JSON.parse((/var FILES = (\[.*?\]);/.exec(loaderBlock[0]) || [0, '[]'])[1]).map((f) => f[0]) : [];
+const scripts = [...loaderFiles, ...[...htmlNoLoader.matchAll(/<script[^>]*\ssrc\s*=\s*["']([^"']+)["'][^>]*>/gi)].map((m) => m[1])];
 if (!scripts.some((s) => /art\/art\.js$/.test(s))) fail('script', 'index.html 沒有載入 art/art.js');
 if (stage === 'polish' && !scripts.some((s) => /audio\/sound\.js$/.test(s))) fail('script', '打磨階段 index.html 沒有載入 audio/sound.js');
 const artIdx = scripts.findIndex((s) => /art\/art\.js$/.test(s));
@@ -179,7 +183,7 @@ for (const src of scripts) {
   if (!fs.existsSync(p)) { fail('load', `${src} 不存在`); continue; }
   run(`load ${src}`, () => vm.runInContext(fs.readFileSync(p, 'utf8'), sandbox, { filename: src }));
 }
-const inline = [...html.matchAll(/<script(?![^>]*\ssrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]).filter((s) => s.trim());
+const inline = [...htmlNoLoader.matchAll(/<script(?![^>]*\ssrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]).filter((s) => s.trim());
 inline.forEach((code, i) => run(`load inline#${i + 1}`, () => vm.runInContext(code, sandbox)));
 if (errors.some((e) => e.step.startsWith('load'))) finish();
 
