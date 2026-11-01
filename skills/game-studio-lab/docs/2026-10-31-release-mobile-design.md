@@ -27,7 +27,7 @@ PVD計畫網站要讓手機也能玩。遊戲在網站裡跑在 iframe 中, 網�
 | Esc 暫停 | 共同守則的通用鍵。遊戲自己沒有 Esc 暫停時由觸控層提供(暫停遮罩 + 「按 Esc 繼續」); 遊戲已有就關掉觸控層的這項 |
 | 載入進度 | 網站版定版時由流程(`lab/loader.py`)把 index.html 的本地程式換成載入程式: 依位元組顯示進度條與百分比, 送 `{type:'pvd:progress', progress}`, 載完送 `{type:'pvd:loaded'}`; file:// 開啟時退回逐個 `<script src>` |
 | 玩完一局 | 遊戲在「一局結束」的時間點(打磨版下載試玩紀錄的那一刻)呼叫 `PVDX.finish()`, 送 `{type:'pvd:finish'}` 給上層網站; 不在 iframe 裡就不送 |
-| 支援裝置 | `info.json` 的 `mobile`: 網站版有 `touch.js` 且畫面比例符合網站(寬度依裝置)→ true, 否則 false |
+| 建議裝置 | 網站要求每款電腦與手機都能玩; `info.json` 的 `device` 只是建議裝置, 由使用者在發布資訊檔指定(見 `2026-10-29-release-stage-design.md`)。網站版沒有觸控操作時定版提醒 |
 | 按鈕有沒有蓋到資訊 | RD 不能開瀏覽器, 只能照座標推算。流程停在挑圖示時, 主 session 用無頭 Chrome 帶 `?touch=1` 逐畫面截圖給使用者看; 有蓋到就由主 session 調 `touch.js` 的 `CONFIG`(按鈕座標、各畫面顯示哪些按鈕) |
 
 ## 遊戲要掛的鉤子

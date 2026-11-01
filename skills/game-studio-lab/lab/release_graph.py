@@ -84,10 +84,10 @@ def build_release_graph(deps, checkpointer=None):
         iface_path = release / "interface.json"
         iface = json.loads(iface_path.read_text(encoding="utf-8")) if iface_path.exists() else {}
         ratio, is_site, mobile_ratio = aspect_ratio(iface)
-        data.update({k: c[k] for k in ("name", "code", "intro")})
-        # 手機能玩 = 符合網站比例的橫式且觸控層有做觸控(直式遊戲 mode 是 none, 網站在手機直拿時本來就不開遊戲)
+        data.update({k: c[k] for k in ("name", "code", "intro", "device")})
+        # touch: 網站版有沒有觸控操作(直式遊戲 mode 是 none); 網站要求每款都能在手機玩, 沒有就在定版時提醒
         data.update({"ratio": ratio, "ratio_site": is_site, "mobile_ratio": mobile_ratio,
-                     "mobile": is_site and touch_mode(release / "game") in ("keys", "mouse")})
+                     "touch": touch_mode(release / "game") in ("keys", "mouse")})
         out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         return {}
 
@@ -155,6 +155,8 @@ def build_release_graph(deps, checkpointer=None):
         warnings += [f"{p.relative_to(release)} 有 {p.stat().st_size / 1024 / 1024:.1f}MB, 超過網站上限 {MAX_FILE_MB}MB"
                     for d in (release / "game", assets) for p in d.rglob("*")
                     if p.is_file() and p.stat().st_size > MAX_FILE_MB * 1024 * 1024]
+        if not info_data.get("touch"):
+            warnings.append("網站版沒有觸控操作, 但網站要求每款遊戲電腦與手機都能玩")
         warnings += site_rule_warnings(release / "game", info_data["code"])
         return {"release_warnings": warnings}
 
