@@ -1,4 +1,4 @@
-"""發布階段: 把打磨定版的遊戲複製成網站版, 做圖示 / 主色 / 遊戲橫幅方案, 使用者挑完後定版。
+"""發布階段: 把打磨定版的遊戲複製成網站版, 做圖示 / 主色(含色帶圖樣) / 遊戲橫幅方案, 使用者挑完後定版。
 
 產出 <專案>/release/: game/(網站版遊戲)、options/(方案與選擇頁)、assets/(定版素材)。
 規格見 docs/2026-10-29-release-stage-design.md。
@@ -14,7 +14,8 @@ from pathlib import Path
 from lab.loader import loader_files
 
 ICON = (512, 512)
-BANNER = (1680, 720)  # 網站試玩頁頂端的封面(21:9); 左下角會被遊戲圖示蓋住
+BANNER = (1680, 720)  # 網站遊戲清單(電腦與手機)的選擇按鈕(21:9); 左下角會疊時長標籤
+PATTERN = (256, 256)  # 試玩頁頂端主題色帶的圖塊, 網站以 128×128 重複鋪滿
 ICON_IDS = ("A", "B", "C")
 COLOR_IDS = ("1", "2", "3")
 MAX_FILE_MB = 25
@@ -85,6 +86,66 @@ def png_size(path: Path) -> tuple[int, int]:
     return struct.unpack(">II", data[16:24])
 
 
+def png_pixels(path: Path) -> tuple[int, int, list[tuple[int, int, int, int]]]:
+    """讀 8 位元、不交錯的 RGB / RGBA PNG(Chrome 截圖就是這種), 回傳 (寬, 高, 每點 RGBA)。"""
+    data = Path(path).read_bytes()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError(f"{path} 不是 PNG")
+    pos, idat, hdr = 8, b"", None
+    while pos < len(data):
+        n = struct.unpack(">I", data[pos:pos + 4])[0]
+        tag, body = data[pos + 4:pos + 8], data[pos + 8:pos + 8 + n]
+        if tag == b"IHDR":
+            hdr = struct.unpack(">IIBBBBB", body)
+        elif tag == b"IDAT":
+            idat += body
+        pos += 12 + n
+    w, h, depth, ctype, _, _, interlace = hdr
+    if depth != 8 or ctype not in (2, 6) or interlace:
+        raise ValueError(f"{path} 不是 8 位元不交錯的 RGB / RGBA PNG")
+    bpp = 3 if ctype == 2 else 4
+    raw, stride, prev, px = zlib.decompress(idat), w * bpp, bytearray(w * bpp), []
+    for y in range(h):
+        f, line = raw[y * (stride + 1)], bytearray(raw[y * (stride + 1) + 1:(y + 1) * (stride + 1)])
+        for i in range(stride):
+            a = line[i - bpp] if i >= bpp else 0
+            b, c = prev[i], prev[i - bpp] if i >= bpp else 0
+            if f == 1: line[i] = (line[i] + a) & 255
+            elif f == 2: line[i] = (line[i] + b) & 255
+            elif f == 3: line[i] = (line[i] + (a + b) // 2) & 255
+            elif f == 4:
+                p = a + b - c; pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                line[i] = (line[i] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+        px += [(line[i], line[i + 1], line[i + 2], line[i + 3] if bpp == 4 else 255) for i in range(0, stride, bpp)]
+        prev = line
+    return w, h, px
+
+
+def pattern_problems(path: Path, bg: str) -> list[str]:
+    """檢查色帶圖樣是否符合網站規格: 尺寸、不透明、底色是主色、紋路淡、四邊接得起來。回傳問題清單。"""
+    w, h, px = png_pixels(path)
+    if (w, h) != PATTERN:
+        return [f"尺寸是 {w}×{h}, 應為 {PATTERN[0]}×{PATTERN[1]}"]
+    out = []
+    if any(p[3] < 255 for p in px):
+        out.append("有透明的地方, 要整張不透明")
+    c = _hex6(bg)
+    want = tuple(int(c[i:i + 2], 16) for i in (1, 3, 5))
+    def dist(p, q=want): return max(abs(p[k] - q[k]) for k in range(3))
+    common = max(set(px), key=px.count)
+    if dist(common) > 24:  # 底色允許一點色差(Chrome 截圖的色彩轉換), 超過就是換了底色
+        out.append(f"底色 {'#%02x%02x%02x' % common[:3]} 不是主色 {c}")
+    if sum(1 for p in px if dist(p, common) > 72) > len(px) * 0.02:  # 紋路要淡: 和底色差很多的點不超過 2%
+        out.append("紋路對比太高, 要淡、對比低")
+    def seam(a, b): return sum(dist(a[i], b[i]) for i in range(len(a))) / len(a)
+    col = lambda x: [px[y * w + x] for y in range(h)]
+    row = lambda y: px[y * w:(y + 1) * w]
+    inner = max(seam(col(w // 2 - 1), col(w // 2)), seam(row(h // 2 - 1), row(h // 2)), 1)
+    if seam(col(w - 1), col(0)) > inner * 3 + 4 or seam(row(h - 1), row(0)) > inner * 3 + 4:  # 接縫處的落差明顯大於圖中間 = 拼起來看得到線
+        out.append("左右或上下邊緣接不起來, 重複鋪滿時會看到接縫")
+    return out
+
+
 def write_png(path: Path, w: int, h: int, rgb=(255, 255, 255)) -> None:
     def chunk(tag, body):
         return struct.pack(">I", len(body)) + tag + body + struct.pack(">I", zlib.crc32(tag + body))
@@ -102,11 +163,12 @@ h1{font-size:22px;margin:0 0 4px}h2{font-size:18px;margin:32px 0 12px}
 .opt h3{margin:0 0 10px;font-size:16px}
 .big{display:block;max-width:100%}
 .ban{position:relative;display:inline-block;max-width:100%}
-.ban::after{content:"圖示會蓋住";position:absolute;left:0;bottom:0;width:25%;height:30%;box-sizing:border-box;border:2px dashed #fff;background:rgba(0,0,0,.35);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center}
+.ban::after{content:"時長標籤";position:absolute;left:0;bottom:0;width:30%;height:25%;box-sizing:border-box;border:2px dashed #fff;background:rgba(0,0,0,.35);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center}
 .thumbs{display:flex;align-items:flex-end;gap:12px;margin-top:12px}
 .thumbs img{border-radius:22%;border:4px solid #2d2144;display:block}
-.card{display:flex;align-items:center;gap:12px;width:320px;padding:14px;border-radius:16px}
-.card img{width:56px;height:56px;border-radius:22%;border:3px solid #2d2144}
+.band{width:500px;max-width:100%;height:76px;border-radius:12px 12px 0 0;background-size:128px 128px}
+.card{position:relative;width:500px;max-width:100%;background:#fff;border-radius:0 0 12px 12px;padding:34px 16px 12px;box-sizing:border-box}
+.card img{position:absolute;left:16px;top:-40px;width:64px;height:64px;border-radius:22%;border:3px solid #2d2144}
 .card b{display:block;font-size:17px}.card span{font-size:13px;opacity:.85}
 .note{font-size:13px;margin-top:8px;max-width:320px}
 """
@@ -121,8 +183,8 @@ def build_options_page(release: Path, info: dict, colors: list[dict]) -> Path:
         for i in ICON_IDS)
     cards = "".join(
         f'<div class="opt"><h3>主色 {c["id"]}</h3>'
-        f'<div class="card" style="background:{e(c["bg"])};color:{e(c["fg"])}">'
-        f'<img src="icon-a.png"><div><b>{e(info["name"])}</b><span>{e(info.get("time", ""))}</span></div></div>'
+        f'<div class="band" style="background-color:{e(c["bg"])};background-image:url(pattern-{e(str(c["id"]))}.png)"></div>'
+        f'<div class="card"><img src="icon-a.png"><b>{e(info["name"])}</b><span>{e(info.get("time", ""))}</span></div>'
         f'<div class="note">{e(c["bg"])} / 字 {e(c["fg"])}　{e(c.get("note", ""))}</div></div>'
         for c in colors)
     banners = "".join(f'<div class="opt"><h3>橫幅 {i}</h3><div class="ban"><img class="big" src="banner-{i.lower()}.png" width="700"></div></div>'
@@ -223,7 +285,7 @@ def write_asset_info(release: Path, info: dict, color: dict) -> Path:
             ("遊戲介紹", info["intro"]), ("遊玩時長", time),
             ("遊戲主色", f"`{color['bg']}`, 字用{fg} `{color['fg']}`"),
             ("遊戲檔案", "`../game/`(入口 `index.html`)"), ("遊戲畫面比例", ratio_text),
-            ("遊戲橫幅", "`banner.png`(1680×720)")]
+            ("遊戲橫幅", "`banner.png`(1680×720)"), ("色帶圖樣", "`pattern.png`(256×256, 跟主色一組)")]
     text = f"# {info['name']} 素材資訊\n\n| 項目 | 內容 |\n|---|---|\n" + "".join(f"| {k} | {v} |\n" for k, v in rows)
     out = Path(release) / "assets" / "素材資訊.md"
     out.parent.mkdir(parents=True, exist_ok=True)

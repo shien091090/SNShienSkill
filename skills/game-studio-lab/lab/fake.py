@@ -123,7 +123,7 @@ class FakeRunner:
 
     def _release_art(self, ctx, broken):
         opts = Path(ctx["release_dir"]) / "options"
-        for n in ("icon-a", "icon-b", "icon-c", "banner-a", "banner-b", "banner-c"):
+        for n in ("icon-a", "icon-b", "icon-c", "banner-a", "banner-b", "banner-c", "pattern-1", "pattern-2", "pattern-3"):
             if f"{n}.html" != self.drop_option:
                 (opts / f"{n}.html").write_text(f"<!doctype html><title>{n}</title>", encoding="utf-8")
         colors = [{"id": str(i), "bg": bg, "fg": "#2d2144", "note": "假"}

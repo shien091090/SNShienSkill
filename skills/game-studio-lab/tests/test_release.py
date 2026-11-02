@@ -64,7 +64,7 @@ def test_options_page_lists_all(tmp_path):
     (tmp_path / "options").mkdir()
     page = build_options_page(tmp_path, INFO, COLORS).read_text(encoding="utf-8")
     for s in ["圖示 A", "圖示 B", "圖示 C", "主色 1", "主色 2", "主色 3", "橫幅 A", "橫幅 C",
-              "#f29cac", "#4776c3", "#e0c64f", "icon-a.png", "banner-c.png", "幽影接力"]:
+              "#f29cac", "#4776c3", "#e0c64f", "icon-a.png", "banner-c.png", "pattern-3.png", "幽影接力"]:
         assert s in page
     assert "<button" not in page and "<input" not in page
 
@@ -169,8 +169,9 @@ def test_release_pick_finalizes_assets(tmp_path):
     assert "#aaefd5" in (assets / "素材資訊.md").read_text(encoding="utf-8")
     site = json.loads((assets / "info.json").read_text(encoding="utf-8"))
     assert site["code"] == "bubble-catcher" and site["color"] == "#aaefd5" and "device" not in site
-    w = snap.values["release_warnings"]  # 測試用的遊戲是直式 3:4 且沒有觸控: 比例與觸控兩條提醒
-    assert len(w) == 2 and "3:4" in w[0] and "16:9" in w[0] and "觸控" in w[1]
+    w = snap.values["release_warnings"]  # 測試用的遊戲是直式 3:4、沒有觸控, 假繪圖的圖樣是白底: 比例、觸控、圖樣底色三條提醒
+    assert len(w) == 3 and "3:4" in w[0] and "16:9" in w[0] and "觸控" in w[1] and "pattern.png" in w[2] and "#aaefd5" in w[2]
+    assert png_size(assets / "pattern.png") == (256, 256)
     game = rel.project / "release" / "game"   # 定版時加上載入進度條, 接合檢查照樣讀得到程式
     assert "<!-- pvd-loader -->" in (game / "index.html").read_text(encoding="utf-8")
     result = NodeChecker().check(game, "deepen")
@@ -305,3 +306,37 @@ def test_loader_uses_page_background(tmp_path):
     g = _loader_game(tmp_path, '<style>body{background:#222}</style><script src="art/art.js"></script>')
     add_loader(g)
     assert "background:#222;color" in (g / "index.html").read_text(encoding="utf-8")
+
+
+def _tile(path, fn, alpha=False):
+    """用 fn(x, y) -> (r, g, b[, a]) 寫一張 256×256 PNG(每列用不同濾波, 順便測解碼)。"""
+    import struct as st, zlib as zl
+    bpp = 4 if alpha else 3
+    raw = b""
+    for y in range(256):
+        line = b"".join(bytes(fn(x, y)[:bpp]) for x in range(256))
+        f = y % 2  # 0 = 不濾波, 1 = Sub
+        if f == 1:
+            line = bytes((line[i] - (line[i - bpp] if i >= bpp else 0)) & 255 for i in range(len(line)))
+        raw += bytes([f]) + line
+    def chunk(t, b): return st.pack(">I", len(b)) + t + b + st.pack(">I", zl.crc32(t + b))
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", st.pack(">IIBBBBB", 256, 256, 8, 6 if alpha else 2, 0, 0, 0))
+                     + chunk(b"IDAT", zl.compress(raw)) + chunk(b"IEND", b""))
+
+
+def test_pattern_problems(tmp_path):
+    from lab.release import pattern_problems, png_pixels
+    bg = (0xf2, 0x9c, 0xac)
+    dots = lambda x, y: (0xe6, 0x8e, 0x9f) if (x % 64 - 32) ** 2 + (y % 64 - 32) ** 2 < 36 else bg  # 淡點, 64 的倍數會無縫
+    _tile(tmp_path / "ok.png", dots)
+    assert png_pixels(tmp_path / "ok.png")[2][32 * 256 + 32][:3] == (0xe6, 0x8e, 0x9f)
+    assert pattern_problems(tmp_path / "ok.png", "#f29cac") == []
+    assert any("底色" in p for p in pattern_problems(tmp_path / "ok.png", "#4776c3"))
+    _tile(tmp_path / "hi.png", lambda x, y: (0, 0, 0) if x % 8 == 0 else bg)
+    assert any("對比" in p for p in pattern_problems(tmp_path / "hi.png", "#f29cac"))
+    _tile(tmp_path / "seam.png", lambda x, y: (bg[0] - x // 8, bg[1], bg[2]))  # 左到右漸層, 首尾差 31
+    assert any("接縫" in p for p in pattern_problems(tmp_path / "seam.png", "#f29cac"))
+    _tile(tmp_path / "alpha.png", lambda x, y: (*bg, 128 if x < 4 else 255), alpha=True)
+    assert any("透明" in p for p in pattern_problems(tmp_path / "alpha.png", "#f29cac"))
+    write_png(tmp_path / "small.png", 128, 128)
+    assert "尺寸" in pattern_problems(tmp_path / "small.png", "#ffffff")[0]

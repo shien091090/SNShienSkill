@@ -13,7 +13,7 @@ from langgraph.types import Command, interrupt
 
 from lab.graph import LabError
 from lab.loader import add_loader
-from lab.release import (ICON, ICON_IDS, MAX_FILE_MB, BANNER, aspect_ratio, build_options_page,
+from lab.release import (ICON, ICON_IDS, MAX_FILE_MB, BANNER, PATTERN, COLOR_IDS, aspect_ratio, pattern_problems, build_options_page,
                          parse_release_info, parse_release_pick, png_size, prune_release_game, site_rule_warnings,
                          touch_mode, write_asset_info,
                          write_site_info)
@@ -33,7 +33,8 @@ class ReleaseOutput(TypedDict):
     release_warnings: list
 
 
-OPTION_PAGES = [f"icon-{i.lower()}" for i in ICON_IDS] + [f"banner-{i.lower()}" for i in ICON_IDS]
+OPTION_PAGES = ([f"icon-{i.lower()}" for i in ICON_IDS] + [f"banner-{i.lower()}" for i in ICON_IDS]
+                + [f"pattern-{i}" for i in COLOR_IDS])  # 色帶圖樣跟主色一組, 挑主色就連圖樣一起定
 
 
 def build_release_graph(deps, checkpointer=None):
@@ -94,7 +95,7 @@ def build_release_graph(deps, checkpointer=None):
     def art(s: ReleaseState):
         _, _, release = paths(s)
         opts = release / "options"
-        for p in [*opts.glob("icon-*"), *opts.glob("banner-*"), *opts.glob("share-*"), opts / "colors.json"]:
+        for p in [*opts.glob("icon-*"), *opts.glob("banner-*"), *opts.glob("pattern-*"), *opts.glob("share-*"), opts / "colors.json"]:
             p.unlink(missing_ok=True)
         deps.runner.run("release-art", ctx(s))
         missing = [f"{n}.html" for n in OPTION_PAGES if not (opts / f"{n}.html").exists()]
@@ -111,7 +112,7 @@ def build_release_graph(deps, checkpointer=None):
         _, _, release = paths(s)
         opts = release / "options"
         for n in OPTION_PAGES:
-            size = ICON if n.startswith("icon") else BANNER
+            size = ICON if n.startswith("icon") else PATTERN if n.startswith("pattern") else BANNER
             out = opts / f"{n}.png"
             renderer.render(opts / f"{n}.html", out, size)
             if png_size(out) != size:
@@ -141,6 +142,7 @@ def build_release_graph(deps, checkpointer=None):
         assets.mkdir()
         shutil.copyfile(opts / f"icon-{chosen['icon'].lower()}.png", assets / "icon.png")
         shutil.copyfile(opts / f"banner-{chosen['banner'].lower()}.png", assets / "banner.png")
+        shutil.copyfile(opts / f"pattern-{chosen['color']}.png", assets / "pattern.png")
         info_data = json.loads((opts / "info.json").read_text(encoding="utf-8"))
         colors = json.loads((opts / "colors.json").read_text(encoding="utf-8"))
         color = next(c for c in colors if str(c["id"]) == chosen["color"])
@@ -157,6 +159,7 @@ def build_release_graph(deps, checkpointer=None):
                     if p.is_file() and p.stat().st_size > MAX_FILE_MB * 1024 * 1024]
         if not info_data.get("touch"):
             warnings.append("網站版沒有觸控操作, 但網站要求每款遊戲電腦與手機都能玩")
+        warnings += [f"assets/pattern.png {p}" for p in pattern_problems(assets / "pattern.png", color["bg"])]
         warnings += site_rule_warnings(release / "game", info_data["code"])
         return {"release_warnings": warnings}
 
