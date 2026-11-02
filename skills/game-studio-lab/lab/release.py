@@ -18,7 +18,6 @@ BANNER = (1680, 720)  # 網站試玩頁頂端的封面(21:9); 左下角會被遊
 ICON_IDS = ("A", "B", "C")
 COLOR_IDS = ("1", "2", "3")
 MAX_FILE_MB = 25
-DEVICES = {"電腦": "pc", "手機": "mobile"}  # 建議裝置: 發布資訊檔寫中文, info.json 寫網站的值; 每款都要電腦手機都能玩, 這只是建議
 KEEP_MD = {"audio/credits.md"}  # 免費素材的授權來源要跟著遊戲公開, 其他 .md 都是開發文件
 CODE_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
@@ -40,10 +39,7 @@ def parse_release_info(text: str) -> dict:
     code = kv["代號"].strip("`")
     if not CODE_RE.match(code):
         raise ValueError(f"代號「{code}」格式不對: 只能用英文小寫、數字與連字號, 例 dungeon-zoo")
-    device = (kv.get("建議裝置") or "電腦").strip()
-    if device not in DEVICES:
-        raise ValueError(f"建議裝置「{device}」要是 電腦 或 手機")
-    return {"name": kv["名稱"], "code": code, "intro": kv["介紹"], "device": DEVICES[device]}
+    return {"name": kv["名稱"], "code": code, "intro": kv["介紹"]}
 
 
 def parse_release_pick(text: str) -> dict:
@@ -206,7 +202,7 @@ def write_site_info(release: Path, info: dict, color: dict) -> Path:
     """給網站同步工具讀的 assets/info.json(格式見 PVD計畫網站《遊戲發布格式》第三節)。"""
     data = {"code": info["code"], "name": info["name"], "intro": info["intro"],
             "time": re.sub(r"\s*[-~～—]\s*", "–", info.get("time", ""), count=1),
-            "device": info.get("device", "pc"), "color": _hex6(color["bg"]),
+            "color": _hex6(color["bg"]),
             "textColor": "#ffffff" if _hex6(color["fg"]) == "#ffffff" else "#2d2144",
             "ratio": info.get("ratio", "未知")}
     data["mobileRatio"] = info.get("mobile_ratio") or data["ratio"]
@@ -224,7 +220,7 @@ def write_asset_info(release: Path, info: dict, color: dict) -> Path:
         ratio_text = f"電腦 {ratio_text}; 手機依螢幕 {info['mobile_ratio'].replace('-', '～')}"
     fg = "白色字" if color["fg"].lower() in ("#fff", "#ffffff") else "深色字"
     rows = [("遊戲代號", f"`{info['code']}`"), ("遊戲名稱", info["name"]), ("遊戲圖示", "`icon.png`(512×512)"),
-            ("遊戲介紹", info["intro"]), ("遊玩時長", time), ("建議裝置", "手機" if info.get("device") == "mobile" else "電腦"),
+            ("遊戲介紹", info["intro"]), ("遊玩時長", time),
             ("遊戲主色", f"`{color['bg']}`, 字用{fg} `{color['fg']}`"),
             ("遊戲檔案", "`../game/`(入口 `index.html`)"), ("遊戲畫面比例", ratio_text),
             ("遊戲橫幅", "`banner.png`(1680×720)")]

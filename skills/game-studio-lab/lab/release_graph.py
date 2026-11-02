@@ -84,7 +84,7 @@ def build_release_graph(deps, checkpointer=None):
         iface_path = release / "interface.json"
         iface = json.loads(iface_path.read_text(encoding="utf-8")) if iface_path.exists() else {}
         ratio, is_site, mobile_ratio = aspect_ratio(iface)
-        data.update({k: c[k] for k in ("name", "code", "intro", "device")})
+        data.update({k: c[k] for k in ("name", "code", "intro")})
         # touch: 網站版有沒有觸控操作(直式遊戲 mode 是 none); 網站要求每款都能在手機玩, 沒有就在定版時提醒
         data.update({"ratio": ratio, "ratio_site": is_site, "mobile_ratio": mobile_ratio,
                      "touch": touch_mode(release / "game") in ("keys", "mouse")})
