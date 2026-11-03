@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(.venv/Scripts/python -m lab *)"
+      "Bash(.venv/Scripts/python -m lab *)",
+      "Bash(PYTHONIOENCODING=utf-8 python -W ignore D:/Git/lobby-agent-client/Skills/Lobby/LobbySetting/backstage-lobby-setting/scripts/lobby_setting.py:*)",
+      "Bash(python -W ignore D:/Git/lobby-agent-client/Skills/Lobby/LobbySetting/backstage-lobby-setting/scripts/lobby_setting.py:*)"
     ],
     "defaultMode": "auto"
   },
