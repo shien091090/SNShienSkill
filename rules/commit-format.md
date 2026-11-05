@@ -66,5 +66,5 @@ push 時:
 
 ## 專案別例外: 不加 `[前綴]`
 
-- `D:\Git\lobby-agent-client`: `[{Skill中文名}] [{次要功能,非必要}] {內容}`, 系統名放該次改動所屬 skill 的中文名(如 `[拆解模塊]`), 不加 `[Skill]` 分類標籤
+- `D:\Git\lobby-agent-client`: `[{Skill中文名}] [{次要功能,非必要}] {內容}`, 系統名放該次改動所屬 skill 的中文名(如 `[拆解模塊]`), 不加 `[Skill]` 分類標籤。skill 中文名沒有文件記錄, 以該 skill 目錄最近一筆 commit 的寫法為準(`git log -1 --format=%s -- <skill 目錄>`), 不從更舊的 commit 抄, 改名後才不會被舊名字蓋回去
 - `D:\Git\808_Lobby_6000\aiToolLib`: `[{規範中文名}] {內容}`(如 `[Unit Test規範]`), 這個 repo 歷史本來就無前綴

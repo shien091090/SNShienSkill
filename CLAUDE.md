@@ -2,9 +2,17 @@
 
 全域使用者指示。位於 `~/.claude/CLAUDE.md`, 每個 session 都會載入, 且隨這個 repo 同步到所有裝置。細則拆在 `~/.claude/rules/`, 這裡只放指標。
 
+## 回覆語言
+
+一律用繁體中文回覆, 包含工作回報與結論; 程式碼、指令、檔名維持原文。
+
 ## Memory 政策
 
 auto-memory 只記一種東西: **進行中、跨 session 要接、且不是在建置 skill 的工作**(`project_*.md`, 必帶 `done_when`)。使用者糾正、路徑、偏好一律不進 memory, 該去 rule 或 skill。做完即刪, 不等提醒。完整規則與 skill 汙染清查流程見 `~/.claude/rules/memory-policy.md`。
+
+## 個人待辦
+
+使用者的個人待辦存在 `~/.claude/TODO.md`, 一筆一行 `- [ ] 內容 (YYYY-MM-DD)`。使用者說「記 todo / 加到待辦」就加在最後, 說「XX 做完了」就刪掉那行(不留打勾); 改完只 commit 這個檔。儀表板的快捷按鈕「Todo」也是讀寫同一份。
 
 ## Commit 規範
 

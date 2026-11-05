@@ -55,3 +55,6 @@ __pycache__/
 
 # dad-chat 的個人資料(家人文字、聊天記憶), 只留本機
 /skills/dad-chat/data/
+
+# fal-generate 的本機設定(存檔路徑、上次輸出), 只留本機
+/skills/fal-generate/config.json
