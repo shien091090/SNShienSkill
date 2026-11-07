@@ -4,6 +4,7 @@
 - `$game_dir/spec.md`、`$game_dir/guide.md`(探索 / 深掘才有)
 - `$game_dir/interface.json` — **繪圖介面**: 美術正在同時照它畫, 你照它呼叫
 - `$studio_refs/rd-lessons.md` — RD 經驗文件
+- spec.md 或 interface.json 指名要參考 / 照搬的檔(例: 回饋附上、老闆看過的示意頁), 有就讀; 跟規格有出入時以規格為準
 
 ## 要做的事
 實作 `$game_dir/game/index.html` 與 `$game_dir/game/game.js`(可加 `style.css`)。

@@ -5,6 +5,7 @@
 - `$game_dir/interface.json` — **繪圖介面, 不可更改**
 - `$studio_refs/art-lessons.md` — 美術經驗文件(設計理念與經驗兩層)
 - `$game_dir/game/art/style.md` 與 `art.js`(打磨階段才會有, 是上一版的美術; 有就沿用它的視覺語言, 只改規格變動牽涉的物件)
+- spec.md 或 interface.json 指名要參考 / 照搬的檔(例: 回饋附上、老闆看過的示意頁), 有就讀; 跟介面文字有出入時以介面為準, 在 style.md 寫明
 
 ## 要做的事
 產出 `$game_dir/game/art/art.js` 與 `$game_dir/game/art/style.md`。
