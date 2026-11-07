@@ -36,7 +36,7 @@
    - `diagonal()`: 哪些畫面方向鍵可以斜走(角色自由移動的場景); `drawIcon`: 第三鍵圖示, 簡單幾何畫出該鍵的主要動作
    - `setAudioPaused(paused)`: 暫停時整個聲音靜音, 繼續時還原成遊戲自己的靜音設定(不動遊戲的靜音開關); `initAudio()`: 做遊戲第一次輸入時的聲音初始化
    - `escPause`: 遊戲自己沒有 Esc 暫停 → true(共同守則的通用鍵, 由觸控層提供); 已有 → false
-   - game.js 掛鉤子(兩份): 鍵盤遊戲的鍵盤輸入要走全域 `inputDown(鍵名)` / `inputUp(鍵名)` / `inputReset()`(沒有就把現有的按鍵處理整理成這三個), `inputDown` 開頭 `if (window.PVDX && PVDX.paused) return;`; 每幀 `if (!(window.PVDX && PVDX.paused)) update(dt);`, 畫完 `if (window.PVDX) PVDX.draw(ctx);`; 真的過關、進結算畫面那一刻呼叫 `if (window.PVDX) PVDX.levelClear(第幾關);`(關卡從 1 起; 失敗、重試、從選單重來、放棄都不送; 重玩已過的關照常送), 最後一關過關時緊接著 `PVDX.gameClear();`(先單關後全局); 同一個時間點只送一次, 不放每幀或重複進結算畫面會再跑的地方。沒有分關的遊戲, 玩到結局才算通關, 送 `levelClear(1)` 再 `gameClear()`
+   - game.js 掛鉤子(兩份): 鍵盤遊戲的鍵盤輸入要走全域 `inputDown(鍵名)` / `inputUp(鍵名)` / `inputReset()`(沒有就把現有的按鍵處理整理成這三個), `inputDown` 開頭 `if (window.PVDX && PVDX.paused) return;`; 每幀 `if (!(window.PVDX && PVDX.paused)) update(dt);`, 畫完 `if (window.PVDX) PVDX.draw(ctx);`; 真的過關、進結算畫面那一刻呼叫 `if (window.PVDX) PVDX.levelClear(第幾關);`(關卡從 1 起; 失敗、重試、從選單重來、放棄都不送; 重玩已過的關照常送), 最後一關過關時緊接著 `PVDX.gameClear();`(先單關後全局); 同一個時間點只送一次, 不放每幀或重複進結算畫面會再跑的地方。沒有分關的遊戲, 玩到結局才算通關, 送 `levelClear(1)` 再 `gameClear()`; 生存制、沒有全破的遊戲(玩到死為止), 進到下一關時送剛過完那關的 `levelClear`, 死掉出現結算畫面時只送 `gameClear()`(死掉那關沒過, 不送單關)
    - 手機字級下限: 觸控模式下照 `$studio_refs/screen-width.md`「版面要顧的」的手機字級下限放大字與小圖示(art.js 與 game.js 兩份), 電腦版不動
    - 手機不放任何聲音按鈕或暫停按鈕(靜音、音量交給手機本身); 遊戲畫面上的聲音開關圖示在觸控模式(`PVDX.on`)不畫
 7. **儲存與上層頁面**(兩份都改; 規範在 PVD計畫網站 repo 的 `docs/遊戲接入規範.md` 第一節與第四節第 4 點; 所有遊戲和網站共用同一份瀏覽器儲存):
