@@ -26,8 +26,8 @@
    - 不改玩法與數值: 遊戲區、判定範圍維持原大小
    - 直式畫面(高大於寬)不改, 在回報寫明「直式, 網站會加寬邊, 要改橫式需另外討論」
 5. **畫布等比縮放**(兩份都查): 畫布要跟著容器(網站 iframe 或視窗)等比縮放並置中, 不裁切、不拉伸; 不假設視窗大小、不寫死畫布的 CSS 像素尺寸; 依 devicePixelRatio 放大實際像素, resize 與 orientationchange 時重算; 滑鼠 / 觸控座標用 `getBoundingClientRect` 換回邏輯座標。不符合就改
-6. **觸控層與網站訊息**(兩份都做): 讓手機能玩, 並接上 PVD計畫網站的暫停 / 繼續 / 玩完一局訊息。
-   - `touch.js` 不存在 → 把 `$studio_refs/touch-template.js` 原樣複製成 `$release_dir/game/touch.js` 與 `$src_dir/game/touch.js`, **只改開頭的 `CONFIG`**, 不改範本其他部分; 已存在(上一次發布加過)→ 保留, 只依這輪打磨的改動更新 `CONFIG`(新畫面、新按鍵)。兩份內容一致
+6. **觸控層與網站訊息**(兩份都做): 讓手機能玩, 並接上 PVD計畫網站的暫停 / 繼續 / 通關通知(單關通關、全局通關)。
+   - `touch.js` 不存在 → 把 `$studio_refs/touch-template.js` 原樣複製成 `$release_dir/game/touch.js` 與 `$src_dir/game/touch.js`, **只改開頭的 `CONFIG`**, 不改範本其他部分; 已存在(上一次發布加過)→ 保留, 只依這輪打磨的改動更新 `CONFIG`(新畫面、新按鍵); 但既有的 `touch.js` 還沒有 `PVDX.levelClear`(通關通知改版前發布的)時, 用範本的「通關通知」段落換掉舊的 `PVDX.finish` 段落, 並一併更新開頭說明註解與 `PVDX` 預設物件, 兩份 game.js 裡的 `PVDX.finish()` 改成下面的過關與全部通關呼叫。兩份內容一致
    - `index.html` 在 `game.js` 之後載入 `touch.js`
    - `CONFIG.mode`: 鍵盤遊戲 `keys`; 滑鼠遊戲 `mouse`(點擊即觸控, 不畫按鈕; 遊戲聽 mouse / click 事件時 `mouseEvents: true`, 只聽 pointer 事件時 false); 直式遊戲 `none`(不做觸控, 只做網站訊息與 Esc 暫停)
    - `keys`: 方向鍵與 A(Z)/ B(X)/ 第三鍵(空白鍵)/ 功能鍵 d 對應到 game.js 的鍵名, 遊戲用不到的鍵設 null; 遊戲有電腦版靠額外按鍵開的功能(例: C 開圖鑑)就接到 d, `drawIconD` 畫該功能的圖示; B 與第三鍵永遠不會同時有用時設 `shareBC: true` 共用一格。`keycaps`: 遊戲裡畫鍵帽時 fillText 的字(先 grep art.js 與 game.js 確認鍵帽字串, 例 'Z'、'空白'), 換成 A / B / 第三鍵圖示
@@ -36,7 +36,7 @@
    - `diagonal()`: 哪些畫面方向鍵可以斜走(角色自由移動的場景); `drawIcon`: 第三鍵圖示, 簡單幾何畫出該鍵的主要動作
    - `setAudioPaused(paused)`: 暫停時整個聲音靜音, 繼續時還原成遊戲自己的靜音設定(不動遊戲的靜音開關); `initAudio()`: 做遊戲第一次輸入時的聲音初始化
    - `escPause`: 遊戲自己沒有 Esc 暫停 → true(共同守則的通用鍵, 由觸控層提供); 已有 → false
-   - game.js 掛鉤子(兩份): 鍵盤遊戲的鍵盤輸入要走全域 `inputDown(鍵名)` / `inputUp(鍵名)` / `inputReset()`(沒有就把現有的按鍵處理整理成這三個), `inputDown` 開頭 `if (window.PVDX && PVDX.paused) return;`; 每幀 `if (!(window.PVDX && PVDX.paused)) update(dt);`, 畫完 `if (window.PVDX) PVDX.draw(ctx);`; 一局結束的時間點(打磨版下載試玩紀錄的那一刻)呼叫 `if (window.PVDX) PVDX.finish();`
+   - game.js 掛鉤子(兩份): 鍵盤遊戲的鍵盤輸入要走全域 `inputDown(鍵名)` / `inputUp(鍵名)` / `inputReset()`(沒有就把現有的按鍵處理整理成這三個), `inputDown` 開頭 `if (window.PVDX && PVDX.paused) return;`; 每幀 `if (!(window.PVDX && PVDX.paused)) update(dt);`, 畫完 `if (window.PVDX) PVDX.draw(ctx);`; 真的過關、進結算畫面那一刻呼叫 `if (window.PVDX) PVDX.levelClear(第幾關);`(關卡從 1 起; 失敗、重試、從選單重來、放棄都不送; 重玩已過的關照常送), 最後一關過關時緊接著 `PVDX.gameClear();`(先單關後全局); 同一個時間點只送一次, 不放每幀或重複進結算畫面會再跑的地方。沒有分關的遊戲, 玩到結局才算通關, 送 `levelClear(1)` 再 `gameClear()`
    - 手機字級下限: 觸控模式下照 `$studio_refs/screen-width.md`「版面要顧的」的手機字級下限放大字與小圖示(art.js 與 game.js 兩份), 電腦版不動
    - 手機不放任何聲音按鈕或暫停按鈕(靜音、音量交給手機本身); 遊戲畫面上的聲音開關圖示在觸控模式(`PVDX.on`)不畫
 7. **儲存與上層頁面**(兩份都改; 規範在 PVD計畫網站 repo 的 `docs/遊戲接入規範.md` 第一節與第四節第 4 點; 所有遊戲和網站共用同一份瀏覽器儲存):
@@ -49,4 +49,4 @@
 9. 用 Node vm + 假 canvas 自測兩份遊戲載入與開局不拋錯, 並確認網站版找不到任何下載(`download`、`createObjectURL`、`a.click`)的呼叫; grep 兩份確認儲存鍵名都是 `$code:` 開頭、沒有 `.clear(`、`window.top`、`window.open`、改網址的寫法; 觸控層用 `?touch=1` 等效的設定(假 location.search)載入, 確認 `PVDX.draw` 每個畫面都不拋錯、模擬 pvd:pause 後遊戲不前進
 
 ## 回報
-移除了哪些東西、名稱改在哪(兩份都要寫)、有沒有寫 interface.json、畫面比例怎麼改(設計區怎麼置中、觸控層版面有沒有更新)、縮放怎麼做、觸控層設定(mode、各畫面顯示哪些按鈕、為了按鈕移開了哪些資訊、斜走的畫面、第三鍵圖示)、一局結束掛在哪、儲存鍵名改了哪些(舊名 → 新名, 怎麼搬舊值)與拿掉的上層頁面寫法、自測結果。
+移除了哪些東西、名稱改在哪(兩份都要寫)、有沒有寫 interface.json、畫面比例怎麼改(設計區怎麼置中、觸控層版面有沒有更新)、縮放怎麼做、觸控層設定(mode、各畫面顯示哪些按鈕、為了按鈕移開了哪些資訊、斜走的畫面、第三鍵圖示)、單關通關 / 全局通關各掛在哪(第幾關怎麼算、最後一關是否兩種都送)、儲存鍵名改了哪些(舊名 → 新名, 怎麼搬舊值)與拿掉的上層頁面寫法、自測結果。

@@ -259,6 +259,17 @@ def test_site_rule_warnings(tmp_path):
     assert site_rule_warnings(tmp_path, "ghost-echo") == []
 
 
+def test_site_rule_warnings_clear_notice(tmp_path):
+    # 有觸控層時: 舊的玩完一局通知要警告, 沒呼叫單關 / 全局通關也要警告; touch.js 自己的說明不算呼叫
+    (tmp_path / "touch.js").write_text("/* 過關 `PVDX.levelClear(第幾關);` 再 `PVDX.gameClear();` */ PVDX.levelClear = function (l) {};", encoding="utf-8")
+    (tmp_path / "game.js").write_text("if (window.PVDX) PVDX.finish();", encoding="utf-8")
+    w = site_rule_warnings(tmp_path, "ghost-echo")
+    assert any("舊的" in x and "game.js" in x for x in w)
+    assert any("levelClear" in x for x in w) and any("gameClear" in x for x in w)
+    (tmp_path / "game.js").write_text("if (window.PVDX && win) { PVDX.levelClear(G.level); if (G.level === 4) PVDX.gameClear(); }", encoding="utf-8")
+    assert site_rule_warnings(tmp_path, "ghost-echo") == []
+
+
 # ---- 載入進度條 ----
 NL = chr(10)
 

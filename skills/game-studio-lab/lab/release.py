@@ -224,11 +224,16 @@ SITE_FORBIDDEN = [(re.compile(r"\b(?:localStorage|sessionStorage)\.clear\s*\("),
                   (re.compile(r"\bwindow\.open\s*\("), "開新視窗"),
                   (re.compile(r"\blocation\.(?:href\s*=(?!=)|assign\s*\(|replace\s*\(|reload\s*\()"), "改網址或重新載入")]
 
+# 通關通知(接入規範第三節): 觸控層提供, 遊戲在過關 / 全部通關時呼叫; touch.js 自己的說明註解不算呼叫
+OLD_FINISH_RE = re.compile(r"\bPVDX\.finish\b|['\"]pvd:finish['\"]")
+CLEAR_CALLS = [("levelClear", re.compile(r"\bPVDX\.levelClear\s*\(")), ("gameClear", re.compile(r"\bPVDX\.gameClear\s*\("))]
+CLEAR_NAMES = {"levelClear": "單關通關", "gameClear": "全局通關"}
+
 
 def site_rule_warnings(game: Path, code: str) -> list[str]:
     """掃網站版程式, 列出違反接入規範的寫法(只抓字面上看得出來的; 動態組出的鍵名靠 RD 自測)。"""
     game = Path(game)
-    out = []
+    out, calls = [], set()
     for p in sorted([*game.rglob("*.js"), *game.rglob("*.html")]):
         rel = p.relative_to(game).as_posix()
         text = p.read_text(encoding="utf-8", errors="ignore")
@@ -239,6 +244,14 @@ def site_rule_warnings(game: Path, code: str) -> list[str]:
         for rx, what in SITE_FORBIDDEN:
             if rx.search(text):
                 out.append(f"{rel} 有{what}的寫法(接入規範不允許)")
+        if OLD_FINISH_RE.search(text):
+            out.append(f"{rel} 還有舊的「玩完一局」通知(PVDX.finish / pvd:finish), 網站已改收單關通關與全局通關")
+        if p.name != "touch.js":
+            calls |= {name for name, rx in CLEAR_CALLS if rx.search(text)}
+    if (game / "touch.js").exists():
+        for name, rx in CLEAR_CALLS:
+            if name not in calls:
+                out.append(f"遊戲程式沒有呼叫 PVDX.{name}(), 網站收不到{CLEAR_NAMES[name]}通知")
     return list(dict.fromkeys(out))
 
 

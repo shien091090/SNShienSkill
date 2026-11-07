@@ -6,10 +6,11 @@
      鍵盤遊戲 → 畫面上層畫虛擬按鈕, 輸入走遊戲的 inputDown / inputUp(和鍵盤同一條路徑), 鍵帽字換成手機版;
      滑鼠遊戲 → 不畫按鈕, 點擊就等於觸控(需要時把觸控轉成滑鼠事件), 遊戲區拖曳不捲動頁面;
      直拿手機時蓋提示並暫停。手機不放任何聲音按鈕, 交給手機本身的靜音與音量
-   - 電腦與手機都有: 收 pvd:pause / pvd:resume 暫停 / 繼續(含音效)、Esc 暫停(CONFIG.escPause)、PVDX.finish() 通知網站玩完一局
+   - 電腦與手機都有: 收 pvd:pause / pvd:resume 暫停 / 繼續(含音效)、Esc 暫停(CONFIG.escPause)、PVDX.levelClear(level) / PVDX.gameClear() 通知網站單關通關 / 全局通關
    遊戲要掛的鉤子(設計見 game-studio-lab docs/2026-10-31-release-mobile-design.md):
      每幀 `if (!(window.PVDX && PVDX.paused)) update(dt);`, 畫完 `if (window.PVDX) PVDX.draw(ctx);`;
-     一局結束 `if (window.PVDX) PVDX.finish();`;
+     真的過關時 `if (window.PVDX) PVDX.levelClear(第幾關);`(失敗、重試、放棄不送), 全部通關再接 `PVDX.gameClear();`(先單關後全局);
+     同一個時間點只送一次: 放在進結算畫面那一刻, 不放每幀或畫面重繪;
      鍵盤遊戲另有全域 inputDown(k) / inputUp(k) / inputReset(), inputDown 開頭 `if (window.PVDX && PVDX.paused) return;` */
 (function () {
   // ───────── 每款遊戲要改的設定 ─────────
@@ -70,7 +71,7 @@
   var ON = CONFIG.mode !== 'none' && (forced || coarse || (hasTouch && !hover));
   var KEYS = CONFIG.mode === 'keys';
 
-  var PVDX = { on: ON, paused: false, held: {}, draw: function () { }, finish: function () { } };
+  var PVDX = { on: ON, paused: false, held: {}, draw: function () { }, levelClear: function () { }, gameClear: function () { } };
   window.PVDX = PVDX;
   function call(fn, arg) { try { fn(arg); } catch (e) { console.error(e); } }
 
@@ -190,10 +191,12 @@
     }, true);
   });
 
-  // 玩完一局: 通知上層網站(不在 iframe 裡就不送)
-  PVDX.finish = function () {
-    try { if (window.parent && window.parent !== window) window.parent.postMessage({ type: 'pvd:finish' }, location.origin); } catch (e) { /* 本機 file:// 開啟時略過 */ }
-  };
+  // 通關通知: 上層網站計算各關與全部通關時間(不在 iframe 裡就不送)
+  function post(msg) {
+    try { if (window.parent && window.parent !== window) window.parent.postMessage(msg, location.origin); } catch (e) { /* 本機 file:// 開啟時略過 */ }
+  }
+  PVDX.levelClear = function (level) { post({ type: 'pvd:level-clear', level: level }); };   // level: 第幾關, 從 1 起
+  PVDX.gameClear = function () { post({ type: 'pvd:game-clear' }); };
 
   // ───────── 觸控模式 ─────────
   var held = {}, cur = {}, touches = {};   // held: 目前要按住的鍵; cur: 已經送進遊戲的; touches: id → {x, y}(邏輯座標)

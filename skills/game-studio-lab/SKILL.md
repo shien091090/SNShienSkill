@@ -15,7 +15,7 @@ description: 遊戲玩法驗證流水線(LangGraph), 一次做多款試玩版、
 
 ## 指令
 
-一律在 skill 資料夾下執行(`-m lab` 才找得到套件):
+一律在本 SKILL.md 所在的資料夾下執行(`-m lab` 才找得到套件; 下面以預設位置為例):
 
 ```
 cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> ...
@@ -33,7 +33,7 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 
 - `.venv` 不存在(新機器)→ 先 `python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`
 - `start` / `resume` 一輪要跑幾十分鐘: **一律用 Bash 的 run_in_background 執行**, 完成時會收到通知, 不要輪詢。等待期間告訴使用者大概要等多久即可
-- stdout 最後一行是狀態 JSON, `status` 有六種: `waiting_feedback`、`build_failed`、`waiting_release_pick`、`done`、`error`、`paused`; `warnings` 非空(例如 push 失敗)要原文轉告使用者
+- stdout 最後一行是狀態 JSON, `status` 可能是: `waiting_feedback`、`build_failed`、`waiting_release_pick`、`done`、`error`、`paused`; `warnings` 非空(例如 push 失敗)要原文轉告使用者
 
 ## 開場
 
@@ -95,7 +95,7 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 
 畫面比例: 設計時畫布固定; 發布時 RD 把網站版與打磨版都改成寬度依裝置, 尺寸與做法只寫在 `references/screen-width.md`(直式不改, 會出現在 `warnings`)。網站版會自動清掉開發文件與沒載入的程式(網站同步工具會擋)。
 
-手機與網站訊息: 發布時 RD 從 `references/touch-template.js` 加觸控層 `touch.js`(網站版與打磨版兩份): 鍵盤遊戲疊虛擬按鈕、滑鼠遊戲點擊即觸控、直式遊戲不做觸控; 直拿手機自動暫停; 接網站的暫停 / 繼續與玩完一局訊息; 遊戲沒有 Esc 暫停時由它提供。觸控模式下字與小圖示放大到手機字級下限(`references/screen-width.md`)。手機不放任何聲音或暫停按鈕(交給手機本身)。之後再打磨時設計與 RD 不管手機, 只是不能弄壞 `touch.js`; 下次發布 RD 會補新畫面的按鈕設定。網站要求每款電腦與手機都能玩, 網站版沒有觸控操作時定版會提醒。設計見 `docs/2026-10-31-release-mobile-design.md`。
+手機與網站訊息: 發布時 RD 從 `references/touch-template.js` 加觸控層 `touch.js`(網站版與打磨版兩份): 鍵盤遊戲疊虛擬按鈕、滑鼠遊戲點擊即觸控、直式遊戲不做觸控; 直拿手機自動暫停; 接網站的暫停 / 繼續與通關通知(真的過關送單關通關, 全部過完再送全局通關); 遊戲沒有 Esc 暫停時由它提供。觸控模式下字與小圖示放大到手機字級下限(`references/screen-width.md`)。手機不放任何聲音或暫停按鈕(交給手機本身)。之後再打磨時設計與 RD 不管手機, 只是不能弄壞 `touch.js`; 下次發布 RD 會補新畫面的按鈕設定。網站要求每款電腦與手機都能玩, 網站版沒有觸控操作時定版會提醒。設計見 `docs/2026-10-31-release-mobile-design.md`。
 
 儲存與上層頁面: 發布時 RD 把兩份的儲存鍵名改成「遊戲代號:用途」(搬舊值)、拿掉清空儲存與碰上層頁面 / 開新視窗 / 改網址的寫法; 定版時再掃一次網站版, 字面上看得出來的違規列進 `warnings`。
 

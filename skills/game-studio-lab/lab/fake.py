@@ -110,6 +110,7 @@ class FakeRunner:
         if self.touch:  # 照發布任務: 範本複製成 touch.js、改 CONFIG.mode、index.html 在 game.js 之後載入
             tpl = (STUDIO_REFS / "touch-template.js").read_text(encoding="utf-8")
             (release / "game" / "touch.js").write_text(tpl.replace("mode: 'keys',", f"mode: '{self.touch}',", 1), encoding="utf-8")
+            p.write_text(p.read_text(encoding="utf-8") + "if (window.PVDX) { PVDX.levelClear(1); PVDX.gameClear(); }\n", encoding="utf-8")  # 通關通知鉤子
             idx = release / "game" / "index.html"
             idx.write_text(idx.read_text(encoding="utf-8").replace(
                 '<script src="game.js"></script>', '<script src="game.js"></script>\n<script src="touch.js"></script>'), encoding="utf-8")
