@@ -169,8 +169,13 @@ def test_standalone_release_flow(bubble, capsys):
     assets = bubble["project"] / "release" / "assets"
     assert (assets / "icon.png").exists() and (assets / "素材資訊.md").exists()
     assert remote_log(bubble["remote"])[0] == "[feat] [WebGame_Bubble] 發布素材定版"
-    # 再發布一次: 停在挑選頁時舊的定版素材還在
+    # 再發布一次: 預設沿用上次定版的素材, 不停在挑選頁
+    icon = (assets / "icon.png").read_bytes()
     code, out = call(capsys, "release", bubble["project"], "--info", info)
+    assert out["status"] == "done" and (assets / "icon.png").read_bytes() == icon, out
+    # 寫明素材重做: 停在挑選頁時舊的定版素材還在
+    redo = write(bubble["project"] / "release-info.md", INFO + "素材: 重做\n")
+    code, out = call(capsys, "release", bubble["project"], "--info", redo)
     assert out["status"] == "waiting_release_pick" and (assets / "icon.png").exists()
     tracked = subprocess.run(["git", "ls-files"], cwd=bubble["project"], capture_output=True, text=True,
                              encoding="utf-8").stdout

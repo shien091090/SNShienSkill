@@ -1,5 +1,8 @@
 """發布子圖: 遊戲複本 → 素材資訊 → 美術方案 → 輸出 PNG + 選擇頁 → 等使用者挑選 → 定版。
 
+已經發布過(release/assets 留有上次定版的圖示 / 橫幅 / 圖樣)時預設沿用, 素材資訊後直接定版, 不出方案;
+發布資訊檔寫「素材: 重做」才重新出方案讓使用者挑。
+
 打磨停點選 release 時掛在主圖底下跑; 非 lab 專案(例: 捕泡手)由 `lab release` 指令單獨編譯。
 只有 pick 會停下來等人(interrupt)。
 """
@@ -14,7 +17,7 @@ from langgraph.types import Command, interrupt
 from lab.graph import LabError
 from lab.loader import add_loader
 from lab.release import (ICON, ICON_IDS, MAX_FILE_MB, BANNER, PATTERN, COLOR_IDS, aspect_ratio, pattern_problems, build_options_page,
-                         parse_release_info, parse_release_pick, png_size, prune_release_game, site_rule_warnings,
+                         parse_release_info, parse_release_pick, png_size, previous_assets, prune_release_game, site_rule_warnings,
                          touch_mode, write_asset_info,
                          write_site_info)
 from lab.renderer import ChromeRenderer
@@ -25,7 +28,7 @@ class ReleaseState(TypedDict, total=False):
     round_dir: str
     feedback: str        # 發布資訊檔(名稱 / 代號 / 介紹)
     standalone: bool     # True: 非 lab 專案, 遊戲在 <project>/game/
-    pick: dict           # 使用者挑的方案 {"icon", "color", "banner"}
+    pick: dict           # 使用者挑的方案 {"icon", "color", "banner"}, 或沿用上次 {"reuse": True}
     release_warnings: list
 
 
@@ -90,7 +93,9 @@ def build_release_graph(deps, checkpointer=None):
         data.update({"ratio": ratio, "ratio_site": is_site, "mobile_ratio": mobile_ratio,
                      "touch": touch_mode(release / "game") in ("keys", "mouse")})
         out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
-        return {}
+        if not c["redo_art"] and previous_assets(release):
+            return Command(goto="finalize", update={"pick": {"reuse": True}})
+        return Command(goto="art")
 
     def art(s: ReleaseState):
         _, _, release = paths(s)
@@ -137,15 +142,20 @@ def build_release_graph(deps, checkpointer=None):
         _, _, release = paths(s)
         opts, assets = release / "options", release / "assets"
         chosen = s["pick"]
-        if assets.exists():
-            shutil.rmtree(assets)
-        assets.mkdir()
-        shutil.copyfile(opts / f"icon-{chosen['icon'].lower()}.png", assets / "icon.png")
-        shutil.copyfile(opts / f"banner-{chosen['banner'].lower()}.png", assets / "banner.png")
-        shutil.copyfile(opts / f"pattern-{chosen['color']}.png", assets / "pattern.png")
         info_data = json.loads((opts / "info.json").read_text(encoding="utf-8"))
-        colors = json.loads((opts / "colors.json").read_text(encoding="utf-8"))
-        color = next(c for c in colors if str(c["id"]) == chosen["color"])
+        if chosen.get("reuse"):   # 沿用上次定版的圖片, 只重寫兩份素材資訊(名稱、介紹、時長可能改了)
+            color = previous_assets(release)
+            if color is None:
+                raise LabError("要沿用上次的素材, 但 release/assets 缺 icon.png / banner.png / pattern.png 或讀不到主色; 改挑方案代號")
+        else:
+            if assets.exists():
+                shutil.rmtree(assets)
+            assets.mkdir()
+            shutil.copyfile(opts / f"icon-{chosen['icon'].lower()}.png", assets / "icon.png")
+            shutil.copyfile(opts / f"banner-{chosen['banner'].lower()}.png", assets / "banner.png")
+            shutil.copyfile(opts / f"pattern-{chosen['color']}.png", assets / "pattern.png")
+            colors = json.loads((opts / "colors.json").read_text(encoding="utf-8"))
+            color = next(c for c in colors if str(c["id"]) == chosen["color"])
         write_asset_info(release, info_data, color)
         write_site_info(release, info_data, color)
         try:
@@ -166,10 +176,9 @@ def build_release_graph(deps, checkpointer=None):
     g = StateGraph(ReleaseState, output_schema=ReleaseOutput)
     for name, fn in [("game", game), ("info", info), ("art", art), ("render", render), ("pick", pick),
                      ("finalize", finalize)]:
-        g.add_node(name, fn)
+        g.add_node(name, fn, destinations=("art", "finalize") if name == "info" else None)
     g.add_edge(START, "game")
     g.add_edge("game", "info")
-    g.add_edge("info", "art")
     g.add_edge("art", "render")
     g.add_edge("render", "pick")
     g.add_edge("finalize", END)

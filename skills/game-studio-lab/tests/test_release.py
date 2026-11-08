@@ -27,7 +27,7 @@ COLORS = [{"id": "1", "bg": "#f29cac", "fg": "#2d2144", "note": "粉"},
 
 def test_parse_release_info_ok():
     got = parse_release_info("名稱: 幽影接力\n代號：ghost-echo\n介紹: 和過去的自己接力闖關。\n")
-    assert got == {"name": "幽影接力", "code": "ghost-echo", "intro": "和過去的自己接力闖關。"}
+    assert got == {"name": "幽影接力", "code": "ghost-echo", "intro": "和過去的自己接力闖關。", "redo_art": False}
 
 
 @pytest.mark.parametrize("text,word", [
@@ -351,3 +351,49 @@ def test_pattern_problems(tmp_path):
     assert any("透明" in p for p in pattern_problems(tmp_path / "alpha.png", "#f29cac"))
     write_png(tmp_path / "small.png", 128, 128)
     assert "尺寸" in pattern_problems(tmp_path / "small.png", "#ffffff")[0]
+
+
+# ---- 再次發布: 預設沿用上次定版的圖示 / 橫幅 / 圖樣 ----
+def _released(tmp_path):
+    rel = Rel(tmp_path)
+    rel.start()
+    rel.pick()
+    (rel.project / ".lab" / "release.sqlite").unlink()   # 下一次發布是新的一趟
+    return rel
+
+
+def test_rerelease_reuses_previous_assets(tmp_path):
+    rel = _released(tmp_path)
+    assets = rel.project / "release" / "assets"
+    before = {n: (assets / n).read_bytes() for n in ("icon.png", "banner.png", "pattern.png")}
+    rel.info.write_text("名稱: 捕泡手\n代號: bubble-catcher\n介紹: 跟著節拍戳泡泡吧。\n", encoding="utf-8")
+    snap, err = rel.start()
+    assert err is None and not snap.next and not snap.interrupts   # 不停在挑選
+    assert calls(rel.runner, "release-art") == 1                    # 只有第一次發布做過方案
+    assert {n: (assets / n).read_bytes() for n in before} == before
+    site = json.loads((assets / "info.json").read_text(encoding="utf-8"))
+    assert site["intro"] == "跟著節拍戳泡泡吧。" and site["color"] == "#aaefd5"
+
+
+def test_rerelease_redo_art_when_asked(tmp_path):
+    rel = _released(tmp_path)
+    rel.info.write_text("名稱: 捕泡手\n代號: bubble-catcher\n介紹: 跟著節拍戳泡泡。\n素材: 重做\n", encoding="utf-8")
+    snap, err = rel.start()
+    assert err is None and snap.interrupts[0].value["kind"] == "waiting_release_pick"
+    assert calls(rel.runner, "release-art") == 2
+
+
+def test_pick_reuse_keeps_previous_assets(tmp_path):
+    rel = _released(tmp_path)
+    rel.info.write_text("名稱: 捕泡手\n代號: bubble-catcher\n介紹: 跟著節拍戳泡泡。\n素材: 重做\n", encoding="utf-8")
+    assets = rel.project / "release" / "assets"
+    icon = (assets / "icon.png").read_bytes()
+    rel.start()
+    snap, err = rel.pick("沿用上次")
+    assert err is None and not snap.next and (assets / "icon.png").read_bytes() == icon
+
+
+def test_parse_release_info_redo_art():
+    assert parse_release_info("名稱: a\n代號: a\n介紹: a\n")["redo_art"] is False
+    assert parse_release_info("名稱: a\n代號: a\n介紹: a\n素材: 重做\n")["redo_art"] is True
+    assert parse_release_pick("沿用上次") == {"reuse": True}

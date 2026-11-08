@@ -40,10 +40,31 @@ def parse_release_info(text: str) -> dict:
     code = kv["代號"].strip("`")
     if not CODE_RE.match(code):
         raise ValueError(f"代號「{code}」格式不對: 只能用英文小寫、數字與連字號, 例 dungeon-zoo")
-    return {"name": kv["名稱"], "code": code, "intro": kv["介紹"]}
+    # 素材: 重做 → 再次發布也重做圖示 / 主色 / 橫幅方案讓使用者挑; 沒寫就沿用上次定版的(見 previous_assets)
+    return {"name": kv["名稱"], "code": code, "intro": kv["介紹"], "redo_art": kv.get("素材", "").strip() in ("重做", "重挑")}
+
+
+def previous_assets(release: Path) -> dict | None:
+    """上次定版留下的圖示、橫幅、色帶圖樣都在且讀得到主色時, 回傳主色 {"bg", "fg"}; 否則 None(要出方案讓使用者挑)。"""
+    a = Path(release) / "assets"
+    if not all((a / n).exists() for n in ("icon.png", "banner.png", "pattern.png")):
+        return None
+    md = a / "素材資訊.md"
+    if md.exists():
+        m = re.search(r"遊戲主色 \| `([^`]+)`, 字用\S+ `([^`]+)`", md.read_text(encoding="utf-8"))
+        if m:
+            return {"bg": m.group(1), "fg": m.group(2)}
+    j = a / "info.json"
+    if j.exists():
+        d = json.loads(j.read_text(encoding="utf-8"))
+        if d.get("color"):
+            return {"bg": d["color"], "fg": d.get("textColor", "#2d2144")}
+    return None
 
 
 def parse_release_pick(text: str) -> dict:
+    if re.search(r"沿用上次", text):
+        return {"reuse": True}   # 方案都不要, 留著上次定版的圖示 / 橫幅 / 圖樣
     kv = _parse_kv(text)
     rules = {"圖示": ("icon", ICON_IDS), "主色": ("color", COLOR_IDS), "橫幅": ("banner", ICON_IDS)}
     out = {}
