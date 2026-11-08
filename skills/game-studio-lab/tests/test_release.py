@@ -266,6 +266,7 @@ def test_site_rule_warnings_clear_notice(tmp_path):
     w = site_rule_warnings(tmp_path, "ghost-echo")
     assert any("舊的" in x and "game.js" in x for x in w)
     assert any("levelClear" in x for x in w) and any("gameClear" in x for x in w)
+    assert any("gameClear" in x and "沒有全破" in x for x in w)   # 沒有全破的遊戲可以不送全局通關, 警告要講明
     (tmp_path / "game.js").write_text("if (window.PVDX && win) { PVDX.levelClear(G.level); if (G.level === 4) PVDX.gameClear(); }", encoding="utf-8")
     assert site_rule_warnings(tmp_path, "ghost-echo") == []
 

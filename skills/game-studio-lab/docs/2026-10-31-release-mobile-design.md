@@ -26,7 +26,7 @@ PVD計畫網站要讓手機也能玩。遊戲在網站裡跑在 iframe 中, 網�
 | 網站暫停 / 繼續 | 收 `pvd:pause` → 暫停(含音效); 收 `pvd:resume` → 顯示「點擊或按任意鍵繼續」, 點一下才繼續, 這一下不傳給遊戲。檢查 `event.origin === location.origin`。電腦版也做 |
 | Esc 暫停 | 共同守則的通用鍵。遊戲自己沒有 Esc 暫停時由觸控層提供(暫停遮罩 + 「按 Esc 繼續」); 遊戲已有就關掉觸控層的這項 |
 | 載入進度 | 網站版定版時由流程(`lab/loader.py`)把 index.html 的本地程式換成載入程式: 依位元組顯示進度條與百分比, 送 `{type:'pvd:progress', progress}`, 載完送 `{type:'pvd:loaded'}`; file:// 開啟時退回逐個 `<script src>` |
-| 通關通知 | 真的過關時呼叫 `PVDX.levelClear(level)` 送 `{type:'pvd:level-clear', level}`(從 1 起), 全部通關呼叫 `PVDX.gameClear()` 送 `{type:'pvd:game-clear'}`, 最後一關兩種都送(先單關); 失敗不送, 同一時間點只送一次; 時間由網站計算; 不在 iframe 裡就不送(2026-11-05 取代舊的 `pvd:finish`, 規範見 PVD計畫網站 repo `docs/遊戲接入規範.md` 第三節) |
+| 通關通知 | 真的過關時呼叫 `PVDX.levelClear(level)` 送 `{type:'pvd:level-clear', level}`(從 1 起), 全部通關呼叫 `PVDX.gameClear()` 送 `{type:'pvd:game-clear'}`, 最後一關的單關通關送出時一併送全局通關(先單關, 同一刻, 不等結算畫面); 沒有全破的遊戲不送全局通關; 失敗不送, 同一時間點只送一次; 時間由網站計算; 不在 iframe 裡就不送(2026-11-05 取代舊的 `pvd:finish`, 規範見 PVD計畫網站 repo `docs/遊戲接入規範.md` 第三節) |
 | 支援裝置 | 網站要求每款電腦與手機都能玩, 一律建議用電腦; `info.json` 不寫裝置欄位。網站版沒有觸控操作時定版提醒 |
 | 按鈕有沒有蓋到資訊 | RD 不能開瀏覽器, 只能照座標推算。流程停在挑圖示時, 主 session 用無頭 Chrome 帶 `?touch=1` 逐畫面截圖給使用者看; 有蓋到就由主 session 調 `touch.js` 的 `CONFIG`(按鈕座標、各畫面顯示哪些按鈕) |
 
@@ -35,7 +35,7 @@ PVD計畫網站要讓手機也能玩。遊戲在網站裡跑在 iframe 中, 網�
 鍵盤遊戲:
 - 全域函式 `inputDown(鍵名)` / `inputUp(鍵名)` / `inputReset()`, 鍵盤事件也走它們; `inputDown` 開頭 `if (window.PVDX && PVDX.paused) return;`(暫停守衛寫在遊戲自己的入口, 觸控層後載入、攔截擋不住)
 - 每幀: `if (!(window.PVDX && PVDX.paused)) update(dt);`, 畫完後 `if (window.PVDX) PVDX.draw(ctx);`
-- 過關: `if (window.PVDX) PVDX.levelClear(第幾關);`, 全部通關再 `PVDX.gameClear();`
+- 過關: `if (window.PVDX) PVDX.levelClear(第幾關);`; 最後一關的單關通關送出時, 同一處緊接著 `PVDX.gameClear();`(不等結算畫面); 沒有全破的遊戲不送全局通關
 
 滑鼠遊戲: 每幀與過關 / 全部通關同上; 輸入不用改(暫停時觸控層在 window 捕獲階段攔下滑鼠 / 觸控事件)。
 

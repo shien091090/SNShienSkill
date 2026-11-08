@@ -9,8 +9,8 @@
    - 電腦與手機都有: 收 pvd:pause / pvd:resume 暫停 / 繼續(含音效)、Esc 暫停(CONFIG.escPause)、PVDX.levelClear(level) / PVDX.gameClear() 通知網站單關通關 / 全局通關
    遊戲要掛的鉤子(設計見 game-studio-lab docs/2026-10-31-release-mobile-design.md):
      每幀 `if (!(window.PVDX && PVDX.paused)) update(dt);`, 畫完 `if (window.PVDX) PVDX.draw(ctx);`;
-     真的過關時 `if (window.PVDX) PVDX.levelClear(第幾關);`(失敗、重試、放棄不送), 全部通關再接 `PVDX.gameClear();`(先單關後全局);
-     同一個時間點只送一次: 放在進結算畫面那一刻, 不放每幀或畫面重繪;
+     真的過關那一刻 `if (window.PVDX) PVDX.levelClear(第幾關);`(失敗、重試、放棄不送); 最後一關的單關通關送出時, 同一處緊接著 `PVDX.gameClear();`(不等結算畫面); 沒有全破的遊戲不送全局通關;
+     同一個時間點只送一次: 不放每幀、畫面重繪或重複進結算畫面會再跑的地方;
      鍵盤遊戲另有全域 inputDown(k) / inputUp(k) / inputReset(), inputDown 開頭 `if (window.PVDX && PVDX.paused) return;` */
 (function () {
   // ───────── 每款遊戲要改的設定 ─────────

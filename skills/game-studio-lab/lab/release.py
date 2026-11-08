@@ -272,7 +272,8 @@ def site_rule_warnings(game: Path, code: str) -> list[str]:
     if (game / "touch.js").exists():
         for name, rx in CLEAR_CALLS:
             if name not in calls:
-                out.append(f"遊戲程式沒有呼叫 PVDX.{name}(), 網站收不到{CLEAR_NAMES[name]}通知")
+                note = "; 遊戲沒有全破就忽略這條(沒有全破不送全局通關)" if name == "gameClear" else ""
+                out.append(f"遊戲程式沒有呼叫 PVDX.{name}(), 網站收不到{CLEAR_NAMES[name]}通知{note}")
     return list(dict.fromkeys(out))
 
 
