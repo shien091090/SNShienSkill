@@ -1,0 +1,583 @@
+<title>影片審閱</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- keep font links and scripts in step with test.html -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=block">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="film.js"></script>
+<script src="sfxopts.js" onerror="void 0"></script>
+<style>
+  /* Layout: options column (one row per keyframe, live mini previews) beside a sticky live player of the whole film. */
+  :root {
+    --bg: #f4f3f8;
+    --panel: #ffffff;
+    --line: #dcd9e6;
+    --ink: #2d2144;
+    --mute: #7a7490;
+    --pick: #2fc9ed;
+    --ui: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #151220; --panel: #1f1a2c; --line: #352e47; --ink: #f1eef8; --mute: #9d97b2; --pick: #2fc9ed; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --bg: #151220; --panel: #1f1a2c; --line: #352e47; --ink: #f1eef8; --mute: #9d97b2; --pick: #2fc9ed; color-scheme: dark; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--ui);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 16px 24px;
+  }
+  .app { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 20px; align-items: start; max-width: 1600px; margin: 0 auto; }
+  .rows { display: grid; gap: 12px; min-width: 0; }
+  /* one tab per keyframe; only the open tab's previews are built */
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tab { height: 44px; padding: 0 14px; border-radius: 22px; border: 2px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; font-weight: 900; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+  .tab:hover { border-color: var(--mute); }
+  .tab:focus-visible { outline: 3px solid var(--pick); outline-offset: 2px; }
+  .tab[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+  .tab .pk { min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: var(--line); color: var(--ink); font-size: 13px; line-height: 22px; text-align: center; }
+  .tab.set .pk { background: var(--pick); color: #0b2a33; }
+  .opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--optw, 240px), 1fr)); gap: 10px; }
+  .opt { position: relative; padding: 0; border: 3px solid var(--line); border-radius: 12px; background: var(--panel); cursor: pointer; overflow: hidden; display: block; width: 100%; }
+  .opt:hover { border-color: var(--mute); }
+  .opt:focus-visible { outline: 3px solid var(--pick); outline-offset: 2px; }
+  .opt.on { border-color: var(--pick); }
+  .opt .badge { position: absolute; left: 6px; top: 6px; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 13px; background: var(--ink); color: var(--panel); font-weight: 900; font-size: 14px; line-height: 26px; text-align: center; z-index: 2; }
+  .opt.on .badge { background: var(--pick); color: #0b2a33; }
+  .vp { position: relative; width: 100%; aspect-ratio: var(--ar, 1); max-width: 100%; overflow: hidden; background: #ffffff; }
+  .vp > .host { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  .opt.snd { min-height: 58px; padding: 12px 12px 12px 48px; text-align: left; color: var(--ink); font: inherit; font-weight: 900; font-size: 15px; line-height: 1.4; }
+  .opt.snd .badge { top: 50%; margin-top: -13px; left: 10px; }
+  /* fine-tuning for the picked sound: loudness and timing steppers */
+  .tune { grid-column: 1 / -1; display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+  .tune .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .tune .nm { font-weight: 900; font-size: 15px; min-width: 44px; }
+  .tune .val { font-weight: 900; font-size: 15px; font-variant-numeric: tabular-nums; min-width: 92px; text-align: center; }
+  .tune .hint { color: var(--mute); font-size: 13px; font-weight: 900; }
+  .tune .ctl { width: auto; min-width: 44px; padding: 0 12px; font: inherit; font-weight: 900; font-size: 14px; }
+  .player { position: sticky; top: calc(16px + env(safe-area-inset-top, 0px)); display: grid; gap: 10px; min-width: 0; }
+  .player .vp { border-radius: 14px; border: 1px solid var(--line); width: min(100%, calc((100vh - 120px) * var(--ar, 1))); margin-inline: auto; }
+  .bar { display: flex; align-items: center; gap: 12px; }
+  .ctl { width: 44px; height: 44px; border-radius: 22px; border: 2px solid var(--ink); background: var(--panel); color: var(--ink); cursor: pointer; display: grid; place-items: center; }
+  .ctl:focus-visible { outline: 3px solid var(--pick); outline-offset: 2px; }
+  .ctl svg { width: 20px; height: 20px; }
+  .ctl .ico { display: grid; place-items: center; }
+  [hidden] { display: none !important; }
+  .track { flex: 1; height: 44px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
+  .track:focus-visible { outline: 3px solid var(--pick); outline-offset: 2px; border-radius: 6px; }
+  .rail { position: relative; width: 100%; height: 8px; border-radius: 4px; background: var(--line); }
+  .rail i { position: absolute; left: 0; top: 0; display: block; height: 100%; width: 0; border-radius: 4px; background: var(--ink); }
+  .rail i::after { content: ""; position: absolute; right: -9px; top: 50%; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%; background: var(--ink); }
+  .time { flex: none; font-weight: 900; font-size: 15px; font-variant-numeric: tabular-nums; color: var(--mute); min-width: 92px; text-align: right; }
+  .time b { color: var(--ink); }
+  .ctl.wide { width: auto; padding: 0 16px; font: inherit; font-weight: 900; font-size: 15px; gap: 6px; grid-auto-flow: column; }
+  /* keyframe table dialog */
+  .kfd { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); color: var(--ink); }
+  .kfd::backdrop { background: rgba(21, 18, 32, 0.55); }
+  .kfd .hd { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; background: var(--panel); border-bottom: 1px solid var(--line); z-index: 1; }
+  .kfd .hd h2 { margin: 0; font-size: 20px; font-weight: 900; }
+  .kfd table { width: 100%; border-collapse: collapse; font-size: 16px; line-height: 1.55; }
+  .kfd th { text-align: left; font-size: 13px; color: var(--mute); font-weight: 900; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .kfd td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .kfd tbody tr { cursor: pointer; }
+  .kfd tbody tr:hover { background: var(--bg); }
+  .kfd tbody tr:focus-visible { outline: 3px solid var(--pick); outline-offset: -3px; }
+  .kfd tr.now { background: color-mix(in srgb, var(--pick) 22%, transparent); }
+  .kfd .n, .kfd .s { white-space: nowrap; font-weight: 900; color: var(--mute); font-variant-numeric: tabular-nums; }
+  .kfd .nm { white-space: nowrap; font-weight: 900; }
+  @media (max-width: 760px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .player { order: -1; position: static; }
+    .kfd .nm { white-space: normal; }
+    .kfd td, .kfd th { padding: 9px 8px; }
+  }
+</style>
+
+<div class="app">
+  <div class="rows" id="rows"></div>
+  <div class="player">
+    <div class="vp" id="main"><div class="host"></div></div>
+    <div class="bar">
+      <button class="ctl" id="replay" type="button" aria-label="重播">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+      </button>
+      <button class="ctl" id="pause" type="button" aria-label="暫停">
+        <span id="ico-pause" class="ico"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></span>
+        <span id="ico-play" class="ico" hidden><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg></span>
+      </button>
+      <button class="ctl" id="snd" type="button" aria-label="開啟音效" aria-pressed="false">
+        <span id="ico-mute" class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg></span>
+        <span id="ico-snd" class="ico" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg></span>
+      </button>
+      <div class="track" id="track" role="slider" aria-label="進度" tabindex="0"><div class="rail"><i id="prog"></i></div></div>
+      <div class="time" id="time"><b>0.0</b> / 0.0 秒</div>
+      <button class="ctl wide" id="kfopen" type="button" aria-haspopup="dialog">關鍵幀</button>
+    </div>
+  </div>
+</div>
+<dialog class="kfd" id="kfd" aria-labelledby="kfd-title">
+  <div class="hd">
+    <h2 id="kfd-title">關鍵幀</h2>
+    <button class="ctl" id="kfclose" type="button" aria-label="關閉">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>開始</th><th>名稱</th><th>內容</th></tr></thead>
+    <tbody id="kfs"></tbody>
+  </table>
+</dialog>
+
+<script>
+  // Rows with options; Claude rewrites this each round from film.js OPTIONS: one row per keyframe that has options.
+  // seg: [from, to] seconds to loop instead of the keyframe's own window (optional).
+  const ROWS = [
+    { id: "k1", label: "K1 片名進場", options: ["a", "b", "c"] },
+    { id: "k2", label: "K2 片名退場", options: ["a", "b", "c"] },
+  ];
+  const BADGE = { 0: "原", x: "無", p: "前" };
+  // what each keyframe shows (Claude keeps this in step with film.js)
+  const KF_DESC = {
+    k1: ["片名進場", "片名出現在畫面中央"],
+    k2: ["片名退場", "片名離開畫面"],
+  };
+
+  const style = document.createElement("style");
+  style.textContent = VID.CSS;
+  document.head.appendChild(style);
+  // every film on this page is built in one format: undefined = the first of film.js FORMATS (the main format).
+  // Set e.g. "sq" while reviewing the secondary format's layout. (Artifact links drop query strings, so this is a constant.)
+  const FMT = undefined;
+  const { W, H } = VID.size({ fmt: FMT });
+  document.documentElement.style.setProperty("--ar", W / H);
+  document.documentElement.style.setProperty("--optw", W / H < 0.8 ? "160px" : "240px");
+
+  let picks = {};
+  let db = null;
+  const players = []; // {vp, host, film, seg:[a,b] | null, t0, visible}
+
+  function fit(p) {
+    const w = p.vp.clientWidth;
+    p.host.style.transform = `scale(${w / W})`;
+  }
+  const ro = new ResizeObserver((es) => es.forEach((e) => {
+    const p = players.find((x) => x.vp === e.target);
+    if (!p) return;
+    if (p.waiting && p.vp.clientWidth) { const pk = p.waiting; p.waiting = null; mount(p, pk); }
+    else fit(p);
+  }));
+
+  async function fonts(pk) {
+    const list = VID.fontsFor(pk || {});
+    try { await Promise.all(list.map((f) => document.fonts.load(f, VID.FONT_SAMPLE))); } catch (e) {}
+  }
+
+  async function mount(p, pk) {
+    const seq = (p.seq = (p.seq || 0) + 1);
+    await fonts(pk);
+    if (seq !== p.seq) return; // a newer mount took over
+    // the film measures its text on build; while the page is hidden everything measures 0 and the
+    // title collapses into one spot, so wait until the player is laid out (the ResizeObserver resumes it)
+    if (!p.vp.clientWidth) { p.waiting = pk; return; }
+    p.waiting = null;
+    if (p.film) p.film.tl.kill();
+    p.film = VID.build(p.host, FMT ? { ...pk, fmt: FMT } : pk);
+    p.t0 = performance.now();
+    fit(p);
+    if (p.onMount) p.onMount();
+  }
+
+  // only animate previews that are on screen
+  const io = new IntersectionObserver((es) => es.forEach((e) => { const p = players.find((x) => x.vp === e.target); if (p) p.visible = e.isIntersecting; }));
+
+  function addPlayer(vp, pk, seg) {
+    const p = { vp, host: vp.querySelector(".host"), film: null, seg, t0: 0, visible: true };
+    players.push(p);
+    ro.observe(vp);
+    io.observe(vp);
+    mount(p, pk);
+    return p;
+  }
+
+  const main = addPlayer(document.getElementById("main"), picks, null);
+  let paused = false, pausedAt = 0;
+
+  // keyframe table (in a dialog): start time + what it shows; clicking a row jumps the player there
+  const kfd = document.getElementById("kfd");
+  const kfsEl = document.getElementById("kfs");
+  const kfEls = {};
+  for (const k of VID.KEYFRAMES) {
+    const tr = document.createElement("tr");
+    const [name, desc] = KF_DESC[k.id] || [k.id, ""];
+    tr.tabIndex = 0;
+    tr.innerHTML = `<td class="n">${k.id.toUpperCase()}</td><td class="s"></td><td class="nm">${name}</td><td>${desc}</td>`;
+    const jump = () => { if (main.film) seekTo(main.film.starts[k.id] + 0.001); kfd.close(); };
+    tr.addEventListener("click", jump);
+    tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); jump(); } });
+    kfsEl.appendChild(tr);
+    kfEls[k.id] = tr;
+  }
+  document.getElementById("kfopen").addEventListener("click", () => { kfd.showModal(); if (nowKf) kfEls[nowKf].scrollIntoView({ block: "nearest" }); });
+  document.getElementById("kfclose").addEventListener("click", () => kfd.close());
+  kfd.addEventListener("click", (e) => { if (e.target === kfd) kfd.close(); });
+  main.onMount = () => { for (const k of VID.KEYFRAMES) kfEls[k.id].querySelector(".s").textContent = main.film.starts[k.id].toFixed(1) + "s"; };
+  let nowKf = null;
+  function showTime(t) {
+    const f = main.film;
+    document.getElementById("time").innerHTML = `<b>${t.toFixed(1)}</b> / ${f.total.toFixed(1)} 秒`;
+    let cur = VID.KEYFRAMES[0].id;
+    for (const k of VID.KEYFRAMES) if (t >= f.starts[k.id]) cur = k.id;
+    if (cur !== nowKf) { if (nowKf) kfEls[nowKf].classList.remove("now"); kfEls[cur].classList.add("now"); nowKf = cur; }
+  }
+
+  // option tabs: one tab per keyframe, and only the open tab builds its previews
+  const rowsEl = document.getElementById("rows");
+  rowsEl.innerHTML = `<div class="tabs" role="tablist" aria-label="關鍵幀"></div><div class="opts" role="tabpanel"></div>`;
+  const tabsEl = rowsEl.querySelector(".tabs");
+  const optsEl = rowsEl.querySelector(".opts");
+  const tabEls = {};
+  let optEls = {};
+  let curTab = null;
+  const keyName = (key) => BADGE[key] || key.toUpperCase();
+  for (const r of ROWS) {
+    const t = document.createElement("button");
+    t.type = "button";
+    t.className = "tab";
+    t.setAttribute("role", "tab");
+    t.innerHTML = `${r.label}<span class="pk"></span>`;
+    t.addEventListener("click", () => openTab(r.id));
+    t.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      const i = ROWS.findIndex((x) => x.id === r.id) + (e.key === "ArrowRight" ? 1 : -1);
+      const next = ROWS[(i + ROWS.length) % ROWS.length];
+      openTab(next.id);
+      tabEls[next.id].focus();
+    });
+    tabsEl.appendChild(t);
+    tabEls[r.id] = t;
+  }
+
+  function dropPlayer(p) {
+    p.seq = (p.seq || 0) + 1; // cancels a mount still waiting on fonts
+    if (p.film) p.film.tl.kill();
+    p.host.innerHTML = "";
+    ro.unobserve(p.vp);
+    io.unobserve(p.vp);
+    players.splice(players.indexOf(p), 1);
+  }
+
+  function openTab(id) {
+    if (id === curTab) return;
+    curTab = id;
+    try { localStorage.setItem("vid-tab", id); } catch (e) {}
+    for (const p of players.slice()) if (p !== main) dropPlayer(p);
+    optsEl.innerHTML = "";
+    optEls = {};
+    const r = ROWS.find((x) => x.id === id);
+    for (const key of r.options) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "opt";
+      b.id = `opt-${r.id}-${key}`;
+      b.setAttribute("aria-label", `${r.label} ${keyName(key)}`);
+      b.innerHTML = `<span class="badge">${keyName(key)}</span><div class="vp"><div class="host"></div></div>`;
+      optsEl.appendChild(b);
+      optEls[key] = b;
+      const pk = { ...picks, [r.id]: key };
+      const pv = addPlayer(b.querySelector(".vp"), pk, null);
+      pv.kid = r.id; pv.key = key; pv.pk = pk;
+      b.addEventListener("click", () => choose(r.id, key));
+    }
+    paint();
+  }
+
+  // previews play only their keyframe (plus a short tail) in a loop
+  function segFor(p) {
+    const r = ROWS.find((x) => x.id === p.kid);
+    if (r && r.seg) return r.seg;
+    const s = p.film.starts[p.kid];
+    return [Math.max(0, s - 0.4), s + p.film.durs[p.kid] + 0.6];
+  }
+
+
+  // sound effects: one short clip per cue (written to sfxopts.js by the audio scripts), scheduled on the Web Audio clock
+  // to follow the main player; which option plays at each sound moment is the user's pick (db sfx/current)
+  const SFX = window.VID_SFX || [];
+  // a round may play a finished track under its options (VID_BASE) and keep its picks in its own db docs (VID_DOC)
+  const BASE = window.VID_BASE || null, DOC = window.VID_DOC || "sfx";
+  const pickOf = (m) => spicks[m.id] || (m.opts.some((o) => o.key === "0") ? "0" : m.opts[0].key);
+  let spicks = {}, tune = {};
+  const TUNE = { db: { step: 2, min: -12, max: 8 }, ms: { step: 20, min: -200, max: 200 } };
+  let sound = false, ac = null, out = null, live = [], base = null, dirty = true;
+  const decoded = new Map(), loading = new Map();
+  function audio() {
+    if (!ac) {
+      ac = new AudioContext();
+      out = ac.createDynamicsCompressor(); // safety limiter only; clips are already balanced
+      out.threshold.value = -3; out.knee.value = 0; out.ratio.value = 20; out.attack.value = 0.002; out.release.value = 0.1;
+      out.connect(ac.destination);
+      for (const m of SFX) for (const o of m.opts) for (const c of o.clips) load(c.src);
+      if (BASE) load(BASE.src);
+    }
+    if (ac.state === "suspended") ac.resume();
+  }
+  function load(src) {
+    if (loading.has(src)) return;
+    loading.set(src, fetch(src).then((r) => r.arrayBuffer()).then((a) => ac.decodeAudioData(a))
+      .then((b) => { decoded.set(src, b); dirty = true; }).catch(() => {}));
+  }
+  function clipsNow() {
+    const list = BASE ? [{ src: BASE.src, t: BASE.t, g: 1 }] : [];
+    for (const m of SFX) {
+      const o = m.opts.find((x) => x.key === pickOf(m)) || m.opts[0];
+      const tu = tune[m.id] || {};
+      for (const c of o.clips) list.push({ src: c.src, t: c.t + (tu.ms || 0) / 1000, g: 10 ** ((tu.db || 0) / 20) });
+    }
+    return list;
+  }
+  function stopAll() { for (const s of live) { try { s.stop(); } catch (e) {} } live = []; base = null; }
+  function schedule(t) {
+    stopAll();
+    const now = ac.currentTime + 0.03;
+    base = now - t;
+    for (const c of clipsNow()) {
+      const b = decoded.get(c.src);
+      if (!b || c.t + b.duration <= t) continue;
+      const s = ac.createBufferSource();
+      s.buffer = b;
+      if (c.g !== 1) { const g = ac.createGain(); g.gain.value = c.g; s.connect(g); g.connect(out); } else s.connect(out);
+      if (c.t >= t) s.start(base + c.t); else s.start(now, t - c.t);
+      live.push(s);
+    }
+  }
+  function syncSound(t) {
+    if (!sound || !ac) return;
+    if (paused || scrubbing) { if (base !== null) stopAll(); return; }
+    if (dirty || base === null || Math.abs(ac.currentTime - base - t) > 0.08) { dirty = false; schedule(t); }
+  }
+  function setSound(v) {
+    sound = v;
+    const b = document.getElementById("snd");
+    b.setAttribute("aria-pressed", String(v));
+    b.setAttribute("aria-label", v ? "關閉音效" : "開啟音效");
+    document.getElementById("ico-mute").hidden = v;
+    document.getElementById("ico-snd").hidden = !v;
+    if (v) { audio(); dirty = true; } else if (ac) stopAll();
+  }
+  document.getElementById("snd").addEventListener("click", () => setSound(!sound));
+
+  // sound tabs: one per sound moment; picking an option plays the film from just before that moment
+  let sndTab = null, sndOptEls = {};
+  const sndTabEls = {};
+  function buildSound() {
+    rowsEl.innerHTML = `<div class="tabs" role="tablist" aria-label="音效段落"></div><div class="opts" role="tabpanel"></div>`;
+    const tabs = rowsEl.querySelector(".tabs");
+    for (const m of SFX) {
+      const t = document.createElement("button");
+      t.type = "button";
+      t.className = "tab";
+      t.setAttribute("role", "tab");
+      t.innerHTML = `${m.label}<span class="pk"></span>`;
+      t.addEventListener("click", () => openSound(m.id));
+      t.addEventListener("keydown", (e) => {
+        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+        e.preventDefault();
+        const i = SFX.findIndex((x) => x.id === m.id) + (e.key === "ArrowRight" ? 1 : -1);
+        const next = SFX[(i + SFX.length) % SFX.length];
+        openSound(next.id);
+        sndTabEls[next.id].focus();
+      });
+      tabs.appendChild(t);
+      sndTabEls[m.id] = t;
+    }
+    let first = SFX[0].id;
+    try { const s = localStorage.getItem("vid-snd-tab"); if (SFX.some((m) => m.id === s)) first = s; } catch (e) {}
+    openSound(first);
+  }
+  function openSound(id) {
+    sndTab = id;
+    try { localStorage.setItem("vid-snd-tab", id); } catch (e) {}
+    const m = SFX.find((x) => x.id === id);
+    const box = rowsEl.querySelector(".opts");
+    box.innerHTML = "";
+    sndOptEls = {};
+    for (const o of m.opts) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "opt snd";
+      b.innerHTML = `<span class="badge">${keyName(o.key)}</span>${o.label}`;
+      b.addEventListener("click", () => chooseSound(id, o.key));
+      box.appendChild(b);
+      sndOptEls[o.key] = b;
+    }
+    const tb = document.createElement("div");
+    tb.className = "tune";
+    tb.innerHTML = `<div class="row"><span class="nm">音量</span><button class="ctl" type="button" data-k="db" data-d="-1">小聲</button><span class="val" id="tv-db"></span><button class="ctl" type="button" data-k="db" data-d="1">大聲</button></div>
+      <div class="row"><span class="nm">時機</span><button class="ctl" type="button" data-k="ms" data-d="-1">提早</button><span class="val" id="tv-ms"></span><button class="ctl" type="button" data-k="ms" data-d="1">延後</button></div>
+      <div class="row"><button class="ctl" type="button" id="tv-hear">再聽一次</button><button class="ctl" type="button" id="tv-reset">還原</button><span class="hint">只調整目前選的聲音</span></div>`;
+    for (const el of tb.querySelectorAll("[data-k]")) el.addEventListener("click", () => nudge(id, el.dataset.k, +el.dataset.d));
+    tb.querySelector("#tv-hear").addEventListener("click", () => hear(id));
+    tb.querySelector("#tv-reset").addEventListener("click", () => { const n = { ...tune }; delete n[id]; saveTune(id, n); });
+    box.appendChild(tb);
+    paintSound();
+  }
+  function paintSound() {
+    const cur = SFX.find((x) => x.id === sndTab);
+    for (const [k, el] of Object.entries(sndOptEls)) el.classList.toggle("on", pickOf(cur) === k);
+    const tb = rowsEl.querySelector(".tune");
+    if (tb) {
+      const tu = tune[sndTab] || {}, d = tu.db || 0, ms = tu.ms || 0;
+      tb.hidden = pickOf(cur) === "x";
+      tb.querySelector("#tv-db").textContent = d ? `${d > 0 ? "+" : ""}${d} dB` : "不變";
+      tb.querySelector("#tv-ms").textContent = ms ? `${ms < 0 ? "早" : "晚"} ${Math.abs(ms) / 1000} 秒` : "不變";
+    }
+    for (const m of SFX) {
+      const t = sndTabEls[m.id], k = pickOf(m);
+      t.setAttribute("aria-selected", String(m.id === sndTab));
+      t.tabIndex = m.id === sndTab ? 0 : -1;
+      t.classList.toggle("set", k !== "0");
+      const tu = tune[m.id] || {};
+      t.querySelector(".pk").textContent = keyName(k) + (tu.db || tu.ms ? "·調" : "");
+    }
+  }
+  function hear(id) {
+    if (!sound) setSound(true); else audio();
+    dirty = true;
+    const m = SFX.find((x) => x.id === id);
+    const ts = m.opts.flatMap((o) => o.clips.map((c) => c.t));
+    if (ts.length) { seekTo(Math.max(0, Math.min(...ts) - 1.2)); setPaused(false); }
+  }
+  function nudge(id, k, dir) {
+    const tu = { ...(tune[id] || {}) }, r = TUNE[k];
+    tu[k] = Math.max(r.min, Math.min(r.max, (tu[k] || 0) + dir * r.step));
+    if (!tu[k]) delete tu[k];
+    const n = { ...tune };
+    if (Object.keys(tu).length) n[id] = tu; else delete n[id];
+    saveTune(id, n);
+  }
+  async function saveTune(id, n) {
+    tune = n;
+    paintSound();
+    hear(id);
+    if (db) { try { await db.doc(`${DOC}/tune`).set(tune); } catch (e) {} }
+  }
+  async function chooseSound(id, key) {
+    spicks = { ...spicks, [id]: key };
+    paintSound();
+    dirty = true;
+    if (!sound) setSound(true); else audio();
+    const m = SFX.find((x) => x.id === id);
+    const ts = m.opts.flatMap((o) => o.clips.map((c) => c.t));
+    if (ts.length) { seekTo(Math.max(0, Math.min(...ts) - 1.2)); setPaused(false); }
+    if (db) { try { await db.doc(`${DOC}/current`).set(spicks); } catch (e) {} }
+  }
+
+  function frame(now) {
+    for (const p of players) {
+      if (!p.film || !p.visible) continue;
+      if (p === main) {
+        const t = paused || scrubbing ? pausedAt : ((now - p.t0) / 1000) % p.film.total;
+        p.film.tl.seek(t, false);
+        syncSound(t);
+        document.getElementById("prog").style.width = (t / p.film.total) * 100 + "%";
+        showTime(t);
+      } else {
+        const [a, b] = segFor(p);
+        p.film.tl.seek(a + (((now - p.t0) / 1000) % (b - a)), false);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  function paint() {
+    for (const [key, el] of Object.entries(optEls)) el.classList.toggle("on", (picks[curTab] || "0") === key);
+    for (const r of ROWS) {
+      const t = tabEls[r.id], key = picks[r.id] || "0";
+      t.setAttribute("aria-selected", String(r.id === curTab));
+      t.tabIndex = r.id === curTab ? 0 : -1;
+      t.classList.toggle("set", key !== "0");
+      // round 1 has no "0" (nothing chosen yet): show a dash until the user picks
+      t.querySelector(".pk").textContent = !picks[r.id] && !r.options.includes("0") ? "–" : keyName(key);
+    }
+  }
+
+  async function apply(next) {
+    const changed = JSON.stringify(next) !== JSON.stringify(picks);
+    picks = next;
+    paint();
+    if (!changed) return;
+    await mount(main, picks);
+    for (const p of players) if (p !== main) { const pk = { ...picks, [p.kid]: p.key }; if (JSON.stringify(pk) !== JSON.stringify(p.pk || {})) { p.pk = pk; mount(p, pk); } }
+  }
+
+  async function choose(id, key) {
+    const next = { ...picks, [id]: key };
+    setPaused(false);
+    await apply(next);
+    if (db) { try { await db.doc("picks/current").set(next); } catch (e) {} }
+  }
+
+  function setPaused(v) {
+    paused = v;
+    document.getElementById("ico-pause").hidden = v;
+    document.getElementById("ico-play").hidden = !v;
+    document.getElementById("pause").setAttribute("aria-label", v ? "播放" : "暫停");
+  }
+  // play on from time t (or hold there while paused)
+  function seekTo(t) {
+    pausedAt = t;
+    main.t0 = performance.now() - t * 1000;
+  }
+  document.getElementById("replay").addEventListener("click", () => { setPaused(false); seekTo(0); });
+  document.getElementById("pause").addEventListener("click", () => {
+    if (!main.film) return;
+    if (paused) { seekTo(pausedAt); setPaused(false); }
+    else { pausedAt = ((performance.now() - main.t0) / 1000) % main.film.total; setPaused(true); }
+  });
+
+  // draggable progress bar
+  let scrubbing = false;
+  const track = document.getElementById("track");
+  const rail = track.querySelector(".rail");
+  function scrubAt(e) {
+    if (!main.film) return;
+    const r = rail.getBoundingClientRect();
+    const f = Math.min(0.9999, Math.max(0, (e.clientX - r.left) / r.width));
+    seekTo(f * main.film.total);
+  }
+  track.addEventListener("pointerdown", (e) => { scrubbing = true; track.setPointerCapture(e.pointerId); scrubAt(e); });
+  track.addEventListener("pointermove", (e) => { if (scrubbing) scrubAt(e); });
+  const endScrub = () => { if (!scrubbing) return; scrubbing = false; seekTo(pausedAt); };
+  track.addEventListener("pointerup", endScrub);
+  track.addEventListener("pointercancel", endScrub);
+  track.addEventListener("keydown", (e) => {
+    if (!main.film || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+    e.preventDefault();
+    const cur = paused ? pausedAt : ((performance.now() - main.t0) / 1000) % main.film.total;
+    seekTo(Math.min(main.film.total - 0.01, Math.max(0, cur + (e.key === "ArrowRight" ? 1 : -1))));
+  });
+
+  // with no option rows this round, the page is just the film
+  if (ROWS.length) {
+    let firstTab = ROWS[0].id;
+    try { const s = localStorage.getItem("vid-tab"); if (ROWS.some((r) => r.id === s)) firstTab = s; } catch (e) {}
+    openTab(firstTab);
+  } else if (SFX.length) {
+    buildSound();
+  } else {
+    rowsEl.remove();
+    document.querySelector(".app").style.gridTemplateColumns = "minmax(0, 1fr)";
+    document.querySelector(".app").style.maxWidth = "1100px";
+  }
+  (async () => {
+    db = (await window.claude?.use?.("db")) ?? null;
+    if (!db) return;
+    db.doc("picks/current").onSnapshot((snap) => { if (snap.exists) apply({ ...snap.data() }); }, () => {});
+    if (SFX.length) db.doc(`${DOC}/tune`).onSnapshot((snap) => { if (snap.exists) { tune = { ...snap.data() }; dirty = true; paintSound(); } }, () => {});
+    if (SFX.length) db.doc(`${DOC}/current`).onSnapshot((snap) => { if (snap.exists) { spicks = { ...snap.data() }; dirty = true; paintSound(); } }, () => {});
+  })();
+</script>

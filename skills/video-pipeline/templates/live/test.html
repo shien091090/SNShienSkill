@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8">
+<!-- render harness: tools/renderfilm.mjs and tools/sfxcues.mjs load this with #<picks JSON>. Keep its font links and scripts in step with index.html. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=block">
+<style>html,body{margin:0;overflow:hidden;background:#fff}#host{position:relative}</style>
+<script src="gsap.min.js"></script><script src="film.js"></script></head><body><div id="host"></div>
+<script>
+const st = document.createElement('style'); st.textContent = VID.CSS; document.head.appendChild(st);
+const picks = JSON.parse(decodeURIComponent(location.hash.slice(1) || '%7B%7D'));
+const { W, H } = VID.size(picks);
+for (const e of [document.documentElement, document.body, document.getElementById('host')]) { e.style.width = W + 'px'; e.style.height = H + 'px'; }
+Promise.all(VID.fontsFor(picks).map((f) => document.fonts.load(f, VID.FONT_SAMPLE))).then(() => document.fonts.ready).then(() => {
+  window.FILM = VID.build(document.getElementById('host'), picks);
+  window.READY = true;
+});
+</script></body></html>
