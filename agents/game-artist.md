@@ -19,7 +19,7 @@ model: opus
 ```js
 // 全域物件, 不用 ES module(file:// 下 module 會被瀏覽器擋)
 window.Art = {
-  canvas: { width: 1680, height: 720 },     // 邏輯畫布尺寸, 照 interface.json(新遊戲固定 21:9 的 1680×720)
+  canvas: { width: 1680, height: 720 },     // 邏輯畫布尺寸, 一律照 interface.json 的 canvas, 不自己定數字
   palette: { bg: '#...', player: '#...' },   // 色票, 名稱對應物件
   drawBackground(ctx) {},
   drawPlayer(ctx, state) {},                 // state: { x, y, ...spec 定義的狀態欄位 }
