@@ -26,7 +26,7 @@ from lab.renderer import ChromeRenderer
 class ReleaseState(TypedDict, total=False):
     project: str
     round_dir: str
-    feedback: str        # 發布資訊檔(名稱 / 代號 / 介紹)
+    feedback: str        # 發布資訊檔(標籤 / 玩法 / 代號 / 介紹)
     standalone: bool     # True: 非 lab 專案, 遊戲在 <project>/game/
     pick: dict           # 使用者挑的方案 {"icon", "color", "banner"}, 或沿用上次 {"reuse": True}
     release_warnings: list
@@ -88,7 +88,7 @@ def build_release_graph(deps, checkpointer=None):
         iface_path = release / "interface.json"
         iface = json.loads(iface_path.read_text(encoding="utf-8")) if iface_path.exists() else {}
         ratio, is_site, mobile_ratio = aspect_ratio(iface)
-        data.update({k: c[k] for k in ("name", "code", "intro")})
+        data.update({k: c[k] for k in ("tag", "pitch", "name", "code", "intro")})
         # touch: 網站版有沒有觸控操作(直式遊戲 mode 是 none); 網站要求每款都能在手機玩, 沒有就在定版時提醒
         data.update({"ratio": ratio, "ratio_site": is_site, "mobile_ratio": mobile_ratio,
                      "touch": touch_mode(release / "game") in ("keys", "mouse")})
@@ -143,7 +143,7 @@ def build_release_graph(deps, checkpointer=None):
         opts, assets = release / "options", release / "assets"
         chosen = s["pick"]
         info_data = json.loads((opts / "info.json").read_text(encoding="utf-8"))
-        if chosen.get("reuse"):   # 沿用上次定版的圖片, 只重寫兩份素材資訊(名稱、介紹、時長可能改了)
+        if chosen.get("reuse"):   # 沿用上次定版的圖片, 只重寫兩份素材資訊(標籤、玩法、介紹、時長可能改了)
             color = previous_assets(release)
             if color is None:
                 raise LabError("要沿用上次的素材, 但 release/assets 缺 icon.png / banner.png / pattern.png 或讀不到主色; 改挑方案代號")

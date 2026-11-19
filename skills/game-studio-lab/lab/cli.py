@@ -253,6 +253,9 @@ def cmd_release(args) -> dict:
 
 def cmd_status(args) -> dict:
     project = Path(args.project).resolve()
+    # 查狀態不能順手建出空的進度檔: 非 lab 專案多了它, 之後 release 會誤判成 lab 專案
+    if not (project / ".lab" / "checkpoint.sqlite").exists():
+        raise SetupError(f"{project} 不是 game-studio-lab 專案(沒有 .lab/checkpoint.sqlite)")
     session = Session(project, make_deps())
     snap = session.snapshot()
     session.close()

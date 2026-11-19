@@ -18,7 +18,7 @@ from lab.release import (aspect_ratio, build_options_page, parse_release_info, p
                          png_size, write_asset_info, write_png, prune_release_game,
                          write_site_info, touch_mode)
 
-INFO = {"name": "幽影接力", "code": "ghost-echo", "intro": "和過去的自己接力闖關。", "time": "5–10 分鐘",
+INFO = {"tag": "平台跳躍＋接力", "pitch": "和死前的自己接力", "name": "", "code": "ghost-echo", "intro": "和過去的自己接力闖關。", "time": "5–10 分鐘",
         "time_estimated": True, "ratio": "9:16", "ratio_site": False}
 COLORS = [{"id": "1", "bg": "#f29cac", "fg": "#2d2144", "note": "粉"},
           {"id": "2", "bg": "#4776c3", "fg": "#ffffff", "note": "藍"},
@@ -26,13 +26,16 @@ COLORS = [{"id": "1", "bg": "#f29cac", "fg": "#2d2144", "note": "粉"},
 
 
 def test_parse_release_info_ok():
-    got = parse_release_info("名稱: 幽影接力\n代號：ghost-echo\n介紹: 和過去的自己接力闖關。\n")
-    assert got == {"name": "幽影接力", "code": "ghost-echo", "intro": "和過去的自己接力闖關。", "redo_art": False}
+    got = parse_release_info("標籤: 平台跳躍 + 接力\n玩法：和死前的自己接力\n代號：ghost-echo\n介紹: 和過去的自己接力闖關。\n")
+    assert got == {"tag": "平台跳躍＋接力", "pitch": "和死前的自己接力", "name": "", "code": "ghost-echo",
+                   "intro": "和過去的自己接力闖關。", "redo_art": False}
+    assert parse_release_info("標籤: a＋b\n玩法: c\n名稱: 幽影接力\n代號: ghost-echo\n介紹: x\n")["name"] == "幽影接力"
 
 
 @pytest.mark.parametrize("text,word", [
-    ("名稱: 幽影接力\n代號: ghost-echo\n", "介紹"),
-    ("名稱: 幽影接力\n代號: Ghost_Echo\n介紹: x\n", "代號"),
+    ("標籤: a＋b\n玩法: c\n代號: ghost-echo\n", "介紹"),
+    ("名稱: 幽影接力\n代號: ghost-echo\n介紹: x\n", "標籤"),
+    ("標籤: a＋b\n玩法: c\n代號: Ghost_Echo\n介紹: x\n", "代號"),
 ])
 def test_parse_release_info_rejects(text, word):
     with pytest.raises(ValueError, match=word):
@@ -64,28 +67,31 @@ def test_options_page_lists_all(tmp_path):
     (tmp_path / "options").mkdir()
     page = build_options_page(tmp_path, INFO, COLORS).read_text(encoding="utf-8")
     for s in ["圖示 A", "圖示 B", "圖示 C", "主色 1", "主色 2", "主色 3", "橫幅 A", "橫幅 C",
-              "#f29cac", "#4776c3", "#e0c64f", "icon-a.png", "banner-c.png", "pattern-3.png", "幽影接力"]:
+              "#f29cac", "#4776c3", "#e0c64f", "icon-a.png", "banner-c.png", "pattern-3.png", "平台跳躍＋接力"]:
         assert s in page
     assert "<button" not in page and "<input" not in page
 
 
 def test_asset_info_fields(tmp_path):
     text = write_asset_info(tmp_path, INFO, COLORS[1]).read_text(encoding="utf-8")
-    for s in ["遊戲代號", "遊戲名稱", "遊戲介紹", "遊玩時長", "遊戲主色", "遊戲畫面比例",
+    for s in ["遊戲代號", "核心玩法標籤", "平台跳躍＋接力", "遊戲玩法", "和死前的自己接力", "遊戲介紹", "遊玩時長", "遊戲主色", "遊戲畫面比例",
               "ghost-echo", "5–10 分鐘(估計)", "#4776c3", "#ffffff", "白色字",
               "不是 16:9"]:
         assert s in text
-    assert "操作方式說明" not in text
+    assert "操作方式說明" not in text and "遊戲名稱" not in text
+    assert "遊戲名稱 | 幽影接力(網站不顯示)" in write_asset_info(tmp_path, {**INFO, "name": "幽影接力"}, COLORS[1]).read_text(encoding="utf-8")
 
 
 def test_site_info_matches_website_format(tmp_path):
     info = {**INFO, "time": "5-10 分鐘", "ratio": "16:9", "mobile_ratio": "16:9-21:9"}
     data = json.loads(write_site_info(tmp_path, info, {"bg": "#4AC", "fg": "#FFF"}).read_text(encoding="utf-8"))
-    assert data == {"code": "ghost-echo", "name": "幽影接力", "intro": "和過去的自己接力闖關。", "time": "5–10 分鐘",
+    assert data == {"code": "ghost-echo", "tag": "平台跳躍＋接力", "pitch": "和死前的自己接力", "intro": "和過去的自己接力闖關。", "time": "5–10 分鐘",
                     "color": "#44aacc", "textColor": "#ffffff", "ratio": "16:9",
                     "mobileRatio": "16:9-21:9"}
     data = json.loads(write_site_info(tmp_path, INFO, COLORS[0]).read_text(encoding="utf-8"))
     assert data["textColor"] == "#2d2144" and data["mobileRatio"] == "9:16" and "mobile" not in data and "device" not in data
+    data = json.loads(write_site_info(tmp_path, {**INFO, "name": "幽影接力"}, COLORS[0]).read_text(encoding="utf-8"))
+    assert data["name"] == "幽影接力"
 
 
 def test_prune_release_game_keeps_only_runtime_files(tmp_path):
@@ -113,7 +119,7 @@ class Rel:
         self.runner = runner or FakeRunner()
         self.renderer = renderer or FakeRenderer()
         self.info = tmp_path / "release-info.md"
-        self.info.write_text("名稱: 捕泡手\n代號: bubble-catcher\n介紹: 跟著節拍戳泡泡。\n", encoding="utf-8")
+        self.info.write_text("標籤: 節奏＋點擊\n玩法: 跟著節拍戳泡泡\n代號: bubble-catcher\n介紹: 跟著節拍戳泡泡。\n", encoding="utf-8")
 
     def call(self, inp):
         conn = sqlite3.connect(self.project / ".lab" / "release.sqlite", check_same_thread=False)
@@ -154,7 +160,7 @@ def test_release_pauses_with_options_page(tmp_path):
     for n in ("banner-a", "banner-b", "banner-c"):
         assert png_size(opts / f"{n}.png") == (1680, 720)
     info = json.loads((opts / "info.json").read_text(encoding="utf-8"))
-    assert info["name"] == "捕泡手" and info["code"] == "bubble-catcher" and info["touch"] is False
+    assert info["tag"] == "節奏＋點擊" and info["pitch"] == "跟著節拍戳泡泡" and info["code"] == "bubble-catcher" and info["touch"] is False
     assert info["ratio"] == "3:4" and info["ratio_site"] is False
 
 
@@ -367,7 +373,7 @@ def test_rerelease_reuses_previous_assets(tmp_path):
     rel = _released(tmp_path)
     assets = rel.project / "release" / "assets"
     before = {n: (assets / n).read_bytes() for n in ("icon.png", "banner.png", "pattern.png")}
-    rel.info.write_text("名稱: 捕泡手\n代號: bubble-catcher\n介紹: 跟著節拍戳泡泡吧。\n", encoding="utf-8")
+    rel.info.write_text("標籤: 節奏＋點擊\n玩法: 跟著節拍戳泡泡\n代號: bubble-catcher\n介紹: 跟著節拍戳泡泡吧。\n", encoding="utf-8")
     snap, err = rel.start()
     assert err is None and not snap.next and not snap.interrupts   # 不停在挑選
     assert calls(rel.runner, "release-art") == 1                    # 只有第一次發布做過方案
@@ -378,7 +384,7 @@ def test_rerelease_reuses_previous_assets(tmp_path):
 
 def test_rerelease_redo_art_when_asked(tmp_path):
     rel = _released(tmp_path)
-    rel.info.write_text("名稱: 捕泡手\n代號: bubble-catcher\n介紹: 跟著節拍戳泡泡。\n素材: 重做\n", encoding="utf-8")
+    rel.info.write_text("標籤: 節奏＋點擊\n玩法: 跟著節拍戳泡泡\n代號: bubble-catcher\n介紹: 跟著節拍戳泡泡。\n素材: 重做\n", encoding="utf-8")
     snap, err = rel.start()
     assert err is None and snap.interrupts[0].value["kind"] == "waiting_release_pick"
     assert calls(rel.runner, "release-art") == 2
@@ -386,7 +392,7 @@ def test_rerelease_redo_art_when_asked(tmp_path):
 
 def test_pick_reuse_keeps_previous_assets(tmp_path):
     rel = _released(tmp_path)
-    rel.info.write_text("名稱: 捕泡手\n代號: bubble-catcher\n介紹: 跟著節拍戳泡泡。\n素材: 重做\n", encoding="utf-8")
+    rel.info.write_text("標籤: 節奏＋點擊\n玩法: 跟著節拍戳泡泡\n代號: bubble-catcher\n介紹: 跟著節拍戳泡泡。\n素材: 重做\n", encoding="utf-8")
     assets = rel.project / "release" / "assets"
     icon = (assets / "icon.png").read_bytes()
     rel.start()
@@ -395,6 +401,6 @@ def test_pick_reuse_keeps_previous_assets(tmp_path):
 
 
 def test_parse_release_info_redo_art():
-    assert parse_release_info("名稱: a\n代號: a\n介紹: a\n")["redo_art"] is False
-    assert parse_release_info("名稱: a\n代號: a\n介紹: a\n素材: 重做\n")["redo_art"] is True
+    assert parse_release_info("標籤: a\n玩法: a\n代號: a\n介紹: a\n")["redo_art"] is False
+    assert parse_release_info("標籤: a\n玩法: a\n代號: a\n介紹: a\n素材: 重做\n")["redo_art"] is True
     assert parse_release_pick("沿用上次") == {"reuse": True}

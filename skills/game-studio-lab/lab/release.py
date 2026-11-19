@@ -34,14 +34,17 @@ def _parse_kv(text: str) -> dict:
 
 def parse_release_info(text: str) -> dict:
     kv = _parse_kv(text)
-    missing = [k for k in ("名稱", "代號", "介紹") if not kv.get(k)]
+    missing = [k for k in ("標籤", "玩法", "代號", "介紹") if not kv.get(k)]
     if missing:
         raise ValueError(f"發布資訊缺少: {'、'.join(missing)}")
     code = kv["代號"].strip("`")
     if not CODE_RE.match(code):
         raise ValueError(f"代號「{code}」格式不對: 只能用英文小寫、數字與連字號, 例 dungeon-zoo")
+    # 網站以核心玩法標籤稱呼遊戲, 不顯示名稱; 標籤一律用全形加號(「塔防＋組裝」)
+    tag = re.sub(r"\s*[+＋]\s*", "＋", kv["標籤"].strip())
     # 素材: 重做 → 再次發布也重做圖示 / 主色 / 橫幅方案讓使用者挑; 沒寫就沿用上次定版的(見 previous_assets)
-    return {"name": kv["名稱"], "code": code, "intro": kv["介紹"], "redo_art": kv.get("素材", "").strip() in ("重做", "重挑")}
+    return {"tag": tag, "pitch": kv["玩法"], "name": kv.get("名稱", ""), "code": code, "intro": kv["介紹"],
+            "redo_art": kv.get("素材", "").strip() in ("重做", "重挑")}
 
 
 def previous_assets(release: Path) -> dict | None:
@@ -205,13 +208,13 @@ def build_options_page(release: Path, info: dict, colors: list[dict]) -> Path:
     cards = "".join(
         f'<div class="opt"><h3>主色 {c["id"]}</h3>'
         f'<div class="band" style="background-color:{e(c["bg"])};background-image:url(pattern-{e(str(c["id"]))}.png)"></div>'
-        f'<div class="card"><img src="icon-a.png"><b>{e(info["name"])}</b><span>{e(info.get("time", ""))}</span></div>'
+        f'<div class="card"><img src="icon-a.png"><b>{e(info["tag"])}</b><span>{e(info.get("time", ""))}</span></div>'
         f'<div class="note">{e(c["bg"])} / 字 {e(c["fg"])}　{e(c.get("note", ""))}</div></div>'
         for c in colors)
     banners = "".join(f'<div class="opt"><h3>橫幅 {i}</h3><div class="ban"><img class="big" src="banner-{i.lower()}.png" width="700"></div></div>'
                       for i in ICON_IDS)
-    page = (f'<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>{e(info["name"])} 發布方案</title>'
-            f"<style>{_PAGE_CSS}</style></head><body><h1>{e(info['name'])} 發布方案</h1>"
+    page = (f'<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>{e(info["tag"])} 發布方案</title>'
+            f"<style>{_PAGE_CSS}</style></head><body><h1>{e(info['tag'])} 發布方案</h1>"
             f"<div>看完回報代號, 例「圖示 B、主色 2、橫幅 A」</div>"
             f'<h2>遊戲圖示</h2><div class="row">{icons}</div>'
             f'<h2>遊戲主色</h2><div class="row">{cards}</div>'
@@ -297,12 +300,14 @@ def _hex6(c: str) -> str:
 
 def write_site_info(release: Path, info: dict, color: dict) -> Path:
     """給網站同步工具讀的 assets/info.json(格式見 PVD計畫網站《遊戲發布格式》第三節)。"""
-    data = {"code": info["code"], "name": info["name"], "intro": info["intro"],
+    data = {"code": info["code"], "tag": info["tag"], "pitch": info["pitch"], "intro": info["intro"],
             "time": re.sub(r"\s*[-~～—]\s*", "–", info.get("time", ""), count=1),
             "color": _hex6(color["bg"]),
             "textColor": "#ffffff" if _hex6(color["fg"]) == "#ffffff" else "#2d2144",
             "ratio": info.get("ratio", "未知")}
     data["mobileRatio"] = info.get("mobile_ratio") or data["ratio"]
+    if info.get("name"):   # 非必要: 網站不顯示名稱
+        data["name"] = info["name"]
     out = Path(release) / "assets" / "info.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -316,12 +321,13 @@ def write_asset_info(release: Path, info: dict, color: dict) -> Path:
     if info.get("mobile_ratio") and info["mobile_ratio"] != ratio:
         ratio_text = f"電腦 {ratio_text}; 手機依螢幕 {info['mobile_ratio'].replace('-', '～')}"
     fg = "白色字" if color["fg"].lower() in ("#fff", "#ffffff") else "深色字"
-    rows = [("遊戲代號", f"`{info['code']}`"), ("遊戲名稱", info["name"]), ("遊戲圖示", "`icon.png`(512×512)"),
+    rows = [("遊戲代號", f"`{info['code']}`"), ("核心玩法標籤", info["tag"]), ("遊戲玩法", info["pitch"]),
+            *([("遊戲名稱", info["name"] + "(網站不顯示)")] if info.get("name") else []), ("遊戲圖示", "`icon.png`(512×512)"),
             ("遊戲介紹", info["intro"]), ("遊玩時長", time),
             ("遊戲主色", f"`{color['bg']}`, 字用{fg} `{color['fg']}`"),
             ("遊戲檔案", "`../game/`(入口 `index.html`)"), ("遊戲畫面比例", ratio_text),
             ("遊戲橫幅", "`banner.png`(1680×720)"), ("色帶圖樣", "`pattern.png`(256×256, 跟主色一組)")]
-    text = f"# {info['name']} 素材資訊\n\n| 項目 | 內容 |\n|---|---|\n" + "".join(f"| {k} | {v} |\n" for k, v in rows)
+    text = f"# {info['tag']} 素材資訊\n\n| 項目 | 內容 |\n|---|---|\n" + "".join(f"| {k} | {v} |\n" for k, v in rows)
     out = Path(release) / "assets" / "素材資訊.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(text, encoding="utf-8")

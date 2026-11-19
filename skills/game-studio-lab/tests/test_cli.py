@@ -85,7 +85,7 @@ def test_status(env, capsys):
     assert out["status"] == "waiting_feedback" and "fix" in out["allowed_choices"]
 
 
-INFO = "名稱: 金幣雨\n代號: coin-rain\n介紹: 點擊收集掉落的金幣。\n"
+INFO = "標籤: 收集＋閃避\n玩法: 點擊收集掉落的金幣\n代號: coin-rain\n介紹: 點擊收集掉落的金幣。\n"
 PICK = "圖示: A\n主色: 3\n橫幅: B\n"
 
 
@@ -111,7 +111,7 @@ def test_release_choice_validation(env, capsys):
     call(capsys, "resume", env["project"], "--choice", "next", "--feedback", fb)
     fb = write(env["project"] / "deepen-1" / "feedback.md", "# 回饋")
     call(capsys, "resume", env["project"], "--choice", "next", "--feedback", fb)
-    bad = write(env["tmp"] / "bad.md", "名稱: 金幣雨\n代號: coin-rain\n")
+    bad = write(env["tmp"] / "bad.md", "標籤: 收集＋閃避\n玩法: 點擊收集掉落的金幣\n代號: coin-rain\n")
     code, out = call(capsys, "resume", env["project"], "--choice", "release", "--feedback", bad)
     assert code == 1 and "介紹" in out["error"]
     code, out = call(capsys, "resume", env["project"], "--choice", "release", "--feedback", info)
@@ -191,3 +191,9 @@ def test_standalone_rejects_lab_project(env, capsys):
 def test_standalone_requires_game(tmp_path, capsys):
     code, out = call(capsys, "release", tmp_path, "--info", write(tmp_path / "i.md", INFO))
     assert code == 1 and "game/index.html" in out["error"]
+
+
+def test_status_does_not_create_checkpoint(tmp_path, capsys):
+    code, out = call(capsys, "status", tmp_path)
+    assert code == 1 and "不是 game-studio-lab 專案" in out["error"]
+    assert not (tmp_path / ".lab" / "checkpoint.sqlite").exists()

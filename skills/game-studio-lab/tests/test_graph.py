@@ -207,7 +207,7 @@ def test_polish_release_then_back_to_interview(tmp_path):
     lab.resume(choice="next", feedback=lab.feedback("explore-1"))
     lab.resume(choice="next", feedback=lab.feedback("deepen-1"))
     info = lab.project / "polish" / "release-info.md"
-    info.write_text("名稱: 金幣雨\n代號: coin-rain\n介紹: 點擊收集掉落的金幣。\n", encoding="utf-8")
+    info.write_text("標籤: 收集＋閃避\n玩法: 點擊收集掉落的金幣\n代號: coin-rain\n介紹: 點擊收集掉落的金幣。\n", encoding="utf-8")
     snap, err = lab.resume(choice="release", feedback=str(info))
     assert err is None, err
     assert interrupt_of(snap)["kind"] == "waiting_release_pick"
