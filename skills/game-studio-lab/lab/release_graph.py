@@ -81,7 +81,10 @@ def build_release_graph(deps, checkpointer=None):
         out = release / "options" / "info.json"
         out.unlink(missing_ok=True)
         c = ctx(s)
-        deps.runner.run("release-info", c)
+        if c.get("time"):   # 發布資訊檔有寫時長就照用, 不跑重估
+            out.write_text(json.dumps({"time": c["time"], "time_estimated": False}, ensure_ascii=False), encoding="utf-8")
+        else:
+            deps.runner.run("release-info", c)
         if not out.exists():
             raise LabError("素材資訊節點沒有寫出 release/options/info.json")
         data = json.loads(out.read_text(encoding="utf-8"))

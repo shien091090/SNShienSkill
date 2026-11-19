@@ -43,7 +43,9 @@ def parse_release_info(text: str) -> dict:
     # 網站以核心玩法標籤稱呼遊戲, 不顯示名稱; 標籤一律用全形加號(「塔防＋組裝」)
     tag = re.sub(r"\s*[+＋]\s*", "＋", kv["標籤"].strip())
     # 素材: 重做 → 再次發布也重做圖示 / 主色 / 橫幅方案讓使用者挑; 沒寫就沿用上次定版的(見 previous_assets)
-    return {"tag": tag, "pitch": kv["玩法"], "name": kv.get("名稱", ""), "code": code, "intro": kv["介紹"],
+    # 時長: 選填; 使用者定過就照用, 不再由素材資訊節點從試玩紀錄重估(重估會蓋掉使用者定的值)
+    time = re.sub(r"\s*[-~～—–]\s*", "–", kv.get("時長", "").strip(), count=1)
+    return {"tag": tag, "pitch": kv["玩法"], "name": kv.get("名稱", ""), "code": code, "intro": kv["介紹"], "time": time,
             "redo_art": kv.get("素材", "").strip() in ("重做", "重挑")}
 
 

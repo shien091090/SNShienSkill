@@ -28,7 +28,8 @@ COLORS = [{"id": "1", "bg": "#f29cac", "fg": "#2d2144", "note": "粉"},
 def test_parse_release_info_ok():
     got = parse_release_info("標籤: 平台跳躍 + 接力\n玩法：和死前的自己接力\n代號：ghost-echo\n介紹: 和過去的自己接力闖關。\n")
     assert got == {"tag": "平台跳躍＋接力", "pitch": "和死前的自己接力", "name": "", "code": "ghost-echo",
-                   "intro": "和過去的自己接力闖關。", "redo_art": False}
+                   "intro": "和過去的自己接力闖關。", "time": "", "redo_art": False}
+    assert parse_release_info("標籤: a＋b\n玩法: c\n代號: ghost-echo\n介紹: x\n時長: 2 - 5 分鐘\n")["time"] == "2–5 分鐘"
     assert parse_release_info("標籤: a＋b\n玩法: c\n名稱: 幽影接力\n代號: ghost-echo\n介紹: x\n")["name"] == "幽影接力"
 
 
@@ -404,3 +405,13 @@ def test_parse_release_info_redo_art():
     assert parse_release_info("標籤: a\n玩法: a\n代號: a\n介紹: a\n")["redo_art"] is False
     assert parse_release_info("標籤: a\n玩法: a\n代號: a\n介紹: a\n素材: 重做\n")["redo_art"] is True
     assert parse_release_pick("沿用上次") == {"reuse": True}
+
+
+def test_release_info_time_skips_estimate(tmp_path):
+    rel = Rel(tmp_path)
+    rel.info.write_text(rel.info.read_text(encoding="utf-8") + "時長: 2~5 分鐘\n", encoding="utf-8")
+    snap, err = rel.start()
+    assert err is None, err
+    assert calls(rel.runner, "release-info") == 0   # 使用者定過時長就不重估
+    info = json.loads((rel.project / "release" / "options" / "info.json").read_text(encoding="utf-8"))
+    assert info["time"] == "2–5 分鐘" and info["time_estimated"] is False
