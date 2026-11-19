@@ -28,7 +28,7 @@
 只做一關、不考慮難度、不做音效。
 
 ### interface.json
-`{"canvas": {"width": 1280, "height": 720}, "draw": [{"name", "state", "size"}...], "guidePages": N}` — 物件清單每個物件一個 `draw<物件名>`, 另有 `drawBackground`(只收 ctx)與 `drawHud`; `drawGuidePage` 固定存在不列; `canvas` 固定 1280×720(16:9 橫式, PVD計畫網站的電腦遊玩框比例; 發布時手機寬螢幕在兩側加寬, 見探索的同一條), 版面照這個尺寸設計。寫完照 `$studio_refs/interface-checklist.md` 逐項自查。美術與 RD 會同時照它開工, 寫完不能改。
+`{"canvas": {"width": 1280, "height": 720}, "draw": [{"name", "state", "size"}...], "guidePages": N}` — 物件清單每個物件一個 `draw<物件名>`, 另有 `drawBackground`(只收 ctx)與 `drawHud`; `drawGuidePage` 固定存在不列; `canvas` 固定 1280×720(16:9 橫式, PVD計畫網站的電腦遊玩框比例; 發布時手機寬螢幕在兩側加寬, 見探索的同一條), 版面照這個尺寸設計。寫完照 `$studio_refs/interface-checklist.md` 逐項自查(沿用上一輪沒改的函式也要整份重跑, 不只查新改的; 上一輪美術 / RD 回報裡有提到、還沒補的介面缺口一併補上——同一個缺口曾因只補當輪點名的項目而連續三輪沒補)。美術與 RD 會同時照它開工, 寫完不能改。
 
 ### guide.md
 照 guide-principles.md, 每頁寫文字、「圖要示意什麼」與示意圖框的最小寬高。「圖要示意什麼」裡的每個狀態, 都先拿規則的數值與狀態轉換時點驗算, 確認規則上真的會出現(例: 計數到上限的那一刻已經換成別的狀態, 就不能要求畫「上限 + 原狀態」); 圖裡標出的每個按鍵, 也要確認圖中那個道具 / 角色真的支援該動作。

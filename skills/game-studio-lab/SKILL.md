@@ -117,7 +117,7 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 
 `error` 是錯誤原文。判斷原因: 是環境問題(權限、網路、claude 登入)→ 請使用者處理後 `resume <專案>`; 是程式問題 → 修 `lab/` 後 `resume`; 不確定 → 原文給使用者看並說你的判斷。已完成的節點不會重做。
 
-錯誤是某節點「逾時」: 每個 `claude -p` 預設上限 2400 秒(`lab/runner.py`), 深掘、打磨的關卡數與系統變多時 RD 容易超過。放寬上限後接續: `LAB_CLAUDE_TIMEOUT=3600 .venv/Scripts/python -m lab resume <專案>`, 只重跑逾時的那個節點。
+錯誤是某節點「逾時」: 每個 `claude -p` 預設上限 2400 秒(`lab/runner.py`), 深掘、打磨的關卡數與系統變多時 RD 容易超過。放寬上限後接續: `LAB_CLAUDE_TIMEOUT=3600 .venv/Scripts/python -m lab resume <專案>`, 只重跑逾時的那個節點; 3600 仍逾時就改 5400(深掘第三輪起 8 關加多套系統的 RD 曾需要約 70 分鐘)。等待中想確認節點沒卡住: 看 `~/.claude/projects/<專案路徑轉成的資料夾>/` 最新 jsonl 的修改時間, RD 常一次寫出整份 game.js, 十幾分鐘沒新檔案是正常的。錯誤原文是 `usage_limit_reached` 時屬環境問題, 等額度重置後再 `resume`
 
 ### paused: 流程行程被中途砍掉
 
