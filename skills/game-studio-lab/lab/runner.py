@@ -85,7 +85,7 @@ class ClaudeRunner:
         logs = project / ".lab" / "logs"
         logs.mkdir(parents=True, exist_ok=True)
         stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        tag = "-".join(x for x in (kind, ctx.get("round_dir"), ctx.get("game")) if x)
+        tag = "-".join(x for x in (kind, ctx.get("round_dir"), ctx.get("game"), ctx.get("element")) if x)
         log_path = logs / f"{stamp}-{tag}.json"
         try:
             r = subprocess.run(cmd, input=prompt, cwd=project, capture_output=True, text=True,

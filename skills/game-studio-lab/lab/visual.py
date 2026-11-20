@@ -93,10 +93,10 @@ def option_notes(options_dir: Path, code: str) -> dict:
 
 _CSS = """
 body{margin:0;padding:24px 16px;background:#f6f4f8;color:#2d2144;font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif}
-main{max-width:1200px;margin:0 auto}
+main{max-width:1400px;margin:0 auto}
 h1{font-size:22px;margin:0 0 4px}h2{font-size:18px;margin:36px 0 4px}
 .why{font-size:13px;opacity:.8;margin:0 0 12px}
-.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.row{display:grid;grid-template-columns:1fr;gap:20px}
 .opt{background:#fff;border-radius:12px;padding:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);min-width:0}
 .opt h3{margin:0 0 8px;font-size:16px}
 canvas{display:block;width:100%;height:auto;background:#222;border-radius:6px}
@@ -104,6 +104,7 @@ canvas{display:block;width:100%;height:auto;background:#222;border-radius:6px}
 .ctl button{font:inherit;font-size:14px;padding:4px 14px;border-radius:999px;border:1px solid #2d2144;background:#fff;color:#2d2144;cursor:pointer}
 .ctl input{flex:1}
 .note{font-size:13px;margin-top:8px}
+.note summary{cursor:pointer;opacity:.6}
 """
 
 _JS = """
@@ -156,17 +157,17 @@ def build_visual_page(visual_dir: Path, elements: list[dict], art_js: Path) -> P
             src = (opts_dir / f"{el['code']}-{i}.js").read_text(encoding="utf-8").replace("</script", "<\\/script")
             scripts.append(f"<script>window.VISUAL_OPTION=null;\n{src}\n;window.__OPTS.push(window.VISUAL_OPTION);</script>")
             cells.append(f'<div class="opt"><h3>{e(el["code"])} 方案 {i}</h3><div data-opt="{n}"></div>'
-                         f'<div class="note">{e(notes.get(i, ""))}</div></div>')
+                         f'<details class="note"><summary>方案說明</summary>{e(notes.get(i, ""))}</details></div>')
             n += 1
         kind = "動態" if el["kind"] == "anim" else "靜態"
+        # 使用者看圖挑方案: 元素內容與方案說明不攤開(說明收進可展開的小字), 每個方案獨佔一列、畫布用滿寬度
         sections.append(f'<h2>{e(el["name"])}（{e(el["code"])}，{kind}）</h2>'
-                        f'<p class="why">{e(el["content"])}{"；" + e(el["why"]) if el["why"] else ""}</p>'
                         f'<div class="row">{"".join(cells)}</div>')
     art = Path(art_js).read_text(encoding="utf-8").replace("</script", "<\\/script")
     page = (f'<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width,initial-scale=1"><title>視覺方案</title>'
             f"<style>{_CSS}</style></head><body><main><h1>視覺方案</h1>"
-            f'<p class="why">每個元素三個方向; 動態方案按「播放」看效果, 可拖進度條。回覆每個元素選哪個, 例「title: B」。</p>'
+            f'<p class="why">動態方案按「播放」。回覆例「title: B」。</p>'
             f'{"".join(sections)}</main><script>window.__OPTS=[];</script><script>{art}</script>'
             f'{"".join(scripts)}<script>{_JS}</script></body></html>')
     out = opts_dir / "index.html"

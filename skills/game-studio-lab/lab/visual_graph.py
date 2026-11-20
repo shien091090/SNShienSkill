@@ -1,11 +1,14 @@
 """視覺設計節點: 挑底版 + 列元素清單 → 等使用者確認 → 每個元素出 3 個方案 → 方案頁 → 等使用者挑 → 寫視覺方向。
 
 深掘選 next 檢討假設後、打磨第一輪設計前跑一次(已有 visual/direction.md 就不再跑)。
-美術方案一個元素起一次 claude -p, 依序跑(並行容易吃光記憶體); 完成標記讓中斷接續時跳過已出好的元素。
+美術方案一個元素起一次 claude -p, 預設依序跑(並行容易吃光記憶體); 環境變數 LAB_VISUAL_PARALLEL=N 可同時跑 N 個元素
+(記憶體充足時用)。完成標記讓中斷接續時跳過已出好的元素; 並行時某個元素失敗, 其他元素照樣跑完並寫標記, 最後才報錯。
 設計見 docs/2026-11-19-visual-design-stage-design.md。
 
 不包成子圖: 同一個子圖裡有兩個停點時, 中途當掉後接續會把上一個停點的回答錯配給下一個停點, 所以每步都是主圖節點。
 """
+import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from langgraph.types import Command, interrupt
 
@@ -56,10 +59,8 @@ def add_visual_nodes(g, deps, done: str) -> str:
         vdir, parsed = visual_dir(s), load_elements(s)
         opts = vdir / "options"
         base_dir = Path(s["project"]) / parsed["base"]
-        for el in parsed["elements"]:
-            marker = opts / f".done-{el['code']}"
-            if marker.exists():
-                continue
+
+        def one(el):
             redo = opts / f"{el['code']}-redo.md"
             deps.runner.run("visual-art", {
                 "project": s["project"], "stage": "visual", "visual_dir": str(vdir), "base_dir": str(base_dir),
@@ -69,7 +70,19 @@ def add_visual_nodes(g, deps, done: str) -> str:
             missing = missing_options(opts, [el["code"]])
             if missing:
                 raise LabError(f"元素 {el['code']} 的方案缺檔: {', '.join(missing)}")
-            marker.write_text("", encoding="utf-8")
+            (opts / f".done-{el['code']}").write_text("", encoding="utf-8")
+
+        todo = [el for el in parsed["elements"] if not (opts / f".done-{el['code']}").exists()]
+        workers = max(1, int(os.environ.get("LAB_VISUAL_PARALLEL", "1") or 1))
+        if workers == 1:
+            for el in todo:
+                one(el)
+            return {}
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [pool.submit(one, el) for el in todo]
+        errors = [f.exception() for f in futures if f.exception()]
+        if errors:
+            raise errors[0]
         return {}
 
     def page(s):

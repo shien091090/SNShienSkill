@@ -274,6 +274,31 @@ def test_visual_resume_skips_done(tmp_path):
     assert count(lab.runner, "visual-art") == 3
 
 
+def test_visual_parallel(tmp_path, monkeypatch):
+    monkeypatch.setenv("LAB_VISUAL_PARALLEL", "3")
+    lab = Lab(tmp_path, FakeRunner())
+    lab.start()
+    lab.resume(choice="next", feedback=lab.feedback("explore-1"))
+    lab.resume(choice="next", feedback=lab.feedback("deepen-1"))
+    snap, err = lab.resume(choice="confirm")
+    assert err is None and interrupt_of(snap)["kind"] == "waiting_visual_pick"
+    assert count(lab.runner, "visual-art") == 2
+
+
+def test_visual_parallel_failure_keeps_others(tmp_path, monkeypatch):
+    monkeypatch.setenv("LAB_VISUAL_PARALLEL", "3")
+    lab = Lab(tmp_path, FakeRunner(fail_nth={"visual-art": 1}))   # 有一個元素當掉
+    lab.start()
+    lab.resume(choice="next", feedback=lab.feedback("explore-1"))
+    lab.resume(choice="next", feedback=lab.feedback("deepen-1"))
+    snap, err = lab.resume(choice="confirm")
+    assert err is not None
+    assert len(list((lab.project / "visual" / "options").glob(".done-*"))) == 1   # 另一個元素照樣完成
+    snap, err = lab.call(None)
+    assert err is None and interrupt_of(snap)["kind"] == "waiting_visual_pick"
+    assert count(lab.runner, "visual-art") == 3
+
+
 def test_visual_runs_once(tmp_path):
     lab = Lab(tmp_path, FakeRunner())
     lab.start()
