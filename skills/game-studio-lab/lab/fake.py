@@ -3,6 +3,7 @@
 break_once: {(kind, game)} 該任務第一次寫出壞掉的產物(讓接合腳本抓到)
 fail_once:  {(kind, game)} 該任務第一次直接拋錯(模擬 claude -p 當掉)
 triage_target: 錯誤判定一律退回給誰(預設看哪個檔壞了)
+fail_nth:   {kind: n} 該任務第 n 次呼叫時拋錯一次(測中斷接續)
 """
 import json
 import shutil
@@ -14,7 +15,9 @@ STUDIO_REFS = Path(__file__).resolve().parent.parent / "references"
 
 
 class FakeRunner:
-    def __init__(self, break_once=None, fail_once=None, games_per_round=2, drop_option=None, touch="none"):
+    def __init__(self, break_once=None, fail_once=None, games_per_round=2, drop_option=None, touch="none",
+                 fail_nth=None):
+        self.fail_nth = dict(fail_nth or {})
         self.drop_option = drop_option  # 發布美術少寫的那張繪製頁(例 "banner-c.html")
         self.touch = touch  # 發布 RD 寫進 touch.js 的 CONFIG.mode; None = 沒加觸控層
         self.break_once = set(break_once or ())
@@ -30,6 +33,9 @@ class FakeRunner:
             if key in self.fail_once:
                 self.fail_once.discard(key)
                 raise RuntimeError(f"假的 claude 當掉: {key}")
+            if self.fail_nth.get(kind) == sum(1 for k, _, _ in self.calls if k == kind):
+                del self.fail_nth[kind]
+                raise RuntimeError(f"假的 claude 當掉: 第 {sum(1 for k, _, _ in self.calls if k == kind)} 次 {kind}")
             broken = key in self.break_once
             self.break_once.discard(key)
         getattr(self, "_" + kind.replace("-", "_"))(ctx, broken)
@@ -38,6 +44,12 @@ class FakeRunner:
     # ---- 各任務 ----
     def _design(self, ctx, broken):
         project = Path(ctx["project"])
+        if ctx["stage"] == "visual":
+            base = sorted(p.name for p in (project / ctx["round_dir"]).iterdir() if (p / "interface.json").exists())[0]
+            (Path(ctx["visual_dir"]) / "elements.md").write_text(
+                f"底版: {ctx['round_dir']}/{base}\n\n## title — 開始畫面\n類型: 動態\n內容: 主視覺小動畫\n"
+                "為什麼是核心: 第一眼\n\n## hero — 主角\n類型: 靜態\n內容: 主角造型\n", encoding="utf-8")
+            return
         round_dir = project / ctx["round_dir"]
         names = ["game"] if ctx["stage"] == "polish" else \
             [f"game-{c}" for c in "abc"[: self.games_per_round]]
@@ -101,6 +113,14 @@ class FakeRunner:
     def _review(self, ctx, broken):
         with open(Path(ctx["project"]) / "hypotheses.md", "a", encoding="utf-8") as f:
             f.write(f"- {ctx['round_dir']} 檢討: 選擇 {ctx['choice']}\n")
+
+    def _visual_art(self, ctx, broken):
+        opts, code = Path(ctx["visual_dir"]) / "options", ctx["element"]
+        for i in "ABC":
+            (opts / f"{code}-{i}.js").write_text(
+                f"window.VISUAL_OPTION={{element:'{code}',id:'{i}',kind:'{ctx['element_kind']}',size:[320,180],"
+                "duration:2,loop:true,draw(ctx,t){ctx.fillRect(0,0,10+t*10,10)}};", encoding="utf-8")
+        (opts / f"{code}.md").write_text(f"A: {code} 一\nB: {code} 二\nC: {code} 三\n", encoding="utf-8")
 
     # ---- 發布 ----
     def _release_game(self, ctx, broken):

@@ -1,6 +1,6 @@
 """LangGraph 流程: 設計 → 分岔製作(每款一個子圖)→ 試玩訪談 → 檢討假設 → 依選擇分支。
 
-只有三個地方會停下來等人(interrupt): join(有款建置失敗)、interview(試玩訪談)與發布子圖的挑選方案。
+會停下來等人(interrupt)的地方: join(有款建置失敗)、interview(試玩訪談)、視覺設計的確認清單與挑方案、發布子圖的挑選方案。
 git commit 不在節點裡做, 由 CLI 在每次停下來後統一做, 確保進度檔已寫完。
 """
 import filecmp
@@ -154,7 +154,8 @@ def build_game_graph(deps: Deps):
 
 
 def build_graph(deps: Deps, checkpointer=None):
-    from lab.release_graph import build_release_graph  # 發布子圖反過來用到本檔的 LabError
+    from lab.release_graph import build_release_graph  # 發布 / 視覺設計子圖反過來用到本檔的 LabError
+    from lab.visual_graph import VISUAL_DIR, add_visual_nodes
     game_graph = build_game_graph(deps)
 
     def project_of(s) -> Path:
@@ -178,8 +179,10 @@ def build_graph(deps: Deps, checkpointer=None):
         (project / round_dir).mkdir(parents=True, exist_ok=True)
         if stage == "polish":
             reset_build_marks(project / POLISH_DIR / "game")
+        # visual_base: 視覺設計定的底版(打磨第一輪照它複製, 不自己挑); 沒跑過視覺設計是「無」
         deps.runner.run("design", {"project": str(project), "stage": stage, "round_dir": round_dir,
-                                   "round_no": rounds[stage], "prev_round": s.get("round_dir") or "無"})
+                                   "round_no": rounds[stage], "prev_round": s.get("round_dir") or "無",
+                                   "visual_base": s.get("visual_base") or "無"})
         games = round_games(project, round_dir)
         if stage == "polish" and games != ["game"]:
             raise LabError(f"打磨階段應只有一款 game/, 實際: {games}")
@@ -271,7 +274,13 @@ def build_graph(deps: Deps, checkpointer=None):
         return {"stage": new_stage}
 
     def after_review(s: LabState):
-        return END if s["choice"] == "end" else "design"
+        if s["choice"] == "end":
+            return END
+        # 深掘進打磨前插一次視覺設計; 每個專案只跑一次(已有方向檔就直接進打磨)
+        if (s["choice"] == "next" and s["round_dir"].startswith("deepen")
+                and not (project_of(s) / VISUAL_DIR / "direction.md").exists()):
+            return "visual_list"
+        return "design"
 
     g = StateGraph(LabState)
     g.add_node("setup", setup)
@@ -284,10 +293,11 @@ def build_graph(deps: Deps, checkpointer=None):
     g.add_node("review", review)
     # 發布不跑檢討假設; 定版後回到同一個打磨停點, 可再選繼續打磨 / 結束 / 再發布
     g.add_node("release", build_release_graph(deps))
+    visual_entry = add_visual_nodes(g, deps, done="design")
     g.add_edge("release", "interview")
     g.add_edge(START, "setup")
     g.add_edge("setup", "design")
     g.add_conditional_edges("design", fanout, ["build_game"])
     g.add_edge("build_game", "join")
-    g.add_conditional_edges("review", after_review, ["design", END])
+    g.add_conditional_edges("review", after_review, ["design", visual_entry, END])
     return g.compile(checkpointer=checkpointer)

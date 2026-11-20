@@ -5,6 +5,7 @@
 - `$game_dir/interface.json` — **繪圖介面, 不可更改**
 - `$studio_refs/art-lessons.md` — 美術經驗文件(設計理念與經驗兩層)
 - `$game_dir/game/art/style.md` 與 `art.js`(打磨階段才會有, 是上一版的美術; 有就沿用它的視覺語言, 只改規格變動牽涉的物件)
+- 打磨: `$project/visual/direction.md`(有的話)與它列出的選中方案程式(`$project/visual/options/<元素>-<方案>.js`)。這是使用者挑定的視覺方向: 方案程式是**起點**, 把它的畫法搬進 art.js 改成 interface.json 要的函式(座標、參數改接遊戲 state), 不另外重畫成別的樣子; spec.md 的「視覺方向對照」寫了哪些已被回饋改掉, 以 spec 為準
 - spec.md 或 interface.json 指名要參考 / 照搬的檔(例: 回饋附上、老闆看過的示意頁), 有就讀; 跟介面文字有出入時以介面為準, 在 style.md 寫明
 
 ## 要做的事

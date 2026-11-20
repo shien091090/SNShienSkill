@@ -95,11 +95,44 @@ def to_polish(env, capsys):
         fb = env["project"] / rd / "feedback.md"
         fb.write_text("# 回饋", encoding="utf-8")
         call(capsys, "resume", env["project"], "--choice", "next", "--feedback", fb)
+    call(capsys, "resume", env["project"], "--choice", "confirm")
+    pick = env["project"] / "visual" / "pick.md"
+    pick.write_text(VISUAL_PICK, encoding="utf-8")
+    call(capsys, "resume", env["project"], "--choice", "pick", "--feedback", pick)
 
 
 def write(path, text):
     path.write_text(text, encoding="utf-8")
     return path
+
+
+VISUAL_PICK = "title: A\nhero: B\n"
+
+
+def test_visual_stops(env, capsys):
+    call(capsys, "start", env["project"], "--idea-file", env["idea"], "--repo", env["remote"])
+    call(capsys, "resume", env["project"], "--choice", "next",
+         "--feedback", write(env["project"] / "explore-1" / "feedback.md", "# 回饋"))
+    code, out = call(capsys, "resume", env["project"], "--choice", "next",
+                     "--feedback", write(env["project"] / "deepen-1" / "feedback.md", "# 回饋"))
+    assert out["status"] == "waiting_visual_list" and out["elements"].endswith("elements.md")
+    assert out["allowed_choices"] == ["confirm"]
+    assert remote_log(env["remote"])[0] == "[docs] [proj] 1.深掘第1輪依試玩回饋檢討假設 2.視覺設計列出核心視覺元素"
+    code, out = call(capsys, "resume", env["project"], "--choice", "pick")
+    assert code == 1 and "confirm" in out["error"]
+    code, out = call(capsys, "resume", env["project"], "--choice", "confirm")
+    assert out["status"] == "waiting_visual_pick" and out["options_page"].endswith("index.html")
+    assert out["allowed_choices"] == ["pick", "redo"]
+    assert remote_log(env["remote"])[0] == "[feat] [proj] 視覺設計產出方案"
+    pick = env["project"] / "visual" / "pick.md"
+    code, out = call(capsys, "resume", env["project"], "--choice", "pick", "--feedback", write(pick, "title: A\n"))
+    assert code == 1 and "hero" in out["error"]
+    code, out = call(capsys, "resume", env["project"], "--choice", "redo", "--feedback", write(pick, "hero: 換方向\n"))
+    assert out["status"] == "waiting_visual_pick"
+    assert remote_log(env["remote"])[0] == "[feat] [proj] 視覺設計重做方案"
+    code, out = call(capsys, "resume", env["project"], "--choice", "pick", "--feedback", write(pick, VISUAL_PICK))
+    assert out["status"] == "waiting_feedback" and out["round_dir"] == "polish"
+    assert remote_log(env["remote"])[0] == "[feat] [proj] 1.視覺設計定案方向 2.打磨第1輪產出1款試玩版"
 
 
 def test_release_choice_validation(env, capsys):
@@ -111,6 +144,9 @@ def test_release_choice_validation(env, capsys):
     call(capsys, "resume", env["project"], "--choice", "next", "--feedback", fb)
     fb = write(env["project"] / "deepen-1" / "feedback.md", "# 回饋")
     call(capsys, "resume", env["project"], "--choice", "next", "--feedback", fb)
+    call(capsys, "resume", env["project"], "--choice", "confirm")
+    call(capsys, "resume", env["project"], "--choice", "pick",
+         "--feedback", write(env["project"] / "visual" / "pick.md", VISUAL_PICK))
     bad = write(env["tmp"] / "bad.md", "標籤: 收集＋閃避\n玩法: 點擊收集掉落的金幣\n代號: coin-rain\n")
     code, out = call(capsys, "resume", env["project"], "--choice", "release", "--feedback", bad)
     assert code == 1 and "介紹" in out["error"]

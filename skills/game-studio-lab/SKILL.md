@@ -33,7 +33,7 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 
 - `.venv` 不存在(新機器)→ 先 `python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt`
 - `start` / `resume` 一輪要跑幾十分鐘: **一律用 Bash 的 run_in_background 執行**, 完成時會收到通知, 不要輪詢。等待期間告訴使用者大概要等多久即可
-- stdout 最後一行是狀態 JSON, `status` 可能是: `waiting_feedback`、`build_failed`、`waiting_release_pick`、`done`、`error`、`paused`; `warnings` 非空(例如 push 失敗)要原文轉告使用者
+- stdout 最後一行是狀態 JSON, `status` 可能是: `waiting_feedback`、`build_failed`、`waiting_visual_list`、`waiting_visual_pick`、`waiting_release_pick`、`done`、`error`、`paused`; `warnings` 非空(例如 push 失敗)要原文轉告使用者
 
 ## 開場
 
@@ -65,7 +65,7 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 | 階段 | continue | next | back-deepen / back-explore | end |
 |---|---|---|---|---|
 | 探索 | 再探索一輪 | 進深掘 | — | 結束 |
-| 深掘 | 再深掘一輪 | 進打磨 | — | 結束 |
+| 深掘 | 再深掘一輪 | 進打磨(先跑一次視覺設計, 見下) | — | 結束 |
 | 打磨 | 再打磨一輪 | — | 退回深掘 / 探索 | 結束 |
 
 打磨另有 `release`(發布, 見下方「發布」), 訪談最後問「再打磨、退回、結束, 還是發布」。
@@ -73,6 +73,16 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 打磨階段固定在 `<專案>/polish/` 迭代(round_dir 永遠是 `polish`), 進入打磨後探索 / 深掘的資料夾會被流程刪除(git 有紀錄)。因為每輪共用同一個資料夾, 打磨第 N 輪(N ≥ 2)的回饋檔改叫 `feedback-N.md`, 免得蓋掉前幾輪的回饋。
 
 打磨階段 resume 之前: 到 `~/Downloads` 把本輪的 `gamelog-<專案資料夾名>-*.json` 搬到 `<round_dir>/logs/round-N/`(N = 打磨第幾輪, 只搬不整理); 一個都沒有就在回饋檔註明。
+
+### 視覺設計: 打磨前先定核心視覺元素的方向
+
+深掘選 `next` 後、打磨第一輪前跑一次(每個專案只跑一次; 進打磨後視覺意見走一般回饋)。設計見 `docs/2026-11-19-visual-design-stage-design.md`。
+
+1. **`waiting_visual_list`**: 讀 `elements`(`visual/elements.md`), 用白話列給使用者: 底版選了哪款、每個元素是什麼、為什麼是核心。使用者增刪或改內容 → 你直接改這份檔(格式見檔內, 代號英文小寫、類型只能 靜態 / 動態), 確認後 `resume <專案> --choice confirm`(不帶回饋檔)。之後美術每個元素出 3 個方案, 依序跑, 元素多時要一段時間, 背景執行
+2. **`waiting_visual_pick`**: 用 Artifact 發布 `options_page`(單一檔, 不用帶 files), 把連結給使用者; 動態方案在頁上按播放看。使用者回覆寫成 `visual/pick.md`, 每行「元素代號: 方案代號[, 附註]」, 每個元素都要有:
+   - 都定了 → `--choice pick --feedback visual/pick.md`, 寫出 `visual/direction.md` 後接打磨第一輪(背景執行)
+   - 某些元素都不喜歡 → 同格式只列那些元素、附註寫意見(方案代號可省), `--choice redo --feedback visual/pick.md`; 只重做列出的, 完成後用同一個檔路徑重新發布 Artifact(網址不變)
+   - Artifact 定案後保留, 使用者要刪再刪
 
 ### 每次流程停下來後: 經驗收件匣與規格同步
 

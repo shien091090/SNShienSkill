@@ -31,6 +31,7 @@ class LabState(TypedDict, total=False):
     target: str
     warnings: list
     release_warnings: list  # 發布定版時的提醒(例: 檔案超過網站上限)
+    visual_base: str        # 視覺設計定的打磨底版(例 deepen-2/game-b)
 
 
 class GameState(TypedDict, total=False):

@@ -9,11 +9,13 @@ CTX = {"project": "P", "stage": "explore", "round_dir": "explore-1", "round_no":
        "game": "game-a", "game_dir": "P/explore-1/game-a", "fix": "F", "report": "R", "out": "O",
        "roles": "art / rd", "bugs": "B", "feedback": "FB", "choice": "next",
        "release_dir": "P/release", "src_dir": "P/polish/game", "logs": "P/polish/logs", "tag": "T＋U", "pitch": "P", "name": "", "code": "c",
-       "intro": "I"}
+       "intro": "I", "visual_base": "無", "visual_dir": "P/visual", "base_dir": "P/deepen-1/game-a", "element": "title",
+       "element_name": "開始畫面", "element_kind": "anim", "element_content": "C", "element_why": "W", "redo_note": "無"}
 
 KINDS = [("design", s) for s in ("explore", "deepen", "polish")] + [
     (k, "explore") for k in ("art", "art-fix", "rd", "rd-fix", "audio", "audio-fix", "triage", "bugfix", "review")] + [
-    (k, "release") for k in ("release-game", "release-info", "release-art")]
+    (k, "release") for k in ("release-game", "release-info", "release-art")] + [
+    ("design", "visual"), ("visual-art", "visual")]
 
 
 @pytest.mark.parametrize("kind,stage", KINDS)

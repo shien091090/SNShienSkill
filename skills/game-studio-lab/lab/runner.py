@@ -24,7 +24,7 @@ AGENTS = {
     "art": "game-artist", "art-fix": "game-artist",
     "rd": "game-rd", "rd-fix": "game-rd", "bugfix": "game-rd",
     "audio": "game-audio", "audio-fix": "game-audio",
-    "release-game": "game-rd", "release-art": "game-artist",
+    "release-game": "game-rd", "release-art": "game-artist", "visual-art": "game-artist",
 }
 
 # 沒有 agent 的任務明確指定模型, 不吃 CLI 預設(預設可能被 managed settings 改掉)。

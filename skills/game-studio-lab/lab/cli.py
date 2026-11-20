@@ -22,6 +22,8 @@ from lab.graph import Deps, build_graph, round_label
 from lab.release import parse_release_info, parse_release_pick
 from lab.release_graph import build_release_graph
 from lab.state import STAGE_NAMES
+from lab.visual import parse_elements, parse_visual_pick
+from lab.visual_graph import VISUAL_DIR
 
 # 同時跑的 claude 上限; 記憶體吃緊時用 LAB_MAX_CONCURRENCY=1 改成一次一個
 CFG = {"configurable": {"thread_id": "main"},
@@ -34,6 +36,8 @@ FEEDBACK_CHOICES = {
 }
 FAILED_CHOICES = {"retry", "skip"}
 PICK_CHOICES = {"pick", "redo"}
+VISUAL_LIST_CHOICES = {"confirm"}
+VISUAL_PICK_CHOICES = {"pick", "redo"}
 RELEASE_CFG = {"configurable": {"thread_id": "release"}}
 
 
@@ -78,6 +82,12 @@ def report(project: Path, snap, error: str | None = None, warnings: list | None 
         elif v["kind"] == "waiting_release_pick":
             out["options_page"] = v["options_page"]
             out["allowed_choices"] = sorted(PICK_CHOICES)
+        elif v["kind"] == "waiting_visual_list":
+            out["elements"] = v["elements"]
+            out["allowed_choices"] = sorted(VISUAL_LIST_CHOICES)
+        elif v["kind"] == "waiting_visual_pick":
+            out["options_page"] = v["options_page"]
+            out["allowed_choices"] = sorted(VISUAL_PICK_CHOICES)
         else:
             out["failed"] = v["failed"]
             out["allowed_choices"] = sorted(FAILED_CHOICES)
@@ -86,24 +96,33 @@ def report(project: Path, snap, error: str | None = None, warnings: list | None 
     return out
 
 
-def commit_message(project: Path, before: dict, after: dict, status: str, choice: str | None) -> str:
+def commit_message(project: Path, before: dict, after: dict, status: str, choice: str | None,
+                   stop_kind: str | None = None) -> str:
+    """stop_kind: 這次 resume 前停在哪種停點; 視覺設計與發布都用 pick / redo, 靠它區分。"""
     name = project.name
     if status == "error":
         return f"[other] [{name}] 流程中途停止, 保留目前進度"
+    if stop_kind == "waiting_visual_list":
+        return f"[feat] [{name}] 視覺設計產出方案"
+    if stop_kind == "waiting_visual_pick" and choice == "redo":
+        return f"[feat] [{name}] 視覺設計重做方案"
     if choice == "fix":
         return f"[fix] [{name}] 修正{round_label(after['stage'], after['rounds'])}{after.get('target', '')}試玩回報的問題"
     release_msg = {"release": "產出發布用遊戲與素材方案", "redo": "重做發布素材方案", "pick": "發布素材定版",
                    "release-resume": "接續中斷的發布流程"}
-    if choice in release_msg:
+    visual_pick = stop_kind == "waiting_visual_pick"
+    if choice in release_msg and not visual_pick:
         return f"[feat] [{name}] {release_msg[choice]}"
-    parts = []
+    parts = ["視覺設計定案方向"] if visual_pick else []
     if not before.get("round_dir"):
         parts.append("建立專案")
     if choice in FAILED_CHOICES:
         parts.append(f"{round_label(after['stage'], after['rounds'])}建置失敗後"
                      f"{'重試' if choice == 'retry' else '略過失敗的款'}")
-    elif choice:
+    elif choice and not visual_pick:
         parts.append(f"{round_label(before['stage'], before['rounds'])}依試玩回饋檢討假設")
+    if status == "waiting_visual_list":
+        parts.append("視覺設計列出核心視覺元素")
     # 打磨固定同一個資料夾, 所以用輪次數判斷有沒有開新一輪, 不能只看資料夾名
     new_round = bool(after.get("round_dir")) and (
         after.get("round_dir") != before.get("round_dir")
@@ -124,7 +143,9 @@ def commit_message(project: Path, before: dict, after: dict, status: str, choice
 
 def run(project: Path, inp, choice: str | None = None, release: bool = False) -> dict:
     session = Session(project, make_deps(), release)
-    before = dict(session.snapshot().values or {})
+    first = session.snapshot()
+    before = dict(first.values or {})
+    stop_kind = first.interrupts[0].value["kind"] if first.interrupts else None
     error = None
     try:
         session.graph.invoke(inp, session.cfg)
@@ -135,7 +156,7 @@ def run(project: Path, inp, choice: str | None = None, release: bool = False) ->
     out = report(project, snap, error)
     if choice == "pick" and not error:
         out["warnings"].extend((snap.values or {}).get("release_warnings") or [])
-    msg = commit_message(project, before, dict(snap.values or {}), out["status"], choice)
+    msg = commit_message(project, before, dict(snap.values or {}), out["status"], choice, stop_kind)
     try:
         warn = Git().commit_push(project, msg)
     except Exception as e:  # noqa: BLE001
@@ -204,6 +225,15 @@ def cmd_resume(args) -> dict:
             check_user_file(args.feedback, parse_release_info)
     elif v["kind"] == "waiting_release_pick":
         check_pick(args)
+    elif v["kind"] == "waiting_visual_list":
+        if args.choice not in VISUAL_LIST_CHOICES:
+            raise SetupError("停在確認視覺元素清單, 只能選 confirm(依使用者意見改好 visual/elements.md 後)")
+        check_user_file(v["elements"], parse_elements)
+    elif v["kind"] == "waiting_visual_pick":
+        if args.choice not in VISUAL_PICK_CHOICES:
+            raise SetupError("停在挑視覺方案, 只能選 pick(交挑選結果)或 redo(重做指定元素)")
+        codes = [e["code"] for e in parse_elements((project / VISUAL_DIR / "elements.md").read_text(encoding="utf-8"))["elements"]]
+        check_user_file(args.feedback, lambda t: parse_visual_pick(t, codes, redo=args.choice == "redo"))
     elif args.choice not in FAILED_CHOICES:
         raise SetupError("建置失敗時只能選 retry 或 skip")
     ans = {"choice": args.choice}

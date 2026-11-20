@@ -47,6 +47,17 @@ class Lab:
     def resume(self, **ans):
         return self.call(Command(resume=ans))
 
+    def visual_pick(self, text="title: A\nhero: B, 再胖一點\n"):
+        p = self.project / "visual" / "pick.md"
+        p.write_text(text, encoding="utf-8")
+        return str(p)
+
+    def to_polish(self, deepen="deepen-1"):
+        """深掘選 next → 視覺設計確認清單 → 挑方案 → 打磨第一輪。"""
+        self.resume(choice="next", feedback=self.feedback(deepen))
+        self.resume(choice="confirm")
+        return self.resume(choice="pick", feedback=self.visual_pick())
+
     def feedback(self, round_dir):
         p = self.project / round_dir / "feedback.md"
         p.write_text("# 回饋\n", encoding="utf-8")
@@ -86,11 +97,20 @@ def test_full_path_explore_deepen_polish_end(tmp_path):
     assert interrupt_of(snap)["round_dir"] == "deepen-1"
     snap, _ = lab.resume(choice="next", feedback=lab.feedback("deepen-1"))
     v = interrupt_of(snap)
-    assert v["round_dir"] == "polish" and [g["id"] for g in v["games"]] == ["game"]
+    assert v["kind"] == "waiting_visual_list" and v["elements"].endswith("elements.md")
+    snap, err = lab.resume(choice="confirm")
+    v = interrupt_of(snap)
+    assert err is None and v["kind"] == "waiting_visual_pick" and Path(v["options_page"]).exists()
+    assert count(lab.runner, "visual-art") == 2 and count(lab.runner, "design") == 4
+    snap, err = lab.resume(choice="pick", feedback=lab.visual_pick())
+    v = interrupt_of(snap)
+    assert err is None and v["round_dir"] == "polish" and [g["id"] for g in v["games"]] == ["game"]
+    assert "再胖一點" in (lab.project / "visual" / "direction.md").read_text(encoding="utf-8")
+    assert snap.values["visual_base"] == "deepen-1/game-a"
     assert count(lab.runner, "audio", "polish") == 1
     # 進打磨後探索 / 深掘的資料夾都刪掉
     assert sorted(p.name for p in lab.project.iterdir() if p.is_dir() and not p.name.startswith(".")) \
-        == ["archive", "polish"]
+        == ["archive", "polish", "visual"]
     snap, err = lab.resume(choice="end", feedback=lab.feedback("polish"))
     assert err is None and snap.next == ()
     assert count(lab.runner, "review") == 4
@@ -102,7 +122,7 @@ def test_polish_can_go_back(tmp_path, choice, stage):
     lab = Lab(tmp_path, FakeRunner())
     lab.start()
     lab.resume(choice="next", feedback=lab.feedback("explore-1"))
-    lab.resume(choice="next", feedback=lab.feedback("deepen-1"))
+    lab.to_polish()
     snap, _ = lab.resume(choice=choice, feedback=lab.feedback("polish"))
     rd = interrupt_of(snap)["round_dir"]
     assert rd == f"{stage}-2"
@@ -112,7 +132,7 @@ def test_polish_iterates_in_same_folder(tmp_path):
     lab = Lab(tmp_path, FakeRunner())
     lab.start()
     lab.resume(choice="next", feedback=lab.feedback("explore-1"))
-    lab.resume(choice="next", feedback=lab.feedback("deepen-1"))
+    lab.to_polish()
     logs = lab.project / "polish" / "logs"
     logs.mkdir()
     (logs / "gamelog-a.json").write_text("{}", encoding="utf-8")
@@ -205,7 +225,7 @@ def test_polish_release_then_back_to_interview(tmp_path):
     lab = Lab(tmp_path, FakeRunner())
     lab.start()
     lab.resume(choice="next", feedback=lab.feedback("explore-1"))
-    lab.resume(choice="next", feedback=lab.feedback("deepen-1"))
+    lab.to_polish()
     info = lab.project / "polish" / "release-info.md"
     info.write_text("標籤: 收集＋閃避\n玩法: 點擊收集掉落的金幣\n代號: coin-rain\n介紹: 點擊收集掉落的金幣。\n", encoding="utf-8")
     snap, err = lab.resume(choice="release", feedback=str(info))
@@ -225,3 +245,53 @@ def test_polish_release_then_back_to_interview(tmp_path):
     # 再打磨一輪, release/ 不會被當成舊輪次資料夾刪掉
     snap, err = lab.resume(choice="continue", feedback=lab.feedback("polish"))
     assert err is None and snap.values["rounds"]["polish"] == 2 and (release / "assets" / "icon.png").exists()
+
+
+def test_visual_redo_only_listed(tmp_path):
+    lab = Lab(tmp_path, FakeRunner())
+    lab.start()
+    lab.resume(choice="next", feedback=lab.feedback("explore-1"))
+    lab.resume(choice="next", feedback=lab.feedback("deepen-1"))
+    lab.resume(choice="confirm")
+    opts = lab.project / "visual" / "options"
+    title_a = (opts / "title-A.js").stat().st_mtime_ns
+    snap, err = lab.resume(choice="redo", feedback=lab.visual_pick("hero: 換方向\n"))
+    assert err is None and interrupt_of(snap)["kind"] == "waiting_visual_pick"
+    assert count(lab.runner, "visual-art") == 3
+    assert (opts / "title-A.js").stat().st_mtime_ns == title_a
+    assert "換方向" in (opts / "hero-redo.md").read_text(encoding="utf-8")
+
+
+def test_visual_resume_skips_done(tmp_path):
+    lab = Lab(tmp_path, FakeRunner(fail_nth={"visual-art": 1}))   # 第 2 個元素當掉
+    lab.start()
+    lab.resume(choice="next", feedback=lab.feedback("explore-1"))
+    lab.resume(choice="next", feedback=lab.feedback("deepen-1"))
+    snap, err = lab.resume(choice="confirm")
+    assert err is not None
+    snap, err = lab.call(None)
+    assert err is None and interrupt_of(snap)["kind"] == "waiting_visual_pick"
+    assert count(lab.runner, "visual-art") == 3
+
+
+def test_visual_runs_once(tmp_path):
+    lab = Lab(tmp_path, FakeRunner())
+    lab.start()
+    lab.resume(choice="next", feedback=lab.feedback("explore-1"))
+    lab.to_polish()
+    snap, _ = lab.resume(choice="back-deepen", feedback=lab.feedback("polish"))
+    assert interrupt_of(snap)["round_dir"] == "deepen-2"
+    snap, err = lab.resume(choice="next", feedback=lab.feedback("deepen-2"))
+    v = interrupt_of(snap)
+    assert err is None and v["kind"] == "waiting_feedback" and v["round_dir"] == "polish"
+    assert count(lab.runner, "visual-art") == 2
+
+
+def test_visual_bad_pick_errors(tmp_path):
+    lab = Lab(tmp_path, FakeRunner())
+    lab.start()
+    lab.resume(choice="next", feedback=lab.feedback("explore-1"))
+    lab.resume(choice="next", feedback=lab.feedback("deepen-1"))
+    lab.resume(choice="confirm")
+    snap, err = lab.resume(choice="pick", feedback=lab.visual_pick("title: A\n"))
+    assert err is not None and "hero" in str(err)
