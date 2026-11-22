@@ -86,7 +86,7 @@ cd ~/.claude/skills/game-studio-lab && .venv/Scripts/python -m lab <子指令> .
 
 ### 每次流程停下來後: 經驗收件匣與規格同步
 
-- **經驗收件匣**: 無頭 `claude -p` 改不了 `~/.claude` 底下的檔(會被權限擋下, 直接回寫的經驗都會遺失), 所以節點把經驗提案寫到 `<專案>/.lab/lessons-inbox/<目標檔名>`。每次流程停下來就審收件匣: 照目標經驗文件的規則(只收跨遊戲通則、先找同類合併、art-lessons 的理念升降規則)併進本 skill 的 `references/`, 不合格的丟掉; 處理完刪掉收件匣檔案, 照 commit 規範 commit `~/.claude`(系統名 `game-studio-lab`)。在專案裡的收件匣檔不必另外 commit 刪除, 下一次流程跑完會一起 commit
+- **經驗收件匣**: 無頭 `claude -p` 改不了 `~/.claude` 底下的檔(會被權限擋下, 直接回寫的經驗都會遺失), 所以節點把經驗提案寫到 `<專案>/.lab/lessons-inbox/<目標檔名>`。每次流程停下來就審收件匣: 照目標經驗文件的規則(只收跨遊戲通則、先找同類合併、art-lessons 的理念升降規則)併進本 skill 的 `references/`, 不合格的丟掉; 處理完刪掉收件匣檔案, 照 commit 規範 commit 並 push `~/.claude`(系統名 `game-studio-lab`), 直接做不用先問使用者(使用者已明確授權)。在專案裡的收件匣檔不必另外 commit 刪除, 下一次流程跑完會一起 commit
   - 經驗文件很大(art-lessons 上百 KB), 在主對話讀會擠掉訪談要用的 context, 所以交給背景子代理做, 你同時讓使用者去試玩。交代子代理: 收件匣與目標檔路徑、先讀目標檔開頭的收錄規則、用搜尋找同類條目不整份讀、提案涉及改 `prompts/` 或 agent 定義的只回報不改、`~/.claude` 工作區常有不相干的修改所以只 `git add` 改到的經驗文件、讀 commit 規範後 commit 並 push、回報每條的處置
   - 改到本 skill 的檔案時 commit 會被 skill-audit 關卡擋下(子代理不能代使用者挑項目): 由你跑 `skill-gate:skill-audit`, 讓使用者挑完、照擋下訊息蓋章後再 commit
 - **規格同步**: RD(含修 bug)不改 spec.md。回報裡若列出「規格要同步的內容」(例: 修 bug 加了關卡物件), 由你照它更新 `<round_dir>/<款>/spec.md`, 讓下一輪設計讀到的是實際狀態
