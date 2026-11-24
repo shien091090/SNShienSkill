@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { buildBoard, daysUntil, isCompanyEdition, parseLsRemote, parseSheet, shortDate } from './release'
+import { buildBoard, daysUntil, isCompanyEdition, jwtClaims, parseLsRemote, parseSheet, parseSheetRows, parsePkcs8, rsaSign, shortDate, signJwt, TOKEN_URL } from './release'
 
 const LS = [
   'b66ee4f6bdeccebf197167959e48955850b4badb\trefs/heads/master',
@@ -76,4 +76,46 @@ test('剩幾天以當地日期計算, 日期顯示成 月/日', () => {
 test('從 plugins-src 載入的是自家電腦, 其他都算公司版', () => {
   expect(isCompanyEdition('C:\\Users\\me\\.claude\\plugins-src\\dashboard')).toBe(false)
   expect(isCompanyEdition('C:\\Users\\me\\.claude\\plugins\\cache\\lobby-agent-client\\dashboard\\1.1.0')).toBe(true)
+})
+
+test('送審日表用 API 讀到的列與 CSV 解析結果一致', () => {
+  const rows = [['Version', 'DateTime'], ['3.130', 'N/A'], ['3.140', '10/27'], ['3.142', '2026/11/30'], ['3.143']]
+  expect(parseSheetRows(rows, 2026)).toEqual({ '3.130': null, '3.140': '2026-10-27', '3.142': '2026-11-30', '3.143': null })
+})
+
+// 測試專用的 1024 位元金鑰(只用在這裡, 不對應任何帳號); 簽章是用 Python cryptography 對同一把金鑰算出的標準答案
+const TEST_KEY_DER = [
+  'MIICdQIBADANBgkqhkiG9w0BAQEFAASCAl8wggJbAgEAAoGBAKlgWTTN9x/GvPd+',
+  '1HY4awYLDijdk5YVIet7gXJMr+vkklzsT036BPWQd3M3kF/vIGAqV9pMQoTtRUQa',
+  'konw4RFEZ84JCIlnKVUeCU8drupLM4v4x7yy7/4xyoDk8mdU/6V9aknvHMLYpH82',
+  'BKeJwptKG1tHCQ7p3sw2cxhoX/brAgMBAAECgYBMyJ7oL08Omrvjvx12EpGCBdT/',
+  'daOIcEAWTsEaHeXKnK41bfNtuCAzarCcDN5ofzFAJzH4hoXJWP8DpsAzxH1i57Ne',
+  'MZfz1fi6Zznt6pLyyt90NGBfwzR2z5FwLdOfptJt6sOmlc6Ht+9su2oWqdzjIwTG',
+  'HveEzGgqmu05JewZoQJBANVPFFsoExu6E29gZXi+ny3wFCNNeNOmQRoZsmZ8YQ/S',
+  'KsDXtluB/u/4VmOoYnmXcoERmZh38GFy7jXizqaoYmMCQQDLRmCKYAKkmDd/cBW0',
+  'lDi6XBo1A4bci8a+LdGemk4Tzb4KF2p/RuUl1zg4lL4TU35moxIuQEwdkR3kyPwg',
+  '1XvZAkAhkeJ4PiRTtsMcQiV2DTnr9t6Ud7rORFn2i5jB/E0iOkc0Nj6ixCClD4Y5',
+  'BOUKkcUZfvWXQzj3fSj0Hg+7tsBVAkBMxqMWAJde9YMYpgv8rXMTqE/ZsCBS0pRZ',
+  'JlMjFWLiBfZ+N0PpGKzZ8wTwEfYMtJ9sQrFOOMjG7hWdYPAhsqBZAkBpvi7ROGif',
+  '7rml4bx8Oa0y5KGmq4a9R6zsfnKGyc3tHK3oZ7+ojT1GAxrQJfpT9kq6oFfikVhl',
+  'nE+seyeBqsDz',
+].join('')
+const TEST_SIG = '081812a27bae39af64281c08696fec907981610a5064f2fc3629189986d33d1eb58d403c096f010aed7c2140f536e6df73cd1a8b5318c0360780f56ab1e806e5594088c5803ad550adf26fa70f7ddeafbafeba252b0b42d45f67d1a8f6756ccd2d1c18abd0c0a853b72058eafc8773e7df63c4f2485c0c14d6ba71aa5cb30b96'
+
+test('RSA 簽章與標準實作一致(RSASSA-PKCS1-v1_5 + SHA-256)', async () => {
+  const key = parsePkcs8(Uint8Array.fromBase64(TEST_KEY_DER))
+  const sig = await rsaSign(key, new TextEncoder().encode('dashboard-test'))
+  expect(sig.toHex()).toBe(TEST_SIG)
+})
+
+test('service account JWT: 三段式, 宣告帶唯讀 scope 與 1 小時效期, 簽在前兩段上', async () => {
+  const pem = `-----BEGIN PRIVATE KEY-----\n${TEST_KEY_DER.replace(/(.{64})/g, '$1\n')}\n-----END PRIVATE KEY-----\n`
+  const jwt = await signJwt({ client_email: 'bot@example.iam.gserviceaccount.com', private_key: pem }, 1_000)
+  const [head, body, sig] = jwt.split('.')
+  const claims = JSON.parse(new TextDecoder().decode(Uint8Array.fromBase64(body!, { alphabet: 'base64url' })))
+  expect(claims).toEqual(jwtClaims('bot@example.iam.gserviceaccount.com', 1_000))
+  expect(claims.aud).toBe(TOKEN_URL)
+  expect(claims.exp - claims.iat).toBe(3600)
+  const expected = await rsaSign(parsePkcs8(Uint8Array.fromBase64(TEST_KEY_DER)), new TextEncoder().encode(`${head}.${body}`))
+  expect(Uint8Array.fromBase64(sig!, { alphabet: 'base64url' }).toHex()).toBe(expected.toHex())
 })

@@ -3,7 +3,11 @@ import type { EngineInterface, Register, SessionContextUsage, SessionRateLimit }
 
 import type { Gauge, ReleaseBoard, ReleaseEntry, Tokens, UnityProject } from '../types'
 import { TAG_CHARS, TOAST_SCRIPT, toastText } from './notify'
-import { buildBoard, daysUntil, isCompanyEdition, LOBBY_REPO, parseLsRemote, parseSheet, shortDate, SUBMISSION_CSV } from './release'
+import {
+  buildBoard, daysUntil, DEFAULT_CREDENTIALS, isCompanyEdition, LOBBY_REPO, parseLsRemote, parseSheet, parseSheetRows,
+  shortDate, signJwt, SUBMISSION_CSV, SUBMISSION_SHEET_VALUES, TOKEN_URL,
+} from './release'
+import type { ServiceAccount } from './release'
 import { addTodo, parseTodos, removeTodo, todayText } from './todo'
 
 const gauges = atom({ plugin: 'dashboard', key: 'gauges' } as const, [] as Gauge[])
@@ -327,19 +331,74 @@ const RELEASE_KEY = 'release'
 // master 最新 commit 沒有 tag 時沿用的 tag
 const MASTER_TAG_KEY = 'masterTag'
 
+// 上次讀到的送審日表; 這次讀不到就沿用, 版號照樣更新
+const SHEET_KEY = 'submissionSheet'
+// service account 換到的 token, 到期前 5 分鐘重換
+let sheetToken: { value: string; expiresAt: number } | null = null
+
+async function credentialsPath($: EngineInterface): Promise<string> {
+  const fromEnv = await $.env.get('GOOGLE_SHEETS_CREDENTIALS')
+  if (fromEnv) return fromEnv
+  const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME')) ?? ''
+  return `${home.replace(/\\/g, '/')}/${DEFAULT_CREDENTIALS}`
+}
+
+async function serviceAccountToken($: EngineInterface, account: ServiceAccount): Promise<string> {
+  if (sheetToken && Date.now() < sheetToken.expiresAt) return sheetToken.value
+  const assertion = await signJwt(account, Math.floor(Date.now() / 1000))
+  const res = await $.http.fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')}&assertion=${assertion}`,
+  })
+  if (!res.ok) throw new Error(`送審日表換 token HTTP ${res.status}`)
+  const { access_token, expires_in } = JSON.parse(res.text) as { access_token: string; expires_in: number }
+  sheetToken = { value: access_token, expiresAt: Date.now() + (expires_in - 300) * 1000 }
+  return access_token
+}
+
+// 有 service account 憑證就用它讀; 沒有就退回公開 CSV(表若重新公開也讀得到)
+async function fetchSheet($: EngineInterface): Promise<Record<string, string | null>> {
+  const year = new Date().getFullYear()
+  const path = await credentialsPath($)
+  if (!(await $.fs.exists(path))) {
+    const csv = await $.http.fetch(SUBMISSION_CSV)
+    if (!csv.ok) throw new Error(`送審日表 HTTP ${csv.status}(找不到憑證 ${path})`)
+    return parseSheet(csv.text, year)
+  }
+  const account = JSON.parse(String(await $.fs.read(path))) as ServiceAccount
+  const token = await serviceAccountToken($, account)
+  const res = await $.http.fetch(SUBMISSION_SHEET_VALUES, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) {
+    if (res.status === 401) sheetToken = null
+    throw new Error(`送審日表 HTTP ${res.status}`)
+  }
+  return parseSheetRows((JSON.parse(res.text) as { values?: string[][] }).values ?? [], year)
+}
+
 async function refreshRelease($: EngineInterface) {
   try {
-    const [git, sheet] = await Promise.all([
+    const [git, fetched] = await Promise.all([
       $.process.run(['git', 'ls-remote', LOBBY_REPO, 'refs/heads/master', 'refs/tags/*'], {
         env: { GIT_TERMINAL_PROMPT: '0' },
         timeoutMs: 30_000,
       }),
-      $.http.fetch(SUBMISSION_CSV),
+      fetchSheet($).catch((err: unknown) => err instanceof Error ? err : new Error(String(err))),
     ])
     if (git.exitCode !== 0) throw new Error(git.stderr.trim() || `git ls-remote 結束碼 ${git.exitCode}`)
-    if (!sheet.ok) throw new Error(`送審日表 HTTP ${sheet.status}`)
+    let sheet: Record<string, string | null>
+    if (fetched instanceof Error) {
+      // 表讀不到時沿用上次的送審日, 免得版號跟著卡住
+      const cached = (await $.store.get(SHEET_KEY)) as Record<string, string | null> | undefined
+      if (!cached) throw fetched
+      $.ui.log(`送審日表讀取失敗, 沿用上次的送審日: ${fetched.message}`, { to: 'debug' })
+      sheet = cached
+    } else {
+      sheet = fetched
+      await $.store.set(SHEET_KEY, sheet)
+    }
     const last = (await $.store.get(MASTER_TAG_KEY)) as string | undefined
-    const board = buildBoard(parseLsRemote(git.stdout), parseSheet(sheet.text, new Date().getFullYear()), last ?? null)
+    const board = buildBoard(parseLsRemote(git.stdout), sheet, last ?? null)
     if (board.masterTag) await $.store.set(MASTER_TAG_KEY, board.masterTag)
     const next: ReleaseBoard = { current: board.current, others: board.others, fetchedAt: Date.now(), isStale: false }
     await $.store.set(RELEASE_KEY, next)

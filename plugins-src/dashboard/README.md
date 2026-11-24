@@ -7,7 +7,9 @@
 - 有連 Unity MCP 時顯示目前開著的 Unity 專案
 - 「Todo」按鈕: 讀寫 `~/.claude/TODO.md` 的個人待辦(一筆一行 `- [ ] 內容 (YYYY-MM-DD)`)
 - 回應完成時跳出 Windows 通知
-- (公司版)進測中的 Lobby 版本與送審日: 第一行是 master 的版本、送審日與剩幾天, 第二行是其他進測中的版本。版號用 `git ls-remote` 問 GitLab 上的 Lobby repo(要能連公司 GitLab), 送審日讀公開的送審日 Google Sheet, 只列表上有的版本; 每 30 分鐘更新一次
+- (公司版)進測中的 Lobby 版本與送審日: 第一行是 master 的版本、送審日與剩幾天, 第二行是其他進測中的版本。版號用 `git ls-remote` 問 GitLab 上的 Lobby repo(要能連公司 GitLab), 送審日讀送審日 Google Sheet, 只列表上有的版本; 每 30 分鐘更新一次
+  - 送審日表不公開, 用訂版 skill(cli-prepare-release)的 service account 憑證讀: 環境變數 `GOOGLE_SHEETS_CREDENTIALS` 指的檔案, 沒設就找 `~/.claude/credentials/client-agent-495603-66436678d81c.json`(做過訂版首次設定就有)。找不到憑證時改讀公開匯出網址, 表沒公開就會失敗
+  - 送審日表讀不到時沿用上次讀到的送審日, 版號照樣更新; GitLab 也連不到(沒開 VPN 等)才保留舊資料, 並在第一行後面標出是多久前的
 
 ## 安裝
 

@@ -5,6 +5,106 @@ export const LOBBY_REPO = 'https://git-game.yile808.com/lobbygroup/Lobby.git'
 export const SUBMISSION_CSV =
   'https://docs.google.com/spreadsheets/d/1Zj2zg1ifRDeWRuIWA5ZRBhZj3zYeyZYEA3L3xgTYORs/export?format=csv&gid=1866154823'
 
+// 送審日表已不公開, 改用訂版 skill(cli-prepare-release)的 service account 讀; 這個帳號已被共用到送審日表
+export const SUBMISSION_SHEET_VALUES =
+  'https://sheets.googleapis.com/v4/spreadsheets/1Zj2zg1ifRDeWRuIWA5ZRBhZj3zYeyZYEA3L3xgTYORs/values/Sheet1'
+// 環境變數 GOOGLE_SHEETS_CREDENTIALS 沒設時的預設位置(訂版 skill 首次設定放的地方), 相對於家目錄
+export const DEFAULT_CREDENTIALS = '.claude/credentials/client-agent-495603-66436678d81c.json'
+export const TOKEN_URL = 'https://oauth2.googleapis.com/token'
+const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly'
+
+export type ServiceAccount = { client_email: string; private_key: string }
+
+const b64url = (bytes: Uint8Array) => bytes.toBase64({ alphabet: 'base64url', omitPadding: true })
+const b64urlJson = (value: unknown) => b64url(new TextEncoder().encode(JSON.stringify(value)))
+
+// service account 的 JWT 宣告: 換 token 用, 有效 1 小時(Google 允許的上限)
+export function jwtClaims(email: string, nowSec: number) {
+  return { iss: email, scope: SHEETS_SCOPE, aud: TOKEN_URL, iat: nowSec, exp: nowSec + 3600 }
+}
+
+// PEM(PKCS#8) → 原始 bytes
+export function pemToBytes(pem: string): Uint8Array {
+  return Uint8Array.fromBase64(pem.replace(/-----[^-]+-----/g, '').replace(/\s+/g, ''))
+}
+
+// plugin 環境的 crypto.subtle 只有 digest, 沒有 importKey / sign, 所以 RSA 簽章用 BigInt 自己算
+
+export type RsaKey = { n: bigint; d: bigint; p: bigint; q: bigint; dp: bigint; dq: bigint; qi: bigint }
+
+const toBig = (bytes: Uint8Array) => bytes.length === 0 ? 0n : BigInt(`0x${bytes.toHex()}`)
+
+// 讀一個 DER 元素: 回傳標籤、內容與下一個元素的位置
+function derRead(buf: Uint8Array, at: number): { tag: number; body: Uint8Array; end: number } {
+  const tag = buf[at]!
+  let len = buf[at + 1]!
+  let pos = at + 2
+  if (len & 0x80) {
+    const count = len & 0x7f
+    len = 0
+    for (let i = 0; i < count; i++) len = len * 256 + buf[pos + i]!
+    pos += count
+  }
+  return { tag, body: buf.subarray(pos, pos + len), end: pos + len }
+}
+
+// 依序取出 SEQUENCE 內的元素
+function derItems(seq: Uint8Array) {
+  const items: { tag: number; body: Uint8Array }[] = []
+  for (let at = 0; at < seq.length;) {
+    const item = derRead(seq, at)
+    items.push(item)
+    at = item.end
+  }
+  return items
+}
+
+// PKCS#8 PrivateKeyInfo → 裡面的 RSAPrivateKey(n, e, d, p, q, dp, dq, qi)
+export function parsePkcs8(der: Uint8Array): RsaKey {
+  const info = derItems(derRead(der, 0).body)
+  const rsa = derItems(derRead(info[2]!.body, 0).body).map(i => toBig(i.body))
+  const [, n, , d, p, q, dp, dq, qi] = rsa
+  return { n: n!, d: d!, p: p!, q: q!, dp: dp!, dq: dq!, qi: qi! }
+}
+
+function modPow(base: bigint, exp: bigint, mod: bigint): bigint {
+  let result = 1n
+  let b = base % mod
+  for (let e = exp; e > 0n; e >>= 1n) {
+    if (e & 1n) result = (result * b) % mod
+    b = (b * b) % mod
+  }
+  return result
+}
+
+// SHA-256 的 DigestInfo 前綴(RFC 8017 9.2)
+const SHA256_PREFIX = Uint8Array.fromHex('3031300d060960864801650304020105000420')
+
+// RSASSA-PKCS1-v1_5 + SHA-256: EM = 00 01 FF..FF 00 DigestInfo, 再用 CRT 算 EM^d mod n
+export async function rsaSign(key: RsaKey, data: Uint8Array): Promise<Uint8Array> {
+  const k = key.n.toString(16).replace(/^0+/, '').length + 1 >> 1
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', data))
+  const t = new Uint8Array([...SHA256_PREFIX, ...digest])
+  const em = new Uint8Array(k).fill(0xff)
+  em[0] = 0
+  em[1] = 1
+  em[k - t.length - 1] = 0
+  em.set(t, k - t.length)
+  const m = toBig(em)
+  const m1 = modPow(m, key.dp, key.p)
+  const m2 = modPow(m, key.dq, key.q)
+  const h = (key.qi * ((m1 - m2) % key.p + key.p)) % key.p
+  const s = m2 + h * key.q
+  return Uint8Array.fromHex(s.toString(16).padStart(k * 2, '0'))
+}
+
+// 用 service account 私鑰簽 RS256 JWT
+export async function signJwt(account: ServiceAccount, nowSec: number): Promise<string> {
+  const head = `${b64urlJson({ alg: 'RS256', typ: 'JWT' })}.${b64urlJson(jwtClaims(account.client_email, nowSec))}`
+  const sig = await rsaSign(parsePkcs8(pemToBytes(account.private_key)), new TextEncoder().encode(head))
+  return `${head}.${b64url(sig)}`
+}
+
 // 從 plugins-src 載入的是維護者自家電腦; 其他(市集安裝)都算公司版
 export const isCompanyEdition = (root: string) => !root.replace(/\\/g, '/').includes('/plugins-src/')
 
@@ -52,11 +152,16 @@ function compareNums(a: number[], b: number[]): number {
 
 const minorRank = (minor: string) => minor.split('.').map(Number)
 
-// 送審日表: 版本 → YYYY-MM-DD; 沒寫年份補今年, N/A 或讀不懂的是 null
+// 送審日表(公開 CSV 匯出): 交給 parseSheetRows
 export function parseSheet(csv: string, year: number): Record<string, string | null> {
+  return parseSheetRows(csv.split(/\r?\n/).map(line => line.split(',')), year)
+}
+
+// 送審日表: 第一列是標題, 之後每列 [版本, 日期] → YYYY-MM-DD; 沒寫年份補今年, N/A 或讀不懂的是 null
+export function parseSheetRows(rows: string[][], year: number): Record<string, string | null> {
   const result: Record<string, string | null> = {}
-  for (const line of csv.split(/\r?\n/).slice(1)) {
-    const [version, raw] = line.split(',').map(s => s.trim())
+  for (const row of rows.slice(1)) {
+    const [version, raw] = row.map(s => String(s ?? '').trim())
     if (!version || !/^\d+\.\d+$/.test(version)) continue
     const m = (raw ?? '').match(/^(?:(\d{4})\/)?(\d{1,2})\/(\d{1,2})$/)
     result[version] = m
