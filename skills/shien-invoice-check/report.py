@@ -55,13 +55,26 @@ for inv in d["matched"]:
     if inv.get("discount"):
         r = inv["discount"]
         disc = f' <span class="disc">（{discount_label(r["rate"])}後 {money(r["amount"])} 已入帳）</span>'
-    elif inv.get("matchedBy") == "group":
+    elif inv.get("matchedBy") in ("group", "crossday-group"):
         disc = f' <span class="disc">（同店合計 {money(inv["groupTotal"])} 已入帳）</span>'
+    if inv.get("matchedBy", "").startswith("crossday"):
+        rec = inv["records"][0]
+        disc += f' <span class="disc">（記在 {e(rec["date"][5:10])}「{e(rec["content"])}」）</span>'
     match_rows.append(
         f'<tr><td class="date">{inv["date"][5:]}</td><td class="store">{e(inv["storeName"])}</td><td class="no">{e(inv["invoiceNo"])}</td>'
         f'<td class="num">{money(inv["netAmount"])}{disc}</td></tr>')
 
 miss_total = sum(i["netAmount"] for i in d["missing"])
+
+# 頁尾拆成短字串: Python 3.8 讀含大量中文的超長行會誤報 Non-UTF-8
+FOOTER = (
+    "比對邏輯：只用對帳區間內的記帳。第一輪逐日：① 同日記帳中單筆金額精確相符；② "
+    "其餘以 exact subset sum 找一組同日記帳加總相符者補配；③ 仍未"
+    "對到、同日同一家店的多張發票，加總相符一筆記帳者視為合記。第二輪跨日：第一輪對不"
+    "到的發票，在區間內其他天找單筆同金額（或同店合計）的記帳，取日期最接近者，表中會"
+    "標出記在哪天。折扣商家（如新知喬 95 折）會同時嘗試原金額與折扣後金額。金額無"
+    "法對齊時標記為可能漏記，請人工確認。"
+)
 
 page = f'''<title>對帳報告 {d["start"][:7]}</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -146,7 +159,7 @@ footer {{ color: var(--muted); font-size: 13px; max-width: 65ch; }}
     <summary>已比對 {len(d["matched"])} 張</summary>
     <div class="scroll"><table class="list"><thead><tr><th>日期</th><th>賣方名稱</th><th>發票號碼</th><th class="num">淨額</th></tr></thead><tbody>{"".join(match_rows)}</tbody></table></div>
   </details>
-  <footer>比對邏輯（三段式 ± 1 日）：① 先找當日與前一日記帳中單筆金額精確相符者；② 其餘以 exact subset sum 找一組記帳加總相符者補配；③ 仍未對到、同日同一家店的多張發票，加總相符一筆記帳者視為合記。折扣商家（如新知喬 95 折）會同時嘗試原金額與折扣後金額。金額無法對齊時標記為可能漏記，請人工確認。</footer>
+  <footer>{FOOTER}</footer>
 </div></main>
 <script>
 document.querySelectorAll("tr.row").forEach(function (r) {{
