@@ -3,7 +3,8 @@
     "allow": [
       "Bash(.venv/Scripts/python -m lab *)",
       "Bash(PYTHONIOENCODING=utf-8 python -W ignore D:/Git/lobby-agent-client/Skills/Lobby/LobbySetting/backstage-lobby-setting/scripts/lobby_setting.py:*)",
-      "Bash(python -W ignore D:/Git/lobby-agent-client/Skills/Lobby/LobbySetting/backstage-lobby-setting/scripts/lobby_setting.py:*)"
+      "Bash(python -W ignore D:/Git/lobby-agent-client/Skills/Lobby/LobbySetting/backstage-lobby-setting/scripts/lobby_setting.py:*)",
+      "Bash(node C:/Users/lithoshu/.claude/plugins-src/skill-gate/skills/skill-audit/gate.js --stamp *)"
     ],
     "defaultMode": "auto"
   },
