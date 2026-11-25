@@ -7,7 +7,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const run = (cmd) => execSync(cmd, { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] }).toString().trim();
+// PYTHONIOENCODING: Windows Python prints in the ANSI code page by default, which mangles non-ASCII folder names (e.g. a Chinese video title)
+const run = (cmd) => execSync(cmd, { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, PYTHONIOENCODING: 'utf-8' } }).toString().trim();
 const win = process.platform === 'win32';
 
 // prerequisites: stop with one readable line instead of a stack trace

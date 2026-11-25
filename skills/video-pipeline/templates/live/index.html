@@ -44,6 +44,7 @@
   .opt:hover { border-color: var(--mute); }
   .opt:focus-visible { outline: 3px solid var(--pick); outline-offset: 2px; }
   .opt.on { border-color: var(--pick); }
+  .opt .cap { padding: 7px 10px 8px; font-weight: 700; font-size: 13px; line-height: 1.35; text-align: left; color: var(--ink); }
   .opt .badge { position: absolute; left: 6px; top: 6px; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 13px; background: var(--ink); color: var(--panel); font-weight: 900; font-size: 14px; line-height: 26px; text-align: center; z-index: 2; }
   .opt.on .badge { background: var(--pick); color: #0b2a33; }
   .vp { position: relative; width: 100%; aspect-ratio: var(--ar, 1); max-width: 100%; overflow: hidden; background: #ffffff; }
@@ -133,8 +134,9 @@
 <script>
   // Rows with options; Claude rewrites this each round from film.js OPTIONS: one row per keyframe that has options.
   // seg: [from, to] seconds to loop instead of the keyframe's own window (optional).
+  // names (optional): one short caption per option, shown under its preview
   const ROWS = [
-    { id: "k1", label: "K1 片名進場", options: ["a", "b", "c"] },
+    { id: "k1", label: "K1 片名進場", options: ["a", "b", "c"], names: { a: "淡入上移", b: "放大彈入", c: "從左滑入" } },
     { id: "k2", label: "K2 片名退場", options: ["a", "b", "c"] },
   ];
   const BADGE = { 0: "原", x: "無", p: "前" };
@@ -283,7 +285,7 @@
       b.className = "opt";
       b.id = `opt-${r.id}-${key}`;
       b.setAttribute("aria-label", `${r.label} ${keyName(key)}`);
-      b.innerHTML = `<span class="badge">${keyName(key)}</span><div class="vp"><div class="host"></div></div>`;
+      b.innerHTML = `<span class="badge">${keyName(key)}</span><div class="vp"><div class="host"></div></div>${r.names && r.names[key] ? `<div class="cap">${r.names[key]}</div>` : ""}`;
       optsEl.appendChild(b);
       optEls[key] = b;
       const pk = { ...picks, [r.id]: key };
@@ -505,19 +507,23 @@
     }
   }
 
-  async function apply(next) {
+  // focusId: after rebuilding, jump the main player to that keyframe (a click on an option);
+  // otherwise (picks arriving from the db) keep playing from where it was instead of restarting at 0
+  async function apply(next, focusId) {
     const changed = JSON.stringify(next) !== JSON.stringify(picks);
     picks = next;
     paint();
-    if (!changed) return;
-    await mount(main, picks);
+    if (!changed && !focusId) return;
+    const was = main.film ? (paused ? pausedAt : ((performance.now() - main.t0) / 1000) % main.film.total) : 0;
+    if (changed) await mount(main, picks);
+    if (main.film) seekTo(focusId ? Math.max(0, main.film.starts[focusId] - 0.4) : Math.min(was, main.film.total - 0.01));
     for (const p of players) if (p !== main) { const pk = { ...picks, [p.kid]: p.key }; if (JSON.stringify(pk) !== JSON.stringify(p.pk || {})) { p.pk = pk; mount(p, pk); } }
   }
 
   async function choose(id, key) {
     const next = { ...picks, [id]: key };
     setPaused(false);
-    await apply(next);
+    await apply(next, id);
     if (db) { try { await db.doc("picks/current").set(next); } catch (e) {} }
   }
 

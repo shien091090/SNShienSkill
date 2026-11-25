@@ -8,7 +8,8 @@
   // Output formats. picks.fmt selects one; the first is the main format the options are judged in.
   const FORMATS = {
     sq: { W: 1080, H: 1080 },  // IG
-    por: { W: 1080, H: 1920 }, // Reels/Threads/TikTok/Shorts/website
+    por: { W: 1080, H: 1920 }, // Reels/Threads/TikTok/Shorts
+    wide: { W: 1280, H: 720 }, // 網站介紹影片 (例: PVD 試玩頁「30 秒介紹」彈窗)
   };
   const fmtOf = (picks) => (FORMATS[picks && picks.fmt] ? picks.fmt : Object.keys(FORMATS)[0]);
   const size = (picks) => FORMATS[fmtOf(picks)];
@@ -72,6 +73,13 @@
     const sfx = [];
     // a sound cue sits at the picture event that causes it; id is stable across retimes (sfxcues adds @frame)
     const cue = (kind, t, o = {}) => sfx.push({ kind, t, id: o.id || kind, ...o });
+    // always use this instead of tl.fromTo: a property set only in the "from" vars (e.g. autoAlpha:1 to reveal) is not
+    // re-applied when the timeline plays again after seeking back, so it is copied into the "to" vars as well.
+    const fromTo = (tg, from, to, pos) => {
+      const t2 = { ...to, immediateRender: false };
+      for (const k in from) if (!(k in t2)) t2[k] = from[k];
+      return tl.fromTo(tg, from, t2, pos);
+    };
 
     // initial states, set explicitly so seeking backwards and looping replay the same
     tl.set($("#title"), { opacity: 0, y: 40 }, 0);
@@ -79,8 +87,8 @@
     // ===== K1 · 片名進場 =====
     {
       const s = starts.k1, k = pick("k1");
-      if (k === "b") tl.fromTo($("#title"), { opacity: 0, scale: 1.4 }, { opacity: 1, scale: 1, y: 0, duration: 0.6, ease: "back.out(2)", immediateRender: false }, s);
-      else if (k === "c") tl.fromTo($("#title"), { opacity: 0, x: -200 }, { opacity: 1, x: 0, y: 0, duration: 0.5, ease: "power3.out", immediateRender: false }, s);
+      if (k === "b") fromTo($("#title"), { opacity: 0, scale: 1.4 }, { opacity: 1, scale: 1, y: 0, duration: 0.6, ease: "back.out(2)", immediateRender: false }, s);
+      else if (k === "c") fromTo($("#title"), { opacity: 0, x: -200 }, { opacity: 1, x: 0, y: 0, duration: 0.5, ease: "power3.out", immediateRender: false }, s);
       else tl.to($("#title"), { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, s);
       cue("title", s + 0.1);
     }

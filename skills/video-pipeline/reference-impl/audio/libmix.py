@@ -7,69 +7,40 @@ The review page offers alternatives per sound moment (moments.py); picks.json ho
 usage: python libmix.py              -> out/sfx-lib.wav from picks.json + tune.json (missing = defaults)
        python libmix.py --options    -> live/sfx/*.wav clips + live/sfxopts.js for the review page
 """
-import json, pathlib
+import json, os, pathlib, subprocess
 import numpy as np, soundfile as sf, pyloudnorm as pyln
 from scipy.signal import resample_poly
 
 HERE = pathlib.Path(__file__).parent
-LIB = HERE / "lib"
+# the sample library: SFX_LIB, else the folder named in libpath.txt (a library shared with an earlier video), else ./lib
+_lp = HERE / "libpath.txt"
+LIB = pathlib.Path(os.environ.get("SFX_LIB") or (_lp.read_text(encoding="utf-8").strip() if _lp.exists() else HERE / "lib"))
+# gameplay recordings for "rec/<file>:<start s>" layers (the game's own sound under a cut); REC_DIR overrides
+REC = pathlib.Path(os.environ.get("REC_DIR", r"E:\Project\Videos\_素材\遊戲實機"))
+FFMPEG = json.loads((HERE.parent / "video.config.json").read_text(encoding="utf-8"))["ffmpeg"]
 SR = 48000
 TARGET = -18.0  # effects-only track: sparse hits, so integrated loudness sits lower
+# "game" points at the featured game's own sound folder; the path below is 接力吉尼's on the original machine — change it per video
 K = {"lab": "lab", "mk": "mixkit", "ui": "interface-sounds/Audio", "imp": "impact-sounds/Audio", "cas": "casino-audio/Audio",
-     "rpg": "rpg-audio/Audio", "dig": "digital-audio/Audio", "oga": "oga/swishes/swishes", "air": "oga"}
+     "rpg": "rpg-audio/Audio", "dig": "digital-audio/Audio", "oga": "oga/swishes/swishes", "air": "oga",
+     "game": "E:/Project/Game/WebGame_GhostEchoV2/release/game/audio/assets"}  # 接力吉尼自己的音效 (CC0)
 
 # cue id -> list of layers: (file, loudness LUFS of that layer on its own, offset s, options)
 # options: semi = pitch shift, cut = (start, length) slice of the sample, hp = high-pass Hz, len = max length s
-PLAN = {
-    "title:0@17":          [("ui/maximize_007", -21, 0, {})],
-    "spread@98":           [("air/air-whoosh.wav", -22, -0.15, {"cut": (1.6, 1.0)})],
-    "focus:ring@161":      [("cas/card-slide-3", -27, 0, {})],
-    "focus-hit:ring@169":  [("imp/impactPlate_light_000", -18, 0, {})],
-    "tile:3@217":          [("cas/card-fan-1", -20, 0, {})],
-    "play:wan@274":        [("ui/toggle_002", -25, 0, {})],
-    "focus:check@386":     [("cas/card-slide-5", -27, 0, {})],
-    "focus-hit:check@395": [("ui/confirmation_003", -18, 0, {})],
-    "wall-down@468":       [("imp/impactWood_medium_002", -18, 0, {})],
-    "vote:text@497":       [("ui/select_004", -21, 0, {})],
-    "votes@507":           [("cas/chips-handle-2", -21, 0, {})],
-    "fun:jump@531":        [("ui/confirmation_002", -17, 0, {})],
-    "chips-fly@634":       [("cas/card-slide-2", -27, 0, {})],
-    "chip-in:0@641":       [("cas/chips-collide-3", -23, 0, {})],
-    "chip-in:5@665":       [("cas/chips-stack-5", -25, 0, {})],
-    "r2-in@701":           [("cas/card-slide-7", -28, 0, {})],
-    "votes@719":           [("cas/chips-handle-1", -22, 0, {})],
-    "chip-in:0@835":       [("cas/chips-collide-1", -23, 0, {})],
-    "chip-in:5@859":       [("cas/chips-stack-2", -25, 0, {})],
-    "hero-zoom@902":       [("air/air-whoosh.wav", -24, -0.1, {"cut": (2.0, 0.7)})],
-    "stamp@938":           [("imp/impactPunch_heavy_002", -13, 0, {}), ("rpg/bookPlace2", -18, 0, {})],
-    "focus:gear@1025":     [("cas/card-slide-4", -27, 0, {})],
-    "focus-hit:gear@1033": [("rpg/metalLatch", -19, 0, {})],
-    "gear:1@1047":         [("rpg/metalClick", -24, 0, {})],
-    "screen-in@1104":      [("cas/card-slide-1", -27, 0, {})],
-    "crack@1123":          [("imp/impactGlass_heavy_001", -19, 0, {})],
-    "shards@1178":         [("imp/impactGlass_light_002", -22, 0, {})],
-    "transform@1247":      [("ui/glass_004", -21, 0, {})],
-    "hero-jump@1269":      [("dig/phaseJump5", -25, 0, {})],
-    "coin:0@1284":         [("dig/powerUp6", -21, 0, {"semi": 0})],
-    "coin:1@1295":         [("dig/powerUp6", -20, 0, {"semi": 2})],
-    "coin:2@1321":         [("dig/powerUp6", -19, 0, {"semi": 4})],
-    "enemy-land@1355":     [("imp/impactSoft_heavy_001", -16, 0, {})],
-    "sword-draw@1359":     [("rpg/drawKnife3", -21, 0, {})],
-    "leap@1380":           [("oga/swish-9", -21, -0.05, {})],
-    "slash-hit@1388":      [("rpg/knifeSlice2", -13, -0.03, {}), ("imp/impactPunch_medium_002", -14, 0, {})],
-    "enemy-puff@1399":     [("rpg/cloth1", -25, 0, {})],
-    "3d-swing@1464":       [("air/air-whoosh.wav", -20, -0.2, {"cut": (1.2, 2.6)})],
-    "steam-win@1607":      [("ui/maximize_002", -21, 0, {})],
-    "steam-seat@1649":     [("ui/switch_003", -20, 0, {})],
-    "box-up@1766":         [("cas/card-slide-8", -25, 0, {})],
-    "lid@1822":            [("rpg/bookClose", -16, 0, {})],
-    "sparkle:0@1863":      [("ui/glass_004", -21, 0, {})],
-    "lockup@1954":         [("imp/impactBell_heavy_000", -18, 0, {})],
-}
+from moments import PLAN  # the default ("0") layers live next to the moments
 
 
 def load(name, o):
     pre, rest = name.split("/", 1)
+    if pre == "rec":  # a slice of a gameplay recording's own audio: "rec/bubble-tempo.mp4:52.65", o["len"] seconds
+        f, t = rest.rsplit(":", 1)
+        n = o.get("len", 0.4)
+        raw = subprocess.run([FFMPEG, "-v", "error", "-ss", t, "-i", str(REC / f), "-t", str(n), "-vn", "-ac", "1", "-ar", str(SR),
+                              "-f", "f32le", "-"], capture_output=True, check=True).stdout
+        x = np.frombuffer(raw, np.float32).astype(np.float64).copy()
+        f1, f2 = int(0.01 * SR), int(0.06 * SR)
+        x[:f1] *= np.linspace(0, 1, f1); x[-f2:] *= np.linspace(1, 0, f2)
+        return x / (np.abs(x).max() + 1e-9)
     if pre == "ov":  # Openverse files are named by id; the plan gives an id prefix
         p = next((LIB / "ov").glob(rest + "*"))
     else:
@@ -167,7 +138,7 @@ def cue_times():
         k = kind(e["id"]); n = seen.get(k, 0); seen[k] = n + 1
         old = names.get(k, [])
         at[old[n] if n < len(old) else e["id"]] = e["f"] / cues["fps"]
-    return at, cues["total"] / cues["fps"]
+    return at, cues["total"]  # sfxcues.mjs writes total in seconds
 
 
 def check():
@@ -218,8 +189,18 @@ def render():
     tf = HERE / "tune.json"
     tune = json.loads(tf.read_text(encoding="utf-8")) if tf.exists() else {}
     plan = plan_for(picks, tune)
-    mix, lufs = master(raw_mix(plan, at, total))
+    # the same gain the review page's clips were made with (the default mix brought to TARGET), so the picked
+    # sounds keep the levels the user heard them at against the music; no re-normalising of the picked mix
+    meter = pyln.Meter(SR)
+    d = raw_mix(plan_for({}), at, total)
+    gain = 10 ** ((TARGET - meter.integrated_loudness(np.stack([d, d], 1))) / 20)
+    m = raw_mix(plan, at, total) * gain
+    mix = limit(np.stack([m, m], 1))
+    fade = int(0.8 * SR)
+    mix[-fade:] *= np.linspace(1, 0, fade)[:, None]
+    lufs = meter.integrated_loudness(mix)
     out = HERE / "out" / "sfx-lib.wav"
+    out.parent.mkdir(exist_ok=True)
     sf.write(out, mix, SR, subtype="PCM_24")
     print(f"{out}  picks={picks} tune={tune} events={sum(len(v) for v in plan.values())} "
           f"lufs={lufs:.2f} peak={20*np.log10(np.abs(mix).max()):.2f}dBFS")

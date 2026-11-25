@@ -18,7 +18,7 @@ const ff = spawn(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-fram
   '-c:v', 'libx264', '-profile:v', 'high', '-pix_fmt', 'yuv420p', '-crf', '16', '-preset', 'medium', '-movflags', '+faststart', out],
   { stdio: ['pipe', 'inherit', 'inherit'] });
 for (let f = 0; f < n; f++) {
-  await p.evaluate((t) => { FILM.tl.seek(t, false); }, f / fps);
+  await p.evaluate(async (t) => { FILM.tl.seek(t, false); if (FILM.settle) await FILM.settle(); }, f / fps);
   const buf = await p.screenshot({ type: 'jpeg', quality: 95 });
   if (!ff.stdin.write(buf)) await new Promise((r) => ff.stdin.once('drain', r));
   if (f % 150 === 0) console.log(`${f}/${n}`);

@@ -6,7 +6,7 @@ const [,, picks = '{}', prefix, ...ts] = process.argv;
 if (!prefix || !ts.length) { console.error("usage: node tools/shot.mjs '<picks JSON>' out-prefix t1 [t2 ...]"); process.exit(2); }
 const { b, p } = await openFilm(picks);
 for (const t of ts) {
-  await p.evaluate((x) => { FILM.tl.seek(x, false); }, +t);
+  await p.evaluate(async (x) => { FILM.tl.seek(x, false); if (FILM.settle) await FILM.settle(); }, +t);
   await p.screenshot({ path: `${prefix}_${t}.png` });
 }
 await b.close();
