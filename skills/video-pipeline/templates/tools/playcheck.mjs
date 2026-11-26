@@ -7,14 +7,15 @@ import { CFG, ROOT, puppeteer } from './env.mjs';
 const [A, B] = [Number(process.argv[2] ?? 0), Number(process.argv[3] ?? 10)];
 const SEL = process.argv[4] || '#main canvas';
 const LIVE = path.join(ROOT, 'live');
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mp4': 'video/mp4', '.json': 'application/json', '.css': 'text/css' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mp4': 'video/mp4', '.json': 'application/json', '.css': 'text/css' };
 const srv = http.createServer((q, r) => {
   const f = path.join(LIVE, decodeURIComponent(q.url.split('?')[0]));
   if (!f.startsWith(LIVE) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { r.writeHead(404); return r.end(); }
   r.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(r);
 }).listen(0);
 const port = srv.address().port;
-const b = await puppeteer.launch({ executablePath: CFG.chrome });
+// 預設用渲染工具的無頭 Chrome; 設 PLAYCHECK_CHROME 指到一般 Chrome 可測一般瀏覽器的影片播放 (無頭版的影片播放不一定照實)
+const b = await puppeteer.launch({ executablePath: process.env.PLAYCHECK_CHROME || CFG.chrome, headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
 const p = await b.newPage(); await p.setViewport({ width: 1400, height: 900 });
 const cdp = await p.createCDPSession();
 await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 40, downloadThroughput: 4e6, uploadThroughput: 1e6 });

@@ -189,7 +189,8 @@
     if (!p.vp.clientWidth) { p.waiting = pk; return; }
     p.waiting = null;
     if (p.film) p.film.tl.kill();
-    p.film = VID.build(p.host, FMT ? { ...pk, fmt: FMT } : pk);
+    // 方案預覽傳 _preview: film.js 可據此減輕預覽的負擔 (例: 遊戲片段不播放只偶爾跳格, 把解碼留給主播放器)
+    p.film = VID.build(p.host, { ...pk, ...(FMT ? { fmt: FMT } : {}), ...(p === main ? {} : { _preview: 1 }) });
     p.t0 = performance.now();
     if (p === main && p.film.warm) p.film.warm();
     fit(p);
