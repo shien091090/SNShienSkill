@@ -211,6 +211,14 @@
   }
 
   const isRender = () => !!root.VID_RENDER;
+  // 審閱頁: 開頁就把所有片段整支下載成 blob (所有播放器共用), 下載完 index.html 才建影片、從頭播。
+  // 邊播邊下載的話第一次播全黑, 快閃段跳格跟不上會停在舊畫面 (馬戲團介紹影片踩過)
+  const BLOB = {};
+  let clipsLoaded = 0;
+  const clipsReady = isRender() ? Promise.resolve() : Promise.all(Object.keys(CLIPS).map((id) => (BLOB[id] = fetch(`clips/${id}.mp4`)
+    .then((r) => r.blob()).then((b) => URL.createObjectURL(b)).catch(() => `clips/${id}.mp4`)
+    .then((u) => { clipsLoaded++; return (BLOB[id] = u); }))));
+  root.VID_CLIPS = { ready: clipsReady, progress: () => [clipsLoaded, Object.keys(CLIPS).length] };
   const pad4 = (n) => String(n).padStart(4, "0");
 
   function build(host, picks = {}) {
@@ -273,7 +281,7 @@
         let v = vids[cvId + clipId];
         if (!v) {
           v = vids[cvId + clipId] = document.createElement("video");
-          v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = `clips/${clipId}.mp4`;
+          v.muted = true; v.playsInline = true; v.preload = "auto"; Promise.resolve(BLOB[clipId]).then((u) => { v.src = u; });
           v.addEventListener("seeked", () => { if (want[cvId] && want[cvId].startsWith(clipId + ":")) ctx.drawImage(v, 0, 0, cv.width, cv.height); });
           v.addEventListener("loadedmetadata", () => { v.currentTime = v._t || 0; });
         }
