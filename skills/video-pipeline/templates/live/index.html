@@ -188,11 +188,10 @@
     // title collapses into one spot, so wait until the player is laid out (the ResizeObserver resumes it)
     if (!p.vp.clientWidth) { p.waiting = pk; return; }
     p.waiting = null;
-    if (p.film) p.film.tl.kill();
-    // 方案預覽傳 _preview: film.js 可據此減輕預覽的負擔 (例: 遊戲片段不播放只偶爾跳格, 把解碼留給主播放器)
+    if (p.film) { p.film.tl.kill(); if (p.film.dispose) p.film.dispose(); }
+    // 方案預覽傳 _preview: 不預先解碼後面的格, 把解碼留給主播放器
     p.film = VID.build(p.host, { ...pk, ...(FMT ? { fmt: FMT } : {}), ...(p === main ? {} : { _preview: 1 }) });
     p.t0 = performance.now();
-    if (p === main && p.film.warm) p.film.warm();
     fit(p);
     if (p.onMount) p.onMount();
   }
@@ -270,7 +269,7 @@
 
   function dropPlayer(p) {
     p.seq = (p.seq || 0) + 1; // cancels a mount still waiting on fonts
-    if (p.film) p.film.tl.kill();
+    if (p.film) { p.film.tl.kill(); if (p.film.dispose) p.film.dispose(); }
     p.host.innerHTML = "";
     ro.unobserve(p.vp);
     io.unobserve(p.vp);

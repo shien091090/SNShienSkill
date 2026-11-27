@@ -58,7 +58,7 @@ node tools/setup.mjs   # 裝 headless Chrome、puppeteer、Python 音訊套件�
 1. 依使用者的敘述重新拆關鍵幀(可以拆細或合併), 貼成表給使用者確認: 編號、名稱、開始秒數、長度、內容一句話。長度加總 = 總時長。使用者確認才寫程式
 2. **每個關鍵幀做 3~4 個方案**(a/b/c/d)。方案之間要是不同的點子(進場方式、運鏡、構圖、節奏), 不是同一招換參數
 3. 這階段**不加音效、不加音樂**
-4. 每個方案寫完用 `node tools/shot.mjs '{"k3":"b"}' renders/k3b 2.1 2.6` 截幾格, 再用 `node tools/sheet.mjs renders/sheet.jpg <png...>` 拼成一張總覽圖一次看完, 確認沒有破圖、文字溢出、元素跑出安全區(`platforms.md`)。每組方案再跑 `node tools/replaycheck.mjs '<picks>'` 確認重播不掉圖(`film-contract.md`)。審閱頁改完跑 `node tools/pagecheck.mjs` 確認沒有 JS 錯誤才發布; 有遊戲片段的再跑 `node tools/playcheck.mjs <起秒> <迄秒>` 涵蓋片段最密的段落, 在限速網路下實際播放, 黑畫面要是 0、停格不超過鏡頭長度; 環境變數 `PLAYCHECK_CHROME` 指到一般 Chrome 的執行檔(無頭版的影片播放不照實)
+4. 每個方案寫完用 `node tools/shot.mjs '{"k3":"b"}' renders/k3b 2.1 2.6` 截幾格, 再用 `node tools/sheet.mjs renders/sheet.jpg <png...>` 拼成一張總覽圖一次看完, 確認沒有破圖、文字溢出、元素跑出安全區(`platforms.md`)。每組方案再跑 `node tools/replaycheck.mjs '<picks>'` 確認重播不掉圖(`film-contract.md`)。審閱頁改完跑 `node tools/pagecheck.mjs` 確認沒有 JS 錯誤才發布; 有遊戲片段的再跑 `node tools/playcheck.mjs <起秒> <迄秒>` 涵蓋片段最密的段落, 在限速網路下實際播放, 黑畫面與「遊戲畫面慢一拍」都要是 0; 環境變數 `PLAYCHECK_CHROME` 指到一般 Chrome 的執行檔, 最接近使用者實際看的情況
 5. 改 `live/index.html` 的 ROWS(含每個方案的一句話說明 `names`)與 KF_DESC, 發布審閱頁(`review-page.md`), 把網址給使用者
 
 ## 階段 3 畫面迭代

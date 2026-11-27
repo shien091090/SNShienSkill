@@ -24,8 +24,10 @@ await p.goto(`http://localhost:${port}/index.html`, { waitUntil: 'load' });
 await p.waitForFunction(() => document.getElementById('loadmsg').hidden, { timeout: 180000 });
 console.log('片段下載完', ((Date.now() - t0) / 1000).toFixed(1), '秒');
 await new Promise((r) => setTimeout(r, 1500));
+let stats = null;
 const samples = await p.evaluate(async (A, B, SEL) => {
   document.getElementById('replay').click();
+  window.VID_STATS = { draws: 0, stale: [] };
   const cv = document.querySelector(SEL), tmp = document.createElement('canvas'); tmp.width = 64; tmp.height = 36;
   const x = tmp.getContext('2d', { willReadFrequently: true });
   const out = [];
@@ -41,13 +43,15 @@ const samples = await p.evaluate(async (A, B, SEL) => {
     }
     await new Promise((r) => setTimeout(r, 100));
   }
-  return out;
-}, A, B, SEL);
+  return { out, st: window.VID_STATS };
+}, A, B, SEL).then((r) => { stats = r.st; return r.out; });
 let black = 0, run = 1, worst = [0, 0];
 for (let i = 0; i < samples.length; i++) {
   if (samples[i][1] < 8) black++;
   if (i && samples[i][2] === samples[i - 1][2]) { run++; if (run > worst[0]) worst = [run, samples[i - run + 1][0]]; } else run = 1;
 }
 console.log(`取樣 ${samples.length} 格, 黑畫面 ${black} 格, 畫面最長沒變 ${worst[0]} 格 (約 ${(worst[0] * 0.1).toFixed(1)} 秒, 從 ${worst[1]} 秒起)`);
+// 主播放器畫遊戲畫面時, 該畫的格還沒準備好的次數 (審閱頁用圖片格時才有)
+if (stats && stats.draws) console.log(`畫面更新 ${stats.draws} 次, 遊戲畫面慢一拍 ${stats.stale.length} 次` + (stats.stale.length ? ' (' + [...new Set(stats.stale.map((t) => t.toFixed(1)))].slice(0, 20).join(', ') + ' 秒)' : ''));
 await b.close(); srv.close();
 if (black > 0) process.exit(1);

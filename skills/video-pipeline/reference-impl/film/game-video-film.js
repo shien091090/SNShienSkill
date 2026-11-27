@@ -4,8 +4,8 @@
 //
 // 馬戲團 (WebGame_DungeonZoo) 30 秒介紹 (PVD 網站 trailer, 1280×720, 60fps)。
 // 實機畫面走「片段」: 兩個畫面框 L / R, 各有一張畫布; reel 記錄每段時間畫哪個片段的第幾格 (60fps 格號)。
-// 審閱頁讀 clips/<id>.mp4 (640 寬全關鍵格), 渲染 (test.html 設 VID_RENDER) 讀 ../media/<id>.mp4 (2 倍解析度);
-// 每次 seek 後 FILM.settle() 等影片跳到那一格並畫上畫布。片段格數與主角位置在 clipdata.js (tools/clips.mjs 產生)。
+// 審閱頁畫 frames/<id>.jpg 的圖片格 (640 寬 30fps, tools/frames.mjs), 渲染 (test.html 設 VID_RENDER) 讀 ../media/<id>.mp4 (2 倍解析度);
+// 每次 seek 後 FILM.settle() 等那一格畫上畫布。片段格數與主角位置在 clipdata.js (tools/clips.mjs 產生)。
 (function (root) {
   const FORMATS = {
     wide: { W: 1280, H: 720 }, // PVD 網站試玩頁「30 秒介紹」彈窗
@@ -81,21 +81,46 @@
   const fontsFor = (picks) => ['900 60px "Noto Sans TC"', '700 40px "Noto Sans TC"'];
 
   const isRender = () => !!root.VID_RENDER;
-  // 審閱頁畫布 1920 寬: 放大的鏡頭才不會被畫布解析度限制住
-  const CW = () => (isRender() ? 2560 : 1920), CH = () => (isRender() ? 1440 : 1080);
+  // 審閱頁的遊戲畫面只有 640 寬, 畫布 1280 就夠
+  const CW = () => (isRender() ? 2560 : 1280), CH = () => (isRender() ? 1440 : 720);
   // 片段上要蓋掉的遊戲提示: [x, y, w, h, 往左取幾 px 的地板蓋上去] (1280×720 座標); 從同一張畫面複製, 顏色才會一模一樣
   const PATCH = { im: [[548, 645, 190, 62, 230]] };
 
-  // 審閱頁: 開頁就把所有片段整支下載成 blob, 所有播放器共用; 下載完才開始播 (邊播邊下載會黑畫面、跳格跟不上)
-  const BLOB = {};
-  // 影片有用到的片段 (審閱頁只下載這些, 也只發布這些)
-  const USED = ["dunA", "showA", "chest2", "kill", "cap1", "cap8", "cap3", "cap4", "im", "show5", "setup", "loose"];
-  const clipIds = USED.filter((id) => (root.CLIPDATA || {})[id]);
+  // 審閱頁的遊戲畫面: 不用 <video> (跳格慢、同時太多個瀏覽器會停掉 → 卡頓、整段不見), 改用 tools/frames.mjs
+  // 預先轉好的 JPEG 格 (640 寬 30fps, 只有影片用到的格)。開頁整包下載, 要畫時才解碼, 解好的格所有播放器共用
+  const FD = root.FRAMEDATA || {};
+  const clipIds = Object.keys(FD);
+  const PACK = {}, BMP = new Map(), DEC = new Map(), WAIT = new Set();
+  const BMP_MAX = 260; // 解好的格最多留幾張 (640×360 一張約 0.9MB)
   let clipsLoaded = 0;
-  const clipsReady = isRender() ? Promise.resolve() : Promise.all(clipIds.map((id) => (BLOB[id] = fetch(`clips/${id}.mp4`)
-    .then((r) => r.blob()).then((b) => URL.createObjectURL(b)).catch(() => `clips/${id}.mp4`)
-    .then((u) => { clipsLoaded++; return (BLOB[id] = u); }))));
+  const clipsReady = isRender() ? Promise.resolve() : Promise.all(clipIds.map((id) => fetch(`frames/${id}.jpg`)
+    .then((r) => r.arrayBuffer()).then((ab) => { PACK[id] = ab; }).catch(() => {}).then(() => { clipsLoaded++; })));
   root.VID_CLIPS = { ready: clipsReady, progress: () => [clipsLoaded, clipIds.length] };
+  // 片段 id 的第 j 格 (30fps) 最接近且有轉出來的格號
+  function nearJ(id, j) {
+    const ix = FD[id];
+    if (!ix || !ix.length) return -1;
+    let lo = 0, hi = ix.length - 1;
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (ix[m][0] <= j) lo = m; else hi = m - 1; }
+    return lo;
+  }
+  // 拿解好的格; 沒解好就開始解 (解好後通知 WAIT 裡的播放器重畫), 回傳 null
+  function frameBmp(id, k) {
+    const key = id + ":" + k;
+    const b = BMP.get(key);
+    if (b) { BMP.delete(key); BMP.set(key, b); return b; }
+    if (!DEC.has(key) && PACK[id]) {
+      const [, off, len] = FD[id][k];
+      DEC.set(key, createImageBitmap(new Blob([new Uint8Array(PACK[id], off, len)], { type: "image/jpeg" })).then((bm) => {
+        BMP.set(key, bm);
+        while (BMP.size > BMP_MAX) { const [k0, b0] = BMP.entries().next().value; BMP.delete(k0); b0.close && b0.close(); }
+        DEC.delete(key);
+        WAIT.forEach((fn) => fn());
+        return bm;
+      }, () => { DEC.delete(key); return null; }));
+    }
+    return null;
+  }
 
   // ===== K10 猴子小劇場 (非遊戲畫面) =====
   // 猴子: 原點在腳底中央, 面朝前; 右邊那隻外層用 scale(-1,1) 翻面。表情三組 (N 平常 / S 驚訝 / A 生氣) 用透明度切換
@@ -333,38 +358,48 @@
       pending.add(new Promise((r) => v._res.push(r)));
       if (v.readyState >= 1) v.currentTime = t;
     }
-    // slot: 審閱頁每一段鏡頭用自己的 <video> (先跳到該段開頭等著), 換鏡頭時不必臨時跳格, 才不會在切換前停頓
-    // 審閱頁: 鏡頭裡的影片直接用 play() 照該段速度播放, 偏太多才跳格 (每格都跳格的話, 瀏覽器一次跳格要幾十毫秒,
-    // 加上審閱頁同時有很多預覽在跑, 換鏡頭時會停頓); 渲染照舊每格精準跳格 + settle()
-    const active = { L: null, R: null }, lastT = { L: -1, R: -1 };
-    let prevT = -1;
-    function liveFrame(P, r, slot, t) {
+    // 審閱頁: 畫預先轉好的圖片格 (見檔頭 frameBmp); 還沒解好就先留著上一張, 解好再補畫
+    const shown = { L: null, R: null }, wantK = { L: null, R: null };
+    function paintBmp(P, clipId, bm) {
+      const cv = canv[P], ctx = cv.getContext("2d");
+      ctx.drawImage(bm, 0, 0, cv.width, cv.height);
+      const k = cv.width / 1280;
+      for (const [x, y, w, h, dx] of PATCH[clipId] || []) ctx.drawImage(cv, (x - dx) * k, y * k, w * k, h * k, x * k, y * k, w * k, h * k);
+    }
+    function liveFrame(P, r, t) {
       const clipId = r.clip, c = CL[clipId] || { n: 1 };
       const f = Math.max(0, Math.min(c.n - 1, r.f0 + ((r.f1 - r.f0) * (t - r.t0)) / (r.t1 - r.t0)));
       hero[P] = c.pos ? c.pos[Math.min(c.pos.length - 1, Math.floor(f) >> 1)] : null;
-      const vk = clipId + "#" + slot, v = getVid(vk, clipId), T = (f + 0.5) / 60;
-      v._live = true;
-      if (active[P] && active[P] !== v) active[P].pause();
-      active[P] = v;
-      const rate = (r.f1 - r.f0) / 60 / (r.t1 - r.t0), dt = t - lastT[P];
-      lastT[P] = t;
-      // 方案預覽 (畫面小、同時很多個) 不播放, 只每 0.25 秒跳一次格, 把解碼留給主播放器
-      const playing = !PREVIEW && dt > 0 && dt < 0.1 && rate > 0.01;
-      if (v.readyState >= 1) {
-        if (playing) {
-          if (Math.abs(v.playbackRate - rate) > 0.001) v.playbackRate = rate;
-          if (Math.abs(v.currentTime - T) > 0.2 && !v.seeking) v.currentTime = T;
-          if (v.paused) v.play().catch(() => {});
-        } else {
-          if (!v.paused) v.pause();
-          if (Math.abs(v.currentTime - T) > (PREVIEW ? 0.25 : 0.02) && !v.seeking) v.currentTime = T;
+      const k = nearJ(clipId, Math.round(f / 2));
+      if (k < 0) return;
+      const key = clipId + ":" + k;
+      wantK[P] = key;
+      if (shown[P] === key) return;
+      const bm = frameBmp(clipId, k);
+      if (bm) { paintBmp(P, clipId, bm); shown[P] = key; return; }
+      // 還沒解好: 渲染檢查工具 (settle) 要等它; 播放中先留著上一張
+      const d = DEC.get(key);
+      if (d) pending.add(d);
+    }
+    // 有格解好時: 每個畫框若還在等那一格就補畫
+    const onDecoded = () => {
+      for (const P of ["L", "R"]) {
+        const key = wantK[P];
+        if (!key || shown[P] === key) continue;
+        const bm = BMP.get(key);
+        if (bm) { paintBmp(P, key.slice(0, key.lastIndexOf(":")), bm); shown[P] = key; }
+      }
+    };
+    if (!isRender()) WAIT.add(onDecoded);
+    // 主播放器: 往後 0.8 秒會用到的格先解好
+    function prefetch(t) {
+      for (const r of reel) {
+        if (r.t1 < t || r.t0 > t + 0.8) continue;
+        const a = Math.max(t, r.t0), b = Math.min(t + 0.8, r.t1);
+        for (let x = a; x <= b; x += 1 / 30) {
+          const f = r.f0 + ((r.f1 - r.f0) * (x - r.t0)) / (r.t1 - r.t0), k = nearJ(r.clip, Math.round(f / 2));
+          if (k >= 0) frameBmp(r.clip, k);
         }
-      } else v._t = T;
-      if (v.readyState >= 2) {
-        const cv = canv[P], ctx = cv.getContext("2d");
-        ctx.drawImage(v, 0, 0, cv.width, cv.height);
-        const k = cv.width / 1280;
-        for (const [x, y, w, h, dx] of PATCH[clipId] || []) ctx.drawImage(cv, (x - dx) * k, y * k, w * k, h * k, x * k, y * k, w * k, h * k);
       }
     }
     function drawFrame(P, clipId, f, slot) {
@@ -391,17 +426,14 @@
         v.muted = true; v.playsInline = true; v.preload = "auto"; v._res = []; v._t = 0;
         const done = () => { const rs = v._res; v._res = []; rs.forEach((r) => r()); };
         v.addEventListener("seeked", () => {
-          // 跳到的格子先畫上 (播放中目標一直往前, 等完全對上才畫會停在舊畫面), 沒對上再跳一次
-          // 審閱頁播放中的影片 (_live) 由 liveFrame 控制, 不追 _t (否則會一直被拉回預熱時的位置, 一直在跳格)
-          if (v._live) { done(); return; }
+          // 跳到的格子先畫上, 沒對上再跳一次
           if (v._paint) v._paint();
           if (Math.abs(v.currentTime - v._t) > 0.002) { v.currentTime = v._t; return; }
           done();
         });
         v.addEventListener("loadedmetadata", () => { v.currentTime = v._t; });
         v.addEventListener("error", done);
-        if (isRender()) v.src = `../media/${clipId}.mp4`;
-        else Promise.resolve(BLOB[clipId]).then((u) => { v.src = u || `clips/${clipId}.mp4`; });
+        v.src = `../media/${clipId}.mp4`; // 只有渲染用影片; 審閱頁用圖片格
       }
       return v;
     }
@@ -426,20 +458,17 @@
         if (done.has(r.P) || t < r.t0 || t >= r.t1) continue;
         done.add(r.P);
         if (isRender()) drawFrame(r.P, r.clip, r.f0 + ((r.f1 - r.f0) * (t - r.t0)) / (r.t1 - r.t0), i);
-        else liveFrame(r.P, r, i, t);
+        else liveFrame(r.P, r, t);
       }
       if (!isRender()) {
-        for (const P of ["L", "R"]) if (!done.has(P) && active[P]) { active[P].pause(); active[P] = null; }
-        // 下一段鏡頭的影片提早 0.35 秒開始播 (play() 要一點時間才真的動起來), 切過去時已經在動
-        const playing = t - prevT > 0 && t - prevT < 0.1;
-        prevT = t;
-        if (playing && !PREVIEW) reel.forEach((r, i) => {
-          if (t < r.t0 - 0.35 || t >= r.t0 || r.f1 === r.f0) return;
-          const v = getVid(r.clip + "#" + i, r.clip), rate = (r.f1 - r.f0) / 60 / (r.t1 - r.t0);
-          if (v.readyState < 1 || !v.paused || v.seeking) return;
-          v._live = true;
-          v.playbackRate = rate; v.currentTime = Math.max(0, (r.f0 + 0.5) / 60 - (r.t0 - t) * rate); v.play().catch(() => {});
-        });
+        for (const P of ["L", "R"]) if (!done.has(P)) wantK[P] = null;
+        if (!PREVIEW) {
+          prefetch(t);
+          // 給 tools/playcheck.mjs: 主播放器有幾次該畫的格還沒解好 (畫面暫時停在上一張)
+          const st = (root.VID_STATS = root.VID_STATS || { draws: 0, stale: [] });
+          st.draws++;
+          for (const P of ["L", "R"]) if (wantK[P] && shown[P] !== wantK[P]) st.stale.push(+t.toFixed(2));
+        }
       }
       applyPan("L"); applyPan("R");
       drawFin();
@@ -1160,10 +1189,11 @@
     const fast = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v / SPEED]));
     return {
       tl: out, total: total / SPEED, starts: fast(starts), durs: fast(durs), film,
+      reel: reel.map((r) => ({ clip: r.clip, f0: r.f0, f1: r.f1 })),
       sfx: sfx.map((c) => ({ ...c, t: c.t / SPEED })),
       // 渲染工具每次 seek 後等這個: 每個畫布的影片跳到那一格並畫好
-      // 審閱頁主播放器: 先把每段要用的片段影片建好、跳到該段開頭, 第一次播到時不必臨時載入
-      warm: () => { reel.forEach((r, i) => seekVid(getVid(r.clip + "#" + i, r.clip), (r.f0 + 0.5) / 60, () => {})); },
+      // 審閱頁: 播放器換掉時不再收「格解好了」的通知
+      dispose: () => WAIT.delete(onDecoded),
       settle: async () => { drawAll(); while (pending.size) { const ps = [...pending]; pending.clear(); await Promise.all(ps); } },
     };
   }
